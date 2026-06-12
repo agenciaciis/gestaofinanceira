@@ -29,7 +29,8 @@ export interface Entity {
   ownerUid: string;
   whatsappConfig?: WhatsAppConfig;
   collaborators?: Collaborator[];
-  collaboratorsEmails?: string[]; // For easier querying
+  collaboratorsEmails?: string[]; // For easier querying (todos os colaboradores)
+  collaboratorsAdminEmails?: string[]; // Apenas colaboradores com papel 'admin' (escrita)
 }
 
 export interface BankAccount {

@@ -83,17 +83,35 @@ async function startServer() {
   // WhatsApp Webhook
   app.post('/api/whatsapp/webhook', async (req, res) => {
     if (!db) return res.sendStatus(500);
-    console.log('WhatsApp Webhook received:', JSON.stringify(req.body, null, 2));
-    
-    const { event, data } = req.body;
 
-    if (event === 'messages.upsert') {
+    // Segredo compartilhado opcional: se WHATSAPP_WEBHOOK_TOKEN estiver definido,
+    // exige o token (header x-webhook-token ou ?token=) para aceitar o webhook.
+    const expectedToken = process.env.WHATSAPP_WEBHOOK_TOKEN;
+    if (expectedToken) {
+      const provided = (req.headers['x-webhook-token'] as string) || (req.query.token as string) || '';
+      if (provided !== expectedToken) {
+        console.warn('WhatsApp Webhook: token inválido, requisição rejeitada.');
+        return res.sendStatus(401);
+      }
+    }
+
+    // Validação defensiva do payload (evita crash/abuso com corpo malformado).
+    const body = req.body || {};
+    const event = body.event;
+    const data = body.data;
+    if (event !== 'messages.upsert') return res.sendStatus(200);
+    if (!data || !data.key || typeof data.key.remoteJid !== 'string' || !data.message) {
+      return res.status(400).json({ error: 'Payload inválido' });
+    }
+
+    {
       const message = data.message;
       const remoteJid = data.key.remoteJid;
       const senderNumber = remoteJid.split('@')[0];
-      const text = message.conversation || message.extendedTextMessage?.text || '';
+      const rawText = message.conversation || message.extendedTextMessage?.text || '';
+      const text = typeof rawText === 'string' ? rawText.slice(0, 500) : '';
 
-      if (!text) return res.sendStatus(200);
+      if (!text || !senderNumber) return res.sendStatus(200);
 
       try {
         const entitiesSnapshot = await db.collection('entities').get();

@@ -69,10 +69,24 @@ service cloud.firestore {
 
     function hasDocAccess() {
       return isAuthenticated() && (
-        isDefaultAdmin() || 
-        (resource != null && resource.data.ownerUid == request.auth.uid) || 
+        isDefaultAdmin() ||
+        (resource != null && resource.data.ownerUid == request.auth.uid) ||
         (resource != null && request.auth.token.email != null && request.auth.token.email in resource.data.get('collaboratorsEmails', [])) ||
         isAdmin()
+      );
+    }
+
+    // Acesso de ESCRITA: dono, admin global, ou colaborador com papel 'admin'.
+    // Colaboradores 'viewer' (não presentes em collaboratorsAdminEmails) só leem.
+    function isEntityWriter(entityId) {
+      let entityPath = /databases/$(database)/documents/entities/$(entityId);
+      return isAuthenticated() && (
+        isDefaultAdmin() || isAdmin() || (
+          exists(entityPath) && (
+            get(entityPath).data.ownerUid == request.auth.uid ||
+            (request.auth.token.email != null && request.auth.token.email in get(entityPath).data.get('collaboratorsAdminEmails', []))
+          )
+        )
       );
     }
 
@@ -175,69 +189,71 @@ service cloud.firestore {
 
       allow create: if isAuthenticated() && isValidEntity(request.resource.data) && 
                       request.resource.data.ownerUid == request.auth.uid;
-      allow update: if isAuthenticated() && isValidEntity(request.resource.data) && 
-                      (resource.data.ownerUid == request.auth.uid || (request.auth.token.email != null && request.auth.token.email in resource.data.get('collaboratorsEmails', [])) || isAdmin()) &&
+      allow update: if isAuthenticated() && isValidEntity(request.resource.data) &&
+                      (resource.data.ownerUid == request.auth.uid ||
+                       (request.auth.token.email != null && request.auth.token.email in resource.data.get('collaboratorsAdminEmails', [])) ||
+                       isAdmin()) &&
                       request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
 
       match /bank_accounts/{accountId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create: if hasEntityAccess(entityId) && isValidBankAccount(request.resource.data);
-        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidBankAccount(request.resource.data);
-        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if isEntityWriter(entityId) && isValidBankAccount(request.resource.data);
+        allow update: if isEntityWriter(entityId) && isValidBankAccount(request.resource.data);
+        allow delete: if isEntityWriter(entityId);
       }
-      
+
       match /credit_cards/{cardId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create, update: if hasDocAccess() || hasEntityAccess(entityId);
-        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update: if isEntityWriter(entityId);
+        allow delete: if isEntityWriter(entityId);
       }
-      
+
       match /transactions/{transactionId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create: if hasEntityAccess(entityId) && isValidTransaction(request.resource.data);
-        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidTransaction(request.resource.data);
-        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if isEntityWriter(entityId) && isValidTransaction(request.resource.data);
+        allow update: if isEntityWriter(entityId) && isValidTransaction(request.resource.data);
+        allow delete: if isEntityWriter(entityId);
       }
 
       match /debts/{debtId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create: if hasEntityAccess(entityId) && isValidDebt(request.resource.data);
-        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidDebt(request.resource.data);
-        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if isEntityWriter(entityId) && isValidDebt(request.resource.data);
+        allow update: if isEntityWriter(entityId) && isValidDebt(request.resource.data);
+        allow delete: if isEntityWriter(entityId);
       }
 
       match /services/{serviceId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if isEntityWriter(entityId);
       }
 
       match /plans/{planId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if isEntityWriter(entityId);
       }
 
       match /quotes/{quoteId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if isEntityWriter(entityId);
       }
 
       match /clients/{clientId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create: if hasEntityAccess(entityId) && isValidClient(request.resource.data);
-        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidClient(request.resource.data);
-        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if isEntityWriter(entityId) && isValidClient(request.resource.data);
+        allow update: if isEntityWriter(entityId) && isValidClient(request.resource.data);
+        allow delete: if isEntityWriter(entityId);
       }
 
       match /suppliers/{supplierId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if isEntityWriter(entityId);
       }
 
       match /config/{configId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create, update: if hasDocAccess() || hasEntityAccess(entityId);
-        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update: if isEntityWriter(entityId);
+        allow delete: if isEntityWriter(entityId);
       }
     }
   }

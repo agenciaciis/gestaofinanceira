@@ -96,6 +96,7 @@ export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: serverTimestamp(),
       collaborators: [],
       collaboratorsEmails: [],
+      collaboratorsAdminEmails: [],
     });
   };
 
@@ -115,7 +116,9 @@ export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         role,
         addedAt: new Date().toISOString()
       }),
-      collaboratorsEmails: arrayUnion(email)
+      collaboratorsEmails: arrayUnion(email),
+      // Apenas 'admin' entra na lista de escrita; 'viewer' fica só com leitura.
+      ...(role === 'admin' ? { collaboratorsAdminEmails: arrayUnion(email) } : {})
     });
   };
 
@@ -129,7 +132,8 @@ export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     await updateDoc(doc(db, 'entities', entityId), {
       collaborators: arrayRemove(collaborator),
-      collaboratorsEmails: arrayRemove(email)
+      collaboratorsEmails: arrayRemove(email),
+      collaboratorsAdminEmails: arrayRemove(email)
     });
   };
 
