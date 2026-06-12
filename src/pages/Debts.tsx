@@ -15,7 +15,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Search,
-  Filter
+  Filter,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -30,6 +31,42 @@ export const Debts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'overdue' | 'paid'>('pending');
+
+  // Edição de uma pendência (corrigir valor/data/descrição lançada errada)
+  const [editingDebt, setEditingDebt] = useState<Transaction | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editDate, setEditDate] = useState('');
+
+  const openEdit = (t: Transaction) => {
+    setEditingDebt(t);
+    setEditDescription(t.description);
+    setEditAmount(String(t.amount));
+    setEditDate(t.date);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEntity || !editingDebt) return;
+    const value = Number(editAmount);
+    if (!Number.isFinite(value) || value <= 0) {
+      showToast('Informe um valor válido.', 'error');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, `entities/${selectedEntity.id}/transactions/${editingDebt.id}`), {
+        description: editDescription.trim() || editingDebt.description,
+        amount: value,
+        date: editDate || editingDebt.date,
+        updatedAt: serverTimestamp(),
+      });
+      showToast('Pendência atualizada com sucesso!', 'success');
+      setEditingDebt(null);
+    } catch (error) {
+      console.error('Error updating debt:', error);
+      showToast('Erro ao atualizar pendência.', 'error');
+    }
+  };
 
   useEffect(() => {
     if (!selectedEntity) return;
@@ -239,16 +276,24 @@ export const Debts: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2 border-l pl-6">
-                      <button 
+                      <button
                         onClick={() => handleMarkAsPaid(debt)}
                         className="rounded-xl bg-emerald-500 p-2.5 text-white hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
                         title="Marcar como Pago"
                       >
                         <CheckCircle2 className="h-5 w-5" />
                       </button>
-                      <button 
+                      <button
+                        onClick={() => openEdit(debt)}
+                        className="rounded-xl bg-gray-50 p-2.5 text-gray-400 hover:bg-primary/10 hover:text-primary transition-all"
+                        title="Editar / Corrigir"
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </button>
+                      <button
                         onClick={() => handleDelete(debt)}
                         className="rounded-xl bg-gray-50 p-2.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"
+                        title="Excluir"
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>
@@ -260,6 +305,70 @@ export const Debts: React.FC = () => {
           })
         )}
       </div>
+
+      {/* Modal de edição de pendência */}
+      <AnimatePresence>
+        {editingDebt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-2xl"
+            >
+              <h3 className="text-xl font-black text-slate-900 dark:text-gray-100">Corrigir Pendência</h3>
+              <p className="text-sm text-slate-500 mb-6">Ajuste o valor, a data ou a descrição lançada.</p>
+              <form onSubmit={handleSaveEdit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descrição</label>
+                  <input
+                    type="text"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vencimento</label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDebt(null)}
+                    className="flex-1 rounded-2xl border border-slate-200 dark:border-gray-700 py-3 text-sm font-bold text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800"
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90">
+                    Salvar Alterações
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

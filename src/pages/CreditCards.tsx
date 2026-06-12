@@ -645,7 +645,7 @@ export const CreditCards: React.FC = () => {
                   type="submit"
                   className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90"
                 >
-                  Salvar Cartão
+                  {editingCard ? 'Salvar Alterações' : 'Salvar Cartão'}
                 </button>
               </div>
             </form>
