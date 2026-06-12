@@ -502,8 +502,8 @@ export const FinancialHealth: React.FC = () => {
                       iconType="circle"
                       wrapperStyle={{ paddingBottom: '20px', fontSize: '12px', fontWeight: 'bold' }}
                     />
-                    <Bar dataKey="Valor Total" fill="#e2e8f0" radius={[4, 4, 0, 0]} barSize={40} name="Dívida Original" />
-                    <Bar dataKey="Valor Restante" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} name="Saldo Devedor" />
+                    <Bar dataKey="Valor Total" fill="#e2e8f0" radius={[4, 4, 0, 0]} barSize={40} name="Dívida Original" animationDuration={900} />
+                    <Bar dataKey="Valor Restante" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} name="Saldo Devedor" animationDuration={900} animationBegin={150} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

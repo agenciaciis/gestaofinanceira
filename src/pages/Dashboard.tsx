@@ -55,10 +55,12 @@ const StatCard: React.FC<{
   subtitle?: string;
   trend?: { value: number; isPositive: boolean };
 }> = ({ title, value, type, subtitle, trend }) => (
-  <motion.div 
+  <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+    transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+    whileHover={{ y: -4 }}
+    className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow duration-300"
   >
     <div className="flex items-center justify-between">
       <p className="text-xs font-bold uppercase tracking-wider text-gray-400">{title}</p>
@@ -632,12 +634,12 @@ export const Dashboard: React.FC = () => {
               <AreaChart data={cashFlowData}>
                 <defs>
                   <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.02}/>
                   </linearGradient>
                   <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.02}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#1f2937' : '#f1f5f9'} />
@@ -666,15 +668,17 @@ export const Dashboard: React.FC = () => {
                   itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
                   labelStyle={{ fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="income" 
+                <Area
+                  type="monotone"
+                  dataKey="income"
                   name="Receita"
-                  stroke="#10b981" 
+                  stroke="#10b981"
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorIncome)" 
+                  fillOpacity={1}
+                  fill="url(#colorIncome)"
                   dot={false}
+                  animationDuration={1400}
+                  animationEasing="ease-out"
                 />
                 <Area 
                   type="monotone" 
@@ -691,15 +695,17 @@ export const Dashboard: React.FC = () => {
                   }}
                   legendType="none"
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="expense" 
+                <Area
+                  type="monotone"
+                  dataKey="expense"
                   name="Despesa"
-                  stroke="#f43f5e" 
+                  stroke="#f43f5e"
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorExpense)" 
+                  fillOpacity={1}
+                  fill="url(#colorExpense)"
                   dot={false}
+                  animationDuration={1400}
+                  animationEasing="ease-out"
                 />
                 <Area 
                   type="monotone" 
@@ -739,6 +745,8 @@ export const Dashboard: React.FC = () => {
                     outerRadius={90}
                     paddingAngle={8}
                     dataKey="value"
+                    animationDuration={900}
+                    animationBegin={150}
                   >
                     {categoryDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

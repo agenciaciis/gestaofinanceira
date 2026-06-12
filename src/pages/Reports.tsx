@@ -658,8 +658,8 @@ export const Reports: React.FC = () => {
                   formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} name="Receita" />
-                <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="Despesa" />
+                <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} name="Receita" animationDuration={900} />
+                <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="Despesa" animationDuration={900} animationBegin={150} />
               </BarChart>
             </ResponsiveContainer>
           </div>
