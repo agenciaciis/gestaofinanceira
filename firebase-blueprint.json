@@ -1,0 +1,296 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Entity": {
+      "title": "Entity",
+      "description": "Financial entity (PF or PJ)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["PF", "PJ"] },
+        "ownerUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "ownerUid"]
+    },
+    "BankAccount": {
+      "title": "Bank Account",
+      "description": "Bank account details",
+      "type": "object",
+      "properties": {
+        "bankName": { "type": "string" },
+        "type": { "type": "string", "enum": ["corrente", "poupanca", "investimento", "caixa", "reserva"] },
+        "initialBalance": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["bankName", "type", "initialBalance", "entityId", "ownerUid"]
+    },
+    "CreditCard": {
+      "title": "Credit Card",
+      "description": "Credit card details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "brand": { "type": "string" },
+        "limit": { "type": "number" },
+        "dueDay": { "type": "number" },
+        "closingDay": { "type": "number" },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "limit", "dueDay", "closingDay", "entityId", "ownerUid"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["income", "expense", "transfer"] },
+        "date": { "type": "string", "format": "date-time" },
+        "categoryId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "cardId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["description", "amount", "type", "date", "status", "entityId", "ownerUid"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Client information and credentials",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "responsibleName": { "type": "string" },
+        "cpf": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "type": "string" },
+        "drivePath": { "type": "string" },
+        "credentials": {
+          "type": "object",
+          "properties": {
+            "instagram": { "type": "string" },
+            "facebook": { "type": "string" },
+            "googleAds": { "type": "string" },
+            "linkedin": { "type": "string" },
+            "meta": { "type": "string" },
+            "wordpress": { "type": "string" },
+            "site": { "type": "string" },
+            "others": { "type": "string" }
+          }
+        },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "signedAt": { "type": "string", "format": "date-time" },
+              "value": { "type": "number" },
+              "expirationDate": { "type": "string", "format": "date" },
+              "status": { "type": "string", "enum": ["active", "inactive"] }
+            }
+          }
+        }
+      },
+      "required": ["name", "entityId", "ownerUid"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Supplier or payment location information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "cnpjOrCpf": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "pixKey": { "type": "string" },
+        "bankInfo": {
+          "type": "object",
+          "properties": {
+            "bank": { "type": "string" },
+            "agency": { "type": "string" },
+            "account": { "type": "string" }
+          }
+        },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "entityId", "ownerUid"]
+    },
+    "Debt": {
+      "title": "Debt",
+      "description": "Debt or loan details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "interestRate": { "type": "number" },
+        "monthlyPayment": { "type": "number" },
+        "dueDate": { "type": "number" },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "alerts": {
+          "type": "object",
+          "properties": {
+            "dueDateEnabled": { "type": "boolean" },
+            "dueDateDaysBefore": { "type": "number" },
+            "thresholdEnabled": { "type": "boolean" },
+            "thresholdValue": { "type": "number" }
+          }
+        }
+      },
+      "required": ["name", "totalAmount", "remainingAmount", "interestRate", "monthlyPayment", "dueDate", "entityId", "ownerUid"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Service catalog item",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "category": { "type": "string" },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "basePrice", "category", "entityId", "ownerUid"]
+    },
+    "Plan": {
+      "title": "Plan",
+      "description": "Service plan or package",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "billingCycle": { "type": "string", "enum": ["monthly", "quarterly", "yearly"] },
+        "services": { "type": "array", "items": { "type": "string" } },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "billingCycle", "entityId", "ownerUid"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Client quote/budget",
+      "type": "object",
+      "properties": {
+        "quoteNumber": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "validUntil": { "type": "string", "format": "date" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "subtotal": { "type": "number" },
+        "discountTotal": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "installments": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "sent", "approved", "rejected", "converted"] },
+        "notes": { "type": "string" },
+        "entityId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "collaboratorsEmails": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["quoteNumber", "clientId", "clientName", "date", "validUntil", "total", "status", "entityId", "ownerUid"]
+    },
+    "BudgetConfig": {
+      "title": "Budget Configuration",
+      "description": "Monthly budget goals and limits by category",
+      "type": "object",
+      "properties": {
+        "monthly_balance_goal": { "type": "number" }
+      },
+      "additionalProperties": { "type": "number" }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/entities/{entityId}": {
+      "schema": "Entity",
+      "description": "Financial entities"
+    },
+    "/entities/{entityId}/bank_accounts/{accountId}": {
+      "schema": "BankAccount",
+      "description": "Bank accounts for an entity"
+    },
+    "/entities/{entityId}/credit_cards/{cardId}": {
+      "schema": "CreditCard",
+      "description": "Credit cards for an entity"
+    },
+    "/entities/{entityId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Transactions for an entity"
+    },
+    "/entities/{entityId}/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Clients for an entity"
+    },
+    "/entities/{entityId}/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Suppliers for an entity"
+    },
+    "/entities/{entityId}/debts/{debtId}": {
+      "schema": "Debt",
+      "description": "Debts for an entity"
+    },
+    "/entities/{entityId}/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Services for an entity"
+    },
+    "/entities/{entityId}/plans/{planId}": {
+      "schema": "Plan",
+      "description": "Plans for an entity"
+    },
+    "/entities/{entityId}/quotes/{quoteId}": {
+      "schema": "Quote",
+      "description": "Quotes for an entity"
+    },
+    "/entities/{entityId}/config/{configId}": {
+      "schema": "BudgetConfig",
+      "description": "Configuration documents (like budgets) for an entity"
+    }
+  }
+}

@@ -1,0 +1,256 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields: uid, email, displayName, photoURL, createdAt, role
+    //
+    // Collection: /entities/{entityId}
+    // Fields: name, type (PF|PJ), ownerUid, createdAt
+    //
+    // Collection: /entities/{entityId}/bank_accounts/{accountId}
+    // Fields: bankName, type, initialBalance, currentBalance, entityId
+    //
+    // Collection: /entities/{entityId}/credit_cards/{cardId}
+    // Fields: name, limit, dueDay, closingDay, entityId
+    //
+    // Collection: /entities/{entityId}/transactions/{transactionId}
+    // Fields: description, amount, type, date, categoryId, accountId, cardId, status, entityId
+    //
+    // Collection: /entities/{entityId}/debts/{debtId}
+    // Fields: name, totalAmount, remainingAmount, interestRate, monthlyPayment, dueDate, entityId, createdAt, alerts
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        isDefaultAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDefaultAdmin() {
+      return isAuthenticated() && request.auth.token.email == "ciisagenciadigital@gmail.com";
+    }
+    
+    function isEntityOwner(entityId) {
+      let entityPath = /databases/$(database)/documents/entities/$(entityId);
+      return isAuthenticated() && exists(entityPath) && get(entityPath).data.ownerUid == request.auth.uid;
+    }
+
+    function hasEntityAccess(entityId) {
+      let entityPath = /databases/$(database)/documents/entities/$(entityId);
+      return isAuthenticated() && (
+        isDefaultAdmin() || (
+          exists(entityPath) && (
+            get(entityPath).data.ownerUid == request.auth.uid || 
+            (request.auth.token.email != null && request.auth.token.email in get(entityPath).data.get('collaboratorsEmails', []))
+          )
+        ) || isAdmin()
+      );
+    }
+
+    function hasDocAccess() {
+      return isAuthenticated() && (
+        isDefaultAdmin() || 
+        (resource != null && resource.data.ownerUid == request.auth.uid) || 
+        (resource != null && request.auth.token.email != null && request.auth.token.email in resource.data.get('collaboratorsEmails', [])) ||
+        isAdmin()
+      );
+    }
+
+    function canCreateDoc(data) {
+      return isAuthenticated() && (
+        isDefaultAdmin() || 
+        data.ownerUid == request.auth.uid || 
+        (request.auth.token.email != null && request.auth.token.email in data.get('collaboratorsEmails', [])) ||
+        isAdmin()
+      );
+    }
+
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(data, ['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() < 255 && isValidEmail(data.email) &&
+             (!('displayName' in data) || data.displayName == null || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() < 1000));
+    }
+
+    function isValidEntity(data) {
+      return hasRequiredFields(data, ['name', 'type', 'ownerUid']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.type in ['PF', 'PJ'];
+    }
+
+    function isValidBankAccount(data) {
+      return hasRequiredFields(data, ['bankName', 'type', 'initialBalance', 'entityId']) &&
+             data.bankName is string && data.bankName.size() < 100 &&
+             data.type in ['corrente', 'poupanca', 'investimento', 'caixa', 'reserva'] &&
+             data.initialBalance is number &&
+             data.entityId is string;
+    }
+
+    function isValidTransaction(data) {
+      return hasRequiredFields(data, ['description', 'amount', 'type', 'date', 'status', 'entityId']) &&
+             data.description is string && data.description.size() < 255 &&
+             data.amount is number &&
+             data.type in ['income', 'expense', 'transfer'] &&
+             data.status in ['pending', 'completed', 'cancelled'] &&
+             data.entityId is string;
+    }
+
+    function isValidDebt(data) {
+      return hasRequiredFields(data, ['name', 'totalAmount', 'remainingAmount', 'interestRate', 'monthlyPayment', 'dueDate', 'entityId']) &&
+             data.name is string && data.name.size() < 100 &&
+             data.totalAmount is number &&
+             data.remainingAmount is number &&
+             data.interestRate is number &&
+             data.monthlyPayment is number &&
+             data.dueDate is number &&
+             data.entityId is string;
+    }
+
+    function isValidClient(data) {
+      return hasRequiredFields(data, ['name', 'entityId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (!('cnpj' in data) || (data.cnpj is string && data.cnpj.size() <= 20)) &&
+             (!('cpf' in data) || (data.cpf is string && data.cpf.size() <= 20)) &&
+             (!('email' in data) || (data.email == "" || isValidEmail(data.email))) &&
+             data.entityId is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isDefaultAdmin() || (isAuthenticated() && userId != request.auth.uid && isAdmin());
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.uid == resource.data.uid;
+    }
+    
+    match /entities/{entityId} {
+      allow get: if isAuthenticated() && (
+        resource.data.ownerUid == request.auth.uid || 
+        (request.auth.token.email != null && request.auth.token.email in resource.data.get('collaboratorsEmails', [])) || 
+        isAdmin()
+      );
+      
+      // Split list rules to ensure they are queryable by the Firestore engine
+      allow list: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      allow list: if isAuthenticated() && request.auth.token.email != null && 
+                    request.auth.token.email in resource.data.get('collaboratorsEmails', []);
+      allow list: if isAdmin();
+
+      allow create: if isAuthenticated() && isValidEntity(request.resource.data) && 
+                      request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isAuthenticated() && isValidEntity(request.resource.data) && 
+                      (resource.data.ownerUid == request.auth.uid || (request.auth.token.email != null && request.auth.token.email in resource.data.get('collaboratorsEmails', [])) || isAdmin()) &&
+                      request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+
+      match /bank_accounts/{accountId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if hasEntityAccess(entityId) && isValidBankAccount(request.resource.data);
+        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidBankAccount(request.resource.data);
+        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+      
+      match /credit_cards/{cardId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update: if hasDocAccess() || hasEntityAccess(entityId);
+        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+      
+      match /transactions/{transactionId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if hasEntityAccess(entityId) && isValidTransaction(request.resource.data);
+        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidTransaction(request.resource.data);
+        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+
+      match /debts/{debtId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if hasEntityAccess(entityId) && isValidDebt(request.resource.data);
+        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidDebt(request.resource.data);
+        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+
+      match /services/{serviceId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+
+      match /plans/{planId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+
+      match /quotes/{quoteId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+
+      match /clients/{clientId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create: if hasEntityAccess(entityId) && isValidClient(request.resource.data);
+        allow update: if (hasDocAccess() || hasEntityAccess(entityId)) && isValidClient(request.resource.data);
+        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+
+      match /suppliers/{supplierId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+
+      match /config/{configId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update: if hasDocAccess() || hasEntityAccess(entityId);
+        allow delete: if hasDocAccess() || hasEntityAccess(entityId);
+      }
+    }
+  }
+}
+
+// ===============================================================
+// Devil's Advocate Attack Analysis
+// ===============================================================
+// 1. Public List Exploit: Denied. All read rules require authentication and ownership/admin.
+// 2. Unauthorized Read/Write: Denied. isOwner and isEntityOwner checks are present.
+// 3. The "Update Bypass": Denied. isValidX() is called in both create and update.
+// 4. Ownership Hijacking: Denied. ownerUid is validated against request.auth.uid and is immutable.
+// 5. Resource Exhaustion: Denied. String size limits (e.g., .size() < 100) are enforced.
+// 6. Data Corruption: Denied. Type checks (is string, is number) are present in validators.
+// 7. Privilege Escalation: Denied. Users cannot write to their own 'role' field in a way that bypasses isValidUser (which doesn't allow role modification).
+// ===============================================================

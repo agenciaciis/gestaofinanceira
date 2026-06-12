@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  
+  --radius-lg: 0.5rem;
+  --radius-md: calc(0.5rem - 2px);
+  --radius-sm: calc(0.5rem - 4px);
+}
+
+@layer base {
+  * {
+    @apply border-gray-200 dark:border-gray-800;
+  }
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans antialiased dark:bg-gray-950 dark:text-gray-100;
+  }
+}
+
+.light {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+}
+
+.light .bg-white { background-color: #ffffff !important; }
+.light .bg-gray-50 { background-color: #f9fafb !important; }
+.light .text-gray-900 { color: #111827 !important; }
+.light .text-slate-900 { color: #111827 !important; }
+.light header { background-color: #ffffff !important; }
+.light aside { background-color: #ffffff !important; }
+
+/* Global Dark Mode Overrides for hardcoded light-mode classes */
+@layer utilities {
+  .dark .bg-white { background-color: #111827 !important; }
+  .dark .bg-gray-50 { background-color: #030712 !important; }
+  .dark .bg-slate-50 { background-color: #1f2937 !important; }
+  .dark .bg-slate-100 { background-color: #1f2937 !important; }
+  
+  .dark .text-gray-900 { color: #f9fafb !important; }
+  .dark .text-slate-900 { color: #f9fafb !important; }
+  .dark .text-gray-800 { color: #f3f4f6 !important; }
+  .dark .text-slate-800 { color: #f3f4f6 !important; }
+  .dark .text-gray-700 { color: #e5e7eb !important; }
+  .dark .text-slate-700 { color: #e5e7eb !important; }
+  .dark .text-gray-600 { color: #d1d5db !important; }
+  .dark .text-slate-600 { color: #d1d5db !important; }
+  .dark .text-gray-500 { color: #9ca3af !important; }
+  .dark .text-slate-500 { color: #9ca3af !important; }
+  .dark .text-gray-400 { color: #6b7280 !important; }
+  .dark .text-slate-400 { color: #6b7280 !important; }
+  
+  .dark .border-gray-50 { border-color: #1f2937 !important; }
+  .dark .border-slate-50 { border-color: #1f2937 !important; }
+  .dark .border-gray-100 { border-color: #1f2937 !important; }
+  .dark .border-slate-100 { border-color: #1f2937 !important; }
+  .dark .border-gray-200 { border-color: #374151 !important; }
+  .dark .border-slate-200 { border-color: #374151 !important; }
+
+  /* Soft backgrounds for status indicators */
+  .dark .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.3) !important; }
+  .dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.4) !important; }
+  .dark .text-emerald-600 { color: #34d399 !important; }
+  
+  .dark .bg-rose-50 { background-color: rgba(159, 18, 57, 0.3) !important; }
+  .dark .bg-rose-100 { background-color: rgba(159, 18, 57, 0.4) !important; }
+  .dark .text-rose-600 { color: #fb7185 !important; }
+  
+  .dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.3) !important; }
+  .dark .bg-blue-100 { background-color: rgba(30, 58, 138, 0.4) !important; }
+  .dark .text-blue-600 { color: #60a5fa !important; }
+  
+  .dark .bg-amber-50 { background-color: rgba(120, 53, 15, 0.3) !important; }
+  .dark .bg-amber-100 { background-color: rgba(120, 53, 15, 0.4) !important; }
+  .dark .text-amber-600 { color: #fbbf24 !important; }
+
+  .dark .bg-slate-900\/60 { background-color: rgba(0, 0, 0, 0.8) !important; }
+
+  /* Specific fix for header in light mode */
+  :root:not(.dark) header {
+    background-color: #ffffff !important;
+  }
+
+  .bg-slate-900:not(.dark *) { @apply bg-slate-50 text-slate-900 border border-slate-200; }
+  .bg-indigo-900:not(.dark *) { @apply bg-indigo-50 text-indigo-900 border border-indigo-200; }
+}
+
+/* Ensure inputs are always readable */
+input, select, textarea {
+  @apply text-gray-900 dark:text-gray-100;
+}
+
+input::placeholder {
+  @apply text-gray-400;
+}
