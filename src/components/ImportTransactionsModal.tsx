@@ -6,11 +6,12 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { suggestCategories } from '../services/geminiService';
+import { suggestCategories, extractStatementFromPdf } from '../services/geminiService';
 import { CATEGORIES } from '../constants';
 import { collection, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { BankAccount, CreditCard } from '../types';
+import { parseAmountBR, parseFlexibleDate, parseOFX, ParsedRow } from '../lib/statementParsers';
 
 interface ImportTransactionsModalProps {
   isOpen: boolean;
@@ -58,49 +59,112 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
   if (!isOpen) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const readAsText = (file: File) => new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || ''));
+    r.onerror = reject;
+    r.readAsText(file);
+  });
+
+  const readAsBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const result = String(r.result || '');
+      resolve(result.includes(',') ? result.split(',')[1] : result);
+    };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+
+  // Converte linhas já normalizadas (data+valor+descrição) em transações,
+  // roda a categorização por IA e vai para a revisão. Usado por OFX e PDF.
+  const processRows = async (rows: ParsedRow[]) => {
+    const clean = rows.filter(r => r.date && Number.isFinite(r.amount) && r.amount !== 0);
+    if (clean.length === 0) {
+      showToast('Nenhuma transação reconhecida no arquivo.', 'error');
+      return;
+    }
+    const transactions: ProcessedTransaction[] = clean.map(r => ({
+      date: r.date,
+      description: r.description,
+      amount: Math.abs(r.amount),
+      type: r.amount >= 0 ? 'income' : 'expense',
+      categoryId: 'outros',
+      status: 'completed',
+    }));
+    const categorized = await categorize(transactions);
+    setProcessedData(categorized);
+    setStep('review');
+  };
+
+  // Categorização por IA em blocos, com alinhamento posicional seguro.
+  const categorize = async (transactions: ProcessedTransaction[]): Promise<ProcessedTransaction[]> => {
+    const chunkSize = 20;
+    const suggested: string[] = [];
+    for (let i = 0; i < transactions.length; i += chunkSize) {
+      const chunk = transactions.slice(i, i + chunkSize).map(t => t.description);
+      try {
+        const res = await suggestCategories(chunk, 'expense');
+        // Garante alinhamento: se a IA retornar tamanho diferente, completa com 'outros'.
+        for (let j = 0; j < chunk.length; j++) suggested.push(res[j] || 'outros');
+      } catch {
+        for (let j = 0; j < chunk.length; j++) suggested.push('outros');
+      }
+    }
+    return transactions.map((t, i) => ({ ...t, categoryId: suggested[i] || 'outros' }));
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const extension = file.name.split('.').pop()?.toLowerCase();
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const bstr = event.target?.result;
-      const extension = file.name.split('.').pop()?.toLowerCase();
-
+    try {
       if (extension === 'csv') {
         Papa.parse(file, {
           complete: (results) => {
-            if (results.data && results.data.length > 0) {
-              const headers = results.data[0] as string[];
-              const rows = results.data.slice(1) as any[][];
-              setRawData({ headers, rows });
+            const data = (results.data as any[][]).filter(r => Array.isArray(r) && r.some(c => String(c).trim() !== ''));
+            if (data.length > 0) {
+              setRawData({ headers: (data[0] as string[]).map(h => String(h)), rows: data.slice(1) });
               setStep('mapping');
+            } else {
+              showToast('Arquivo CSV vazio.', 'error');
             }
           },
           header: false,
-          skipEmptyLines: true
+          skipEmptyLines: true,
         });
       } else if (extension === 'xlsx' || extension === 'xls') {
-        const workbook = XLSX.read(bstr, { type: 'binary' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-        
+        const buf = await file.arrayBuffer();
+        const workbook = XLSX.read(buf, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = (XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][])
+          .filter(r => Array.isArray(r) && r.some(c => String(c).trim() !== ''));
         if (data.length > 0) {
-          const headers = data[0].map(h => String(h));
-          const rows = data.slice(1);
-          setRawData({ headers, rows });
+          setRawData({ headers: data[0].map(h => String(h)), rows: data.slice(1) });
           setStep('mapping');
+        } else {
+          showToast('Planilha vazia.', 'error');
         }
+      } else if (extension === 'ofx' || extension === 'qfx') {
+        setLoading(true);
+        const text = await readAsText(file);
+        await processRows(parseOFX(text));
+      } else if (extension === 'pdf') {
+        setLoading(true);
+        showToast('Lendo o PDF com IA... isso pode levar alguns segundos.', 'info');
+        const base64 = await readAsBase64(file);
+        const rows = await extractStatementFromPdf(base64, 'application/pdf');
+        await processRows(rows);
       } else {
-        showToast('Formato de arquivo não suportado. Use CSV ou Excel.', 'error');
+        showToast('Formato não suportado. Use CSV, Excel, OFX ou PDF.', 'error');
       }
-    };
-
-    if (file.name.endsWith('.csv')) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsBinaryString(file);
+    } catch (err) {
+      console.error('Erro ao ler arquivo:', err);
+      showToast('Erro ao ler o arquivo. Verifique o formato.', 'error');
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -116,41 +180,12 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
       const descIdx = rawData.headers.indexOf(mapping.description);
       const amountIdx = rawData.headers.indexOf(mapping.amount);
 
-      const transactions: ProcessedTransaction[] = rawData.rows.map(row => {
-        let amount = 0;
-        const rawAmount = String(row[amountIdx]);
-        // Handle common formats like "1.234,56" or "1234.56"
-        amount = parseFloat(rawAmount.replace(/\./g, '').replace(',', '.'));
-        if (isNaN(amount)) amount = 0;
-
-        return {
-          date: String(row[dateIdx]),
-          description: String(row[descIdx]),
-          amount: Math.abs(amount),
-          type: amount >= 0 ? 'income' : 'expense',
-          categoryId: 'outros',
-          status: 'completed'
-        };
-      });
-
-      // AI Categorization in chunks to avoid prompt limits
-      const descriptions = transactions.map(t => t.description);
-      const chunkSize = 20;
-      const suggestedCategories: string[] = [];
-
-      for (let i = 0; i < descriptions.length; i += chunkSize) {
-        const chunk = descriptions.slice(i, i + chunkSize);
-        const chunkSuggestions = await suggestCategories(chunk, 'expense'); // Defaulting to expense for better matching
-        suggestedCategories.push(...chunkSuggestions);
-      }
-
-      const finalData = transactions.map((t, i) => ({
-        ...t,
-        categoryId: suggestedCategories[i] || 'outros'
+      const rows: ParsedRow[] = rawData.rows.map(row => ({
+        date: parseFlexibleDate(row[dateIdx]),
+        description: String(row[descIdx] ?? '').trim() || 'Lançamento importado',
+        amount: parseAmountBR(row[amountIdx]),
       }));
-
-      setProcessedData(finalData);
-      setStep('review');
+      await processRows(rows);
     } catch (error) {
       console.error("Error processing mapping:", error);
       showToast('Erro ao processar dados. Verifique o formato das colunas.', 'error');
@@ -167,38 +202,31 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
     setLoading(true);
     try {
-      const batch = writeBatch(db);
       const entity = entities.find(e => e.id === targetEntityId);
-
-      processedData.forEach(t => {
-        const docRef = doc(collection(db, `entities/${targetEntityId}/transactions`));
-        
-        // Try to parse date string to YYYY-MM-DD
-        let formattedDate = t.date;
-        try {
-          const d = new Date(t.date);
-          if (!isNaN(d.getTime())) {
-            formattedDate = d.toISOString().split('T')[0];
-          }
-        } catch (e) {}
-
-        batch.set(docRef, {
-          description: t.description,
-          amount: t.amount,
-          type: t.type,
-          date: formattedDate,
-          categoryId: t.categoryId,
-          accountId: paymentMethod === 'account' ? accountId : null,
-          cardId: paymentMethod === 'card' ? cardId : null,
-          status: t.status,
-          entityId: targetEntityId,
-          ownerUid: entity?.ownerUid,
-          collaboratorsEmails: entity?.collaboratorsEmails || [],
-          createdAt: serverTimestamp(),
-        });
-      });
-
-      await batch.commit();
+      // Firestore limita 500 operações por batch — comita em blocos.
+      const CHUNK = 450;
+      for (let i = 0; i < processedData.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        for (const t of processedData.slice(i, i + CHUNK)) {
+          const docRef = doc(collection(db, `entities/${targetEntityId}/transactions`));
+          const formattedDate = parseFlexibleDate(t.date) || t.date;
+          batch.set(docRef, {
+            description: t.description,
+            amount: t.amount,
+            type: t.type,
+            date: formattedDate,
+            categoryId: t.categoryId,
+            accountId: paymentMethod === 'account' ? accountId : null,
+            cardId: paymentMethod === 'card' ? cardId : null,
+            status: t.status,
+            entityId: targetEntityId,
+            ownerUid: entity?.ownerUid,
+            collaboratorsEmails: entity?.collaboratorsEmails || [],
+            createdAt: serverTimestamp(),
+          });
+        }
+        await batch.commit();
+      }
       showToast(`${processedData.length} transações importadas com sucesso!`, 'success');
       onClose();
     } catch (error) {
@@ -224,7 +252,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-900">Importar Extrato</h3>
-              <p className="text-sm text-gray-500">Suba arquivos CSV ou Excel para processar automaticamente.</p>
+              <p className="text-sm text-gray-500">CSV, Excel, OFX ou PDF — processamos automaticamente.</p>
             </div>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 text-gray-400">
@@ -259,9 +287,17 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {step === 'upload' && (
+          {step === 'upload' && loading && (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="mt-4 text-sm font-bold text-gray-700">Processando arquivo...</p>
+              <p className="mt-1 text-xs text-gray-400">Extraindo e categorizando as transações.</p>
+            </div>
+          )}
+
+          {step === 'upload' && !loading && (
             <div className="flex flex-col items-center justify-center py-12">
-              <div 
+              <div
                 onClick={() => fileInputRef.current?.click()}
                 className="group relative flex w-full max-w-md cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-12 transition-all hover:border-primary/50 hover:bg-primary/5"
               >
@@ -270,13 +306,13 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 </div>
                 <p className="text-lg font-bold text-gray-900">Clique para selecionar</p>
                 <p className="mt-1 text-sm text-gray-500">ou arraste seu arquivo aqui</p>
-                <p className="mt-4 text-xs text-gray-400">Suporta .CSV, .XLSX, .XLS</p>
-                <input 
-                  type="file" 
+                <p className="mt-4 text-xs text-gray-400">Suporta .CSV, .XLSX, .XLS, .OFX e .PDF (via IA)</p>
+                <input
+                  type="file"
                   ref={fileInputRef}
                   onChange={handleFileUpload}
-                  accept=".csv, .xlsx, .xls"
-                  className="hidden" 
+                  accept=".csv,.xlsx,.xls,.ofx,.qfx,.pdf"
+                  className="hidden"
                 />
               </div>
 
