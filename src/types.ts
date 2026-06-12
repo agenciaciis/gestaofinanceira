@@ -81,6 +81,12 @@ export interface Transaction {
   cardId?: string;
   status: 'pending' | 'completed' | 'cancelled';
   entityId: string;
+  paidAt?: string; // data em que foi efetivamente pago (YYYY-MM-DD)
+  // Forma de pagamento (além de conta/cartão): pix, boleto, dinheiro, transferência...
+  paymentType?: 'pix' | 'boleto' | 'dinheiro' | 'transferencia' | 'debito' | 'credito' | 'outro';
+  // Vínculo opcional com um cliente cadastrado (para receitas/recebimentos)
+  clientId?: string;
+  clientName?: string;
   // Installment fields
   installmentNumber?: number;
   totalInstallments?: number;

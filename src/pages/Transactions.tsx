@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, where, writeBatch, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Transaction, BankAccount, CreditCard } from '../types';
+import { Transaction, BankAccount, CreditCard, Client } from '../types';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Search, Filter, Calendar, Tag, Wallet, CreditCard as CardIcon, ArrowRightLeft, Repeat, Download, CheckCircle2, Clock, AlertCircle, ChevronLeft, ChevronRight, Edit2, Trash2, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -15,6 +15,18 @@ import { Sparkles, Loader2 } from 'lucide-react';
 
 import { CATEGORIES, MONTHS } from '../constants';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
+import { splitInstallments, parseLocalDate } from '../lib/finance';
+import { planRecurringRenewals } from '../lib/recurring';
+
+const PAYMENT_TYPES: { id: NonNullable<Transaction['paymentType']>; label: string }[] = [
+  { id: 'pix', label: 'PIX' },
+  { id: 'boleto', label: 'Boleto' },
+  { id: 'dinheiro', label: 'Dinheiro' },
+  { id: 'transferencia', label: 'Transferência' },
+  { id: 'debito', label: 'Débito' },
+  { id: 'credito', label: 'Crédito' },
+  { id: 'outro', label: 'Outro' },
+];
 
 export const Transactions: React.FC = () => {
   const { entities, filterType } = useEntity();
@@ -38,7 +50,10 @@ export const Transactions: React.FC = () => {
   const [accountId, setAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
   const [cardId, setCardId] = useState('');
-  
+  const [paymentType, setPaymentType] = useState<'' | NonNullable<Transaction['paymentType']>>('');
+  const [clientId, setClientId] = useState('');
+  const [clients, setClients] = useState<Client[]>([]);
+
   // Installment state
   const [isInstallment, setIsInstallment] = useState(false);
   const [totalInstallments, setTotalInstallments] = useState('1');
@@ -69,6 +84,7 @@ export const Transactions: React.FC = () => {
       });
 
       const text = response.text?.trim();
+      if (!text) return;
 
       const category = CATEGORIES.find(c => c.name.toLowerCase() === text.toLowerCase());
       if (category) {
@@ -158,6 +174,8 @@ export const Transactions: React.FC = () => {
       setAccountId(t.accountId || '');
     }
     setToAccountId(t.toAccountId || '');
+    setPaymentType(t.paymentType || '');
+    setClientId(t.clientId || '');
     setIsInstallment(!!t.installmentGroupId);
     setTotalInstallments(t.totalInstallments?.toString() || '1');
     setIsRecurring(!!t.isRecurring);
@@ -281,8 +299,18 @@ export const Transactions: React.FC = () => {
     let allTransactions: Transaction[] = [];
     let allAccounts: BankAccount[] = [];
     let allCards: CreditCard[] = [];
+    let allClients: Client[] = [];
 
     filteredEntities.forEach(entity => {
+      // Clients (para vincular receitas a um cliente)
+      const clQ = query(collection(db, `entities/${entity.id}/clients`));
+      const unsubCl = onSnapshot(clQ, (snapshot) => {
+        const entityCl = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Client[];
+        allClients = [...allClients.filter(c => c.entityId !== entity.id), ...entityCl];
+        setClients([...allClients]);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/clients`));
+      unsubscribes.push(unsubCl);
+
       // Transactions
       const tQ = query(collection(db, `entities/${entity.id}/transactions`), orderBy('date', 'desc'));
       const unsubT = onSnapshot(tQ, (snapshot) => {
@@ -316,6 +344,57 @@ export const Transactions: React.FC = () => {
     return () => unsubscribes.forEach(unsub => unsub());
   }, [entities, filterType]);
 
+  // Renovação automática de recorrências: mantém ~12 meses de ocorrências futuras
+  // para lançamentos fixos (aluguel etc.), sem que o usuário precise recadastrar.
+  const renewingRef = useRef(false);
+  useEffect(() => {
+    if (transactions.length === 0 || renewingRef.current) return;
+    const plan = planRecurringRenewals(transactions, new Date(), 12);
+    if (plan.length === 0) return;
+
+    renewingRef.current = true;
+    (async () => {
+      try {
+        const batch = writeBatch(db);
+        let count = 0;
+        for (const item of plan) {
+          const tmpl = item.template;
+          const ent = entities.find(e => e.id === tmpl.entityId);
+          for (const d of item.dates) {
+            if (count >= 400) break; // limite seguro do batch
+            const ref = doc(collection(db, `entities/${tmpl.entityId}/transactions`));
+            batch.set(ref, {
+              description: tmpl.description,
+              amount: tmpl.amount,
+              type: tmpl.type,
+              date: d,
+              categoryId: tmpl.categoryId,
+              accountId: tmpl.accountId ?? null,
+              cardId: tmpl.cardId ?? null,
+              paymentType: tmpl.paymentType ?? null,
+              clientId: tmpl.clientId ?? null,
+              clientName: tmpl.clientName ?? null,
+              status: 'pending',
+              entityId: tmpl.entityId,
+              ownerUid: ent?.ownerUid,
+              collaboratorsEmails: ent?.collaboratorsEmails || [],
+              isRecurring: true,
+              recurringPeriod: tmpl.recurringPeriod,
+              recurringGroupId: tmpl.recurringGroupId,
+              createdAt: serverTimestamp(),
+            });
+            count++;
+          }
+        }
+        if (count > 0) await batch.commit();
+      } catch (e) {
+        console.error('Erro ao renovar recorrências:', e);
+      } finally {
+        renewingRef.current = false;
+      }
+    })();
+  }, [transactions, entities]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetEntityId) return;
@@ -342,15 +421,22 @@ export const Transactions: React.FC = () => {
             
             snapshot.docs.forEach(docSnap => {
               const docData = docSnap.data();
-              if (new Date(docData.date) >= new Date(editingTransaction.date)) {
+              if (parseLocalDate(docData.date) >= parseLocalDate(editingTransaction.date)) {
+                // Preserva a numeração (i/N) das parcelas na descrição do grupo.
+                const desc = docData.installmentNumber
+                  ? `${description} (${docData.installmentNumber}/${docData.totalInstallments})`
+                  : description;
                 batch.update(docSnap.ref, {
-                  description,
+                  description: desc,
                   amount: Number(amount),
                   type,
                   categoryId,
                   accountId: paymentMethod === 'account' ? accountId : null,
                   cardId: paymentMethod === 'card' ? cardId : null,
                   toAccountId: type === 'transfer' ? toAccountId : null,
+                  paymentType: paymentType || null,
+                  clientId: clientId || null,
+                  clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
                 });
               }
             });
@@ -371,6 +457,9 @@ export const Transactions: React.FC = () => {
           accountId: paymentMethod === 'account' ? accountId : null,
           cardId: paymentMethod === 'card' ? cardId : null,
           toAccountId: type === 'transfer' ? toAccountId : null,
+          paymentType: paymentType || null,
+          clientId: clientId || null,
+          clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           isRecurring,
           recurringPeriod: isRecurring ? recurringPeriod : null,
         });
@@ -384,6 +473,7 @@ export const Transactions: React.FC = () => {
           categoryId: 'transferencia',
           accountId,
           toAccountId,
+          paymentType: paymentType || 'transferencia',
           status: 'completed',
           entityId: targetEntityId,
           ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
@@ -394,20 +484,24 @@ export const Transactions: React.FC = () => {
         const batch = writeBatch(db);
         const installmentGroupId = crypto.randomUUID();
         const numInstallments = Number(totalInstallments);
-        const installmentAmount = Number(amount) / numInstallments;
-        const baseDate = new Date(date);
+        // Parcelas com centavos ajustados: a soma fecha exatamente o total.
+        const parcels = splitInstallments(Number(amount), numInstallments);
+        const baseDate = parseLocalDate(date);
 
         for (let i = 1; i <= numInstallments; i++) {
           const installmentDate = format(addMonths(baseDate, i - 1), 'yyyy-MM-dd');
           const docRef = doc(collection(db, `entities/${targetEntityId}/transactions`));
           batch.set(docRef, {
             description: `${description} (${i}/${numInstallments})`,
-            amount: installmentAmount,
+            amount: parcels[i - 1],
             type,
             date: installmentDate,
             categoryId,
             accountId: paymentMethod === 'account' ? accountId : null,
             cardId: paymentMethod === 'card' ? cardId : null,
+            paymentType: paymentType || null,
+            clientId: clientId || null,
+            clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 1 ? 'completed' : 'pending',
             entityId: targetEntityId,
             ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
@@ -422,9 +516,9 @@ export const Transactions: React.FC = () => {
       } else if (isRecurring) {
         const batch = writeBatch(db);
         const recurringGroupId = crypto.randomUUID();
-        const baseDate = new Date(date);
-        
-        // Create 12 months of recurring transactions as a start
+        const baseDate = parseLocalDate(date);
+
+        // Cria 12 ocorrências iniciais; a renovação automática mantém o horizonte depois.
         for (let i = 0; i < 12; i++) {
           let nextDate: Date;
           if (recurringPeriod === 'monthly') nextDate = addMonths(baseDate, i);
@@ -445,6 +539,9 @@ export const Transactions: React.FC = () => {
             categoryId,
             accountId: paymentMethod === 'account' ? accountId : null,
             cardId: paymentMethod === 'card' ? cardId : null,
+            paymentType: paymentType || null,
+            clientId: clientId || null,
+            clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 0 ? 'completed' : 'pending',
             entityId: targetEntityId,
             ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
@@ -465,6 +562,9 @@ export const Transactions: React.FC = () => {
           categoryId,
           accountId: paymentMethod === 'account' ? accountId : null,
           cardId: paymentMethod === 'card' ? cardId : null,
+          paymentType: paymentType || null,
+          clientId: clientId || null,
+          clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           status: 'completed',
           entityId: targetEntityId,
           ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
@@ -491,6 +591,9 @@ export const Transactions: React.FC = () => {
     setAccountId('');
     setToAccountId('');
     setCardId('');
+    setPaymentMethod('account');
+    setPaymentType('');
+    setClientId('');
     setIsInstallment(false);
     setTotalInstallments('1');
     setType('expense');
@@ -966,12 +1069,43 @@ export const Transactions: React.FC = () => {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Tipo de Pagamento</label>
+                      <select
+                        value={paymentType}
+                        onChange={(e) => setPaymentType(e.target.value as typeof paymentType)}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="">Não informado</option>
+                        {PAYMENT_TYPES.map(p => (
+                          <option key={p.id} value={p.id}>{p.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Cliente {type === 'income' ? '(quem pagou)' : '(opcional)'}
+                      </label>
+                      <select
+                        value={clientId}
+                        onChange={(e) => setClientId(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="">Nenhum</option>
+                        {clients.filter(c => c.entityId === targetEntityId).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   {!editingTransaction && (
                     <div className="space-y-4">
                       <div className="rounded-xl bg-gray-50 p-4">
                         <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={isInstallment}
                             onChange={(e) => {
                               setIsInstallment(e.target.checked);
