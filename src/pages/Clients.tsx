@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Client } from '../types';
+import { Client, Transaction } from '../types';
 import { 
   Plus, 
   Search, 
@@ -53,6 +53,7 @@ export const Clients: React.FC = () => {
   const { showToast, confirm } = useUI();
   const { theme } = useTheme();
   const [clients, setClients] = useState<Client[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,7 +102,7 @@ export const Clients: React.FC = () => {
     return value
       .replace(/\D/g, '')
       .replace(/(\d{2})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$3')
+      .replace(/(\d{3})(\d)/, '$1.$2')
       .replace(/(\d{3})(\d)/, '$1/$2')
       .replace(/(\d{4})(\d)/, '$1-$2')
       .replace(/(-\d{2})\d+?$/, '$1');
@@ -116,6 +117,7 @@ export const Clients: React.FC = () => {
 
     const unsubscribes: (() => void)[] = [];
     let allClients: Client[] = [];
+    let allTx: Transaction[] = [];
 
     filteredEntities.forEach(entity => {
       const q = query(collection(db, `entities/${entity.id}/clients`), orderBy('createdAt', 'desc'));
@@ -128,11 +130,31 @@ export const Clients: React.FC = () => {
         handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/clients`);
       });
       unsubscribes.push(unsub);
+
+      // Transações para calcular recebido/pendente por cliente.
+      const txUnsub = onSnapshot(query(collection(db, `entities/${entity.id}/transactions`)), (snapshot) => {
+        const entityTx = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[];
+        allTx = [...allTx.filter(t => t.entityId !== entity.id), ...entityTx];
+        setTransactions([...allTx]);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/transactions`));
+      unsubscribes.push(txUnsub);
     });
 
     setLoading(false);
     return () => unsubscribes.forEach(unsub => unsub());
   }, [entities, filterType]);
+
+  // Totais por cliente: recebido (concluído) e a receber (pendente).
+  const clientTotals = useMemo(() => {
+    const map: Record<string, { received: number; pending: number }> = {};
+    for (const t of transactions) {
+      if (!t.clientId || t.type !== 'income') continue;
+      if (!map[t.clientId]) map[t.clientId] = { received: 0, pending: 0 };
+      if (t.status === 'completed') map[t.clientId].received += Number(t.amount) || 0;
+      else if (t.status === 'pending') map[t.clientId].pending += Number(t.amount) || 0;
+    }
+    return map;
+  }, [transactions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,7 +206,7 @@ export const Clients: React.FC = () => {
     setAddress(client.address || '');
     setDrivePath(client.drivePath || '');
     setTargetEntityId(client.entityId);
-    setCredentials(client.credentials);
+    setCredentials(client.credentials || {});
     setContracts(client.contracts || []);
     setActiveTab('info');
     setIsModalOpen(true);
@@ -388,12 +410,29 @@ export const Clients: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Acessos</p>
                   <div className="flex flex-wrap gap-2">
-                    {client.credentials.instagram && <Instagram className="h-4 w-4 text-pink-500" />}
-                    {client.credentials.facebook && <Facebook className="h-4 w-4 text-blue-600" />}
-                    {client.credentials.googleAds && <Chrome className="h-4 w-4 text-yellow-600" />}
-                    {client.credentials.wordpress && <Layout className="h-4 w-4 text-gray-600" />}
+                    {client.credentials?.instagram && <Instagram className="h-4 w-4 text-pink-500" />}
+                    {client.credentials?.facebook && <Facebook className="h-4 w-4 text-blue-600" />}
+                    {client.credentials?.googleAds && <Chrome className="h-4 w-4 text-yellow-600" />}
+                    {client.credentials?.wordpress && <Layout className="h-4 w-4 text-gray-600" />}
                   </div>
                 </div>
+
+                {(clientTotals[client.id]?.received || clientTotals[client.id]?.pending) ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-emerald-50 p-2.5">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-500">Recebido</p>
+                      <p className="text-sm font-black text-emerald-700">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(clientTotals[client.id]?.received || 0)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-amber-50 p-2.5">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500">A Receber</p>
+                      <p className="text-sm font-black text-amber-700">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(clientTotals[client.id]?.pending || 0)}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
 
                 {client.contracts && client.contracts.length > 0 && (
                   <div className="space-y-2">
