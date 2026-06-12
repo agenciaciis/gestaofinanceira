@@ -141,7 +141,14 @@ export const Quotes: React.FC = () => {
             }
           }
         }
-        updated.total = updated.quantity * updated.unitPrice;
+        // Guarda contra NaN vindo de inputs vazios. O desconto é abatido uma única
+        // vez no total geral (subtotal - discountTotal), então item.total é bruto.
+        const qty = Number(updated.quantity) || 0;
+        const price = Number(updated.unitPrice) || 0;
+        updated.quantity = qty;
+        updated.unitPrice = price;
+        updated.discount = Number(updated.discount) || 0;
+        updated.total = qty * price;
         return updated;
       }
       return item;
@@ -155,6 +162,15 @@ export const Quotes: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEntity) return;
+
+    if (quoteItems.length === 0) {
+      showToast('Adicione pelo menos um item ao orçamento.', 'error');
+      return;
+    }
+    if (quoteItems.some(i => !i.description?.trim())) {
+      showToast('Há itens sem descrição. Selecione um serviço/plano para cada item.', 'error');
+      return;
+    }
 
     try {
       let clientId = selectedClientId;
@@ -174,8 +190,16 @@ export const Quotes: React.FC = () => {
         clientName = newClientName;
       }
 
-      const quoteData = {
-        quoteNumber: editingQuote?.quoteNumber || `ORC-${Date.now().toString().slice(-6)}`,
+      // Número único: data + epoch base36 + sufixo aleatório (sem colisão prática).
+      const uniqueQuoteNumber = () => {
+        const d = new Date();
+        const ym = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
+        return `ORC-${ym}-${Date.now().toString(36).slice(-4).toUpperCase()}${rand}`;
+      };
+
+      const quoteData: any = {
+        quoteNumber: editingQuote?.quoteNumber || uniqueQuoteNumber(),
         clientId,
         clientName,
         date: quoteDate,
@@ -185,13 +209,13 @@ export const Quotes: React.FC = () => {
         discountTotal,
         total,
         paymentMethod,
-        installments,
+        installments: Number(installments) || 1,
         status: editingQuote?.status || 'draft',
         notes,
         entityId: selectedEntity.id,
         ownerUid: selectedEntity.ownerUid,
         collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
-        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         recurrenceConfig: {
           enabled: recurrenceEnabled,
           frequency: recurrenceFrequency,
@@ -200,8 +224,10 @@ export const Quotes: React.FC = () => {
       };
 
       if (editingQuote) {
+        // Preserva o createdAt original na edição.
         await updateDoc(doc(db, `entities/${selectedEntity.id}/quotes/${editingQuote.id}`), quoteData);
       } else {
+        quoteData.createdAt = serverTimestamp();
         await addDoc(collection(db, `entities/${selectedEntity.id}/quotes`), quoteData);
       }
 

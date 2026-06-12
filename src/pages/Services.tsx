@@ -75,7 +75,7 @@ export const Services: React.FC = () => {
         const serviceData = {
           name,
           description,
-          basePrice: parseFloat(price),
+          basePrice: Number(price) || 0,
           category,
           entityId: selectedEntity.id,
           ownerUid: selectedEntity.ownerUid,
@@ -92,7 +92,7 @@ export const Services: React.FC = () => {
         const planData = {
           name,
           description,
-          price: parseFloat(price),
+          price: Number(price) || 0,
           billingCycle,
           services: selectedServices,
           entityId: selectedEntity.id,
