@@ -39,6 +39,7 @@ import { cn } from '../lib/utils';
 import { format, addMonths, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GoogleGenAI } from "@google/genai";
+import { computeBalances, daysUntilDueDay } from '../lib/finance';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -91,8 +92,11 @@ export const FinancialHealth: React.FC = () => {
   }, [selectedEntity]);
 
   const totalDebt = useMemo(() => debts.reduce((acc, d) => acc + d.remainingAmount, 0), [debts]);
-  const totalBalance = useMemo(() => accounts.reduce((acc, a) => acc + a.currentBalance, 0), [accounts]);
-  
+  const totalBalance = useMemo(() => {
+    const balances = computeBalances(accounts, transactions);
+    return Object.values(balances).reduce((acc, v) => acc + v, 0);
+  }, [accounts, transactions]);
+
   const debtStats = useMemo(() => {
     let totalEstimatedInterest = 0;
     let maxMonths = 0;
@@ -132,8 +136,8 @@ export const FinancialHealth: React.FC = () => {
     }));
   }, [debts]);
 
-  const calculatePayoff = (remaining: number, monthly: number, interestRate: number) => {
-    if (monthly <= 0) return { months: Infinity, totalInterest: Infinity };
+  function calculatePayoff(remaining: number, monthly: number, interestRate: number) {
+    if (!(monthly > 0)) return { months: Infinity, totalInterest: Infinity };
     
     const monthlyRate = interestRate / 100;
     let currentBalance = remaining;
@@ -154,11 +158,10 @@ export const FinancialHealth: React.FC = () => {
   };
 
   const activeAlerts = useMemo(() => {
-    const today = new Date().getDate();
     return debts.filter(debt => {
       if (!debt.alerts) return false;
-      
-      const daysUntilDue = debt.dueDate >= today ? debt.dueDate - today : (30 - today + debt.dueDate);
+
+      const daysUntilDue = daysUntilDueDay(debt.dueDate);
       const isDueSoon = debt.alerts.dueDateEnabled && daysUntilDue <= (debt.alerts.dueDateDaysBefore || 0);
       const isThresholdReached = debt.alerts.thresholdEnabled && debt.remainingAmount <= (debt.alerts.thresholdValue || 0);
       
@@ -173,8 +176,7 @@ export const FinancialHealth: React.FC = () => {
     }
 
     try {
-      const today = new Date().getDate();
-      const daysUntilDue = debt.dueDate >= today ? debt.dueDate - today : (30 - today + debt.dueDate);
+      const daysUntilDue = daysUntilDueDay(debt.dueDate);
       const isDueSoon = debt.alerts?.dueDateEnabled && daysUntilDue <= (debt.alerts?.dueDateDaysBefore || 0);
       const isThresholdReached = debt.alerts?.thresholdEnabled && debt.remainingAmount <= (debt.alerts?.thresholdValue || 0);
 
@@ -329,8 +331,7 @@ export const FinancialHealth: React.FC = () => {
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {activeAlerts.map(debt => {
-                  const today = new Date().getDate();
-                  const daysUntilDue = debt.dueDate >= today ? debt.dueDate - today : (30 - today + debt.dueDate);
+                  const daysUntilDue = daysUntilDueDay(debt.dueDate);
                   const isDueSoon = debt.alerts?.dueDateEnabled && daysUntilDue <= (debt.alerts?.dueDateDaysBefore || 0);
                   const isThresholdReached = debt.alerts?.thresholdEnabled && debt.remainingAmount <= (debt.alerts?.thresholdValue || 0);
 
@@ -575,8 +576,7 @@ export const FinancialHealth: React.FC = () => {
                         </div>
                       )}
                       {(() => {
-                        const today = new Date().getDate();
-                        const daysUntilDue = debt.dueDate >= today ? debt.dueDate - today : (30 - today + debt.dueDate);
+                        const daysUntilDue = daysUntilDueDay(debt.dueDate);
                         if (debt.alerts?.dueDateEnabled && daysUntilDue <= (debt.alerts.dueDateDaysBefore || 0)) {
                           return (
                             <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-rose-50 text-[10px] font-bold text-rose-600 border border-rose-100">

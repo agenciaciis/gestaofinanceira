@@ -3,16 +3,19 @@ import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { BankAccount } from '../types';
-import { Plus, Landmark, MoreVertical, Trash2, Edit2, Wallet } from 'lucide-react';
+import { BankAccount, Transaction } from '../types';
+import { Plus, Landmark, Trash2, Edit2, Wallet } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { computeBalances } from '../lib/finance';
 
 export const BankAccounts: React.FC = () => {
   const { selectedEntity } = useEntity();
   const { showToast, confirm } = useUI();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Form state
@@ -23,43 +26,77 @@ export const BankAccounts: React.FC = () => {
   useEffect(() => {
     if (!selectedEntity) return;
 
-    const q = query(collection(db, `entities/${selectedEntity.id}/bank_accounts`));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const qAccounts = query(collection(db, `entities/${selectedEntity.id}/bank_accounts`));
+    const unsubAccounts = onSnapshot(qAccounts, (snapshot) => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BankAccount[]);
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/bank_accounts`));
 
-    return () => unsubscribe();
+    const qTx = query(collection(db, `entities/${selectedEntity.id}/transactions`));
+    const unsubTx = onSnapshot(qTx, (snapshot) => {
+      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[]);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/transactions`));
+
+    return () => { unsubAccounts(); unsubTx(); };
   }, [selectedEntity]);
 
+  // Saldo é SEMPRE calculado a partir das transações concluídas (fonte da verdade).
+  const balances = computeBalances(accounts, transactions);
+  const getBalance = (account: BankAccount) =>
+    account.id in balances ? balances[account.id] : (account.currentBalance ?? account.initialBalance ?? 0);
+
   const summary = accounts.reduce((acc, curr) => {
-    acc[curr.type] = (acc[curr.type] || 0) + curr.currentBalance;
-    acc.total = (acc.total || 0) + curr.currentBalance;
+    const bal = getBalance(curr);
+    acc[curr.type] = (acc[curr.type] || 0) + bal;
+    acc.total = (acc.total || 0) + bal;
     return acc;
   }, {} as Record<string, number>);
+
+  const resetForm = () => {
+    setBankName('');
+    setType('corrente');
+    setInitialBalance('');
+    setEditingAccount(null);
+  };
+
+  const handleEdit = (account: BankAccount) => {
+    setEditingAccount(account);
+    setBankName(account.bankName);
+    setType(account.type);
+    setInitialBalance(String(account.initialBalance ?? ''));
+    setIsModalOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEntity) return;
 
     try {
-      await addDoc(collection(db, `entities/${selectedEntity.id}/bank_accounts`), {
-        bankName,
-        type,
-        initialBalance: Number(initialBalance),
-        currentBalance: Number(initialBalance),
-        entityId: selectedEntity.id,
-        ownerUid: selectedEntity.ownerUid,
-        collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
-        createdAt: serverTimestamp(),
-      });
+      if (editingAccount) {
+        await updateDoc(doc(db, `entities/${selectedEntity.id}/bank_accounts`, editingAccount.id), {
+          bankName,
+          type,
+          initialBalance: Number(initialBalance),
+        });
+        showToast('Conta bancária atualizada com sucesso!', 'success');
+      } else {
+        await addDoc(collection(db, `entities/${selectedEntity.id}/bank_accounts`), {
+          bankName,
+          type,
+          initialBalance: Number(initialBalance),
+          currentBalance: Number(initialBalance),
+          entityId: selectedEntity.id,
+          ownerUid: selectedEntity.ownerUid,
+          collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
+          createdAt: serverTimestamp(),
+        });
+        showToast('Conta bancária cadastrada com sucesso!', 'success');
+      }
       setIsModalOpen(false);
-      setBankName('');
-      setInitialBalance('');
-      showToast('Conta bancária cadastrada com sucesso!', 'success');
+      resetForm();
     } catch (error) {
-      console.error("Error adding account:", error);
-      showToast('Erro ao cadastrar conta bancária.', 'error');
+      console.error("Error saving account:", error);
+      showToast('Erro ao salvar conta bancária.', 'error');
     }
   };
 
@@ -99,8 +136,8 @@ export const BankAccounts: React.FC = () => {
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Contas & Caixas</h2>
           <p className="text-sm font-medium text-slate-500">Gestão centralizada de toda sua liquidez.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
+        <button
+          onClick={() => { resetForm(); setIsModalOpen(true); }}
           className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
         >
           <Plus className="h-4 w-4" />
@@ -160,7 +197,10 @@ export const BankAccounts: React.FC = () => {
                 <Landmark className="h-6 w-6" />
               </div>
               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-2 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-primary transition-colors">
+                <button
+                  onClick={() => handleEdit(account)}
+                  className="p-2 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-primary transition-colors"
+                >
                   <Edit2 className="h-4 w-4" />
                 </button>
                 <button 
@@ -178,8 +218,11 @@ export const BankAccounts: React.FC = () => {
               <h3 className="text-lg font-black text-slate-900 mt-1">{account.bankName}</h3>
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-sm font-bold text-slate-400">R$</span>
-                <p className="text-3xl font-black text-slate-900 tracking-tight">
-                  {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(account.currentBalance)}
+                <p className={cn(
+                  "text-3xl font-black tracking-tight",
+                  getBalance(account) < 0 ? "text-rose-600" : "text-slate-900"
+                )}>
+                  {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(getBalance(account))}
                 </p>
               </div>
             </div>
@@ -210,7 +253,7 @@ export const BankAccounts: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl"
           >
-            <h3 className="text-xl font-bold text-gray-900">Nova Conta Bancária</h3>
+            <h3 className="text-xl font-bold text-gray-900">{editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Nome do Banco</label>
@@ -255,7 +298,7 @@ export const BankAccounts: React.FC = () => {
               <div className="mt-8 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); resetForm(); }}
                   className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                 >
                   Cancelar
@@ -264,7 +307,7 @@ export const BankAccounts: React.FC = () => {
                   type="submit"
                   className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90"
                 >
-                  Salvar Conta
+                  {editingAccount ? 'Salvar Alterações' : 'Salvar Conta'}
                 </button>
               </div>
             </form>

@@ -19,7 +19,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { format, isAfter, isBefore, startOfDay } from 'date-fns';
+import { format, isBefore, startOfDay } from 'date-fns';
+import { CATEGORIES } from '../constants';
+import { parseLocalDate } from '../lib/finance';
 
 export const Debts: React.FC = () => {
   const { selectedEntity } = useEntity();
@@ -62,7 +64,8 @@ export const Debts: React.FC = () => {
 
     try {
       await updateDoc(doc(db, `entities/${selectedEntity.id}/transactions/${transaction.id}`), {
-        status: 'paid',
+        status: 'completed',
+        paidAt: new Date().toISOString().split('T')[0],
         updatedAt: serverTimestamp()
       });
       showToast('Pagamento confirmado com sucesso!', 'success');
@@ -94,10 +97,10 @@ export const Debts: React.FC = () => {
 
   const filteredDebts = transactions.filter(t => {
     const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const isOverdue = isBefore(new Date(t.date), startOfDay(new Date()));
-    
+    const isOverdue = isBefore(parseLocalDate(t.date), startOfDay(new Date()));
+
     if (filter === 'overdue') return matchesSearch && isOverdue;
-    if (filter === 'pending') return matchesSearch && !isOverdue;
+    // "Pendentes" mostra TODAS as pendências (inclusive as atrasadas).
     return matchesSearch;
   });
 
@@ -188,7 +191,7 @@ export const Debts: React.FC = () => {
           </div>
         ) : (
           filteredDebts.map(debt => {
-            const isOverdue = isBefore(new Date(debt.date), startOfDay(new Date()));
+            const isOverdue = isBefore(parseLocalDate(debt.date), startOfDay(new Date()));
             return (
               <motion.div 
                 layout
@@ -211,7 +214,7 @@ export const Debts: React.FC = () => {
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          Vencimento: {format(new Date(debt.date), 'dd/MM/yyyy')}
+                          Vencimento: {format(parseLocalDate(debt.date), 'dd/MM/yyyy')}
                         </span>
                         {isOverdue && (
                           <span className="text-[10px] font-black uppercase tracking-widest text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
@@ -231,7 +234,7 @@ export const Debts: React.FC = () => {
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(debt.amount)}
                       </p>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        {debt.category}
+                        {CATEGORIES.find(c => c.id === debt.categoryId)?.name || 'Outros'}
                       </p>
                     </div>
 

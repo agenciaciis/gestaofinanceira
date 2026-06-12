@@ -46,8 +46,9 @@ import { cn } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth, isAfter, isBefore, isSameDay, isSameYear, subDays, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice } from '../lib/finance';
 
-const StatCard: React.FC<{ 
+const StatCard: React.FC<{
   title: string; 
   value: number; 
   type: 'income' | 'expense' | 'balance' | 'neutral'; 
@@ -187,9 +188,13 @@ export const Dashboard: React.FC = () => {
   const currentMonthStart = startOfMonth(now);
   const lastMonthStart = subMonths(currentMonthStart, 1);
 
+  // Saldo calculado por conta (fonte da verdade), usado também na lista lateral.
+  const accountBalances = useMemo(() => computeBalances(accounts, transactions), [accounts, transactions]);
+
   const stats = useMemo(() => {
-    const totalBankBalance = accounts.reduce((acc, a) => acc + a.currentBalance, 0);
-    
+    const balancesByAccount = computeBalances(accounts, transactions);
+    const totalBankBalance = Object.values(balancesByAccount).reduce((acc, v) => acc + v, 0);
+
     const filterFn = (date: Date, referenceDate: Date) => {
       if (timeFilter === 'today') return isSameDay(date, referenceDate);
       if (timeFilter === 'year') return isSameYear(date, referenceDate);
@@ -205,19 +210,19 @@ export const Dashboard: React.FC = () => {
     const prevDate = getPreviousPeriodDate(now);
 
     const incomeThisPeriod = transactions
-      .filter(t => t.type === 'income' && t.status === 'completed' && filterFn(new Date(t.date), now))
+      .filter(t => t.type === 'income' && t.status === 'completed' && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
     
     const expenseThisPeriod = transactions
-      .filter(t => t.type === 'expense' && t.status === 'completed' && filterFn(new Date(t.date), now))
+      .filter(t => t.type === 'expense' && t.status === 'completed' && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const incomeLastPeriod = transactions
-      .filter(t => t.type === 'income' && t.status === 'completed' && filterFn(new Date(t.date), prevDate))
+      .filter(t => t.type === 'income' && t.status === 'completed' && filterFn(parseLocalDate(t.date), prevDate))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const expenseLastPeriod = transactions
-      .filter(t => t.type === 'expense' && t.status === 'completed' && filterFn(new Date(t.date), prevDate))
+      .filter(t => t.type === 'expense' && t.status === 'completed' && filterFn(parseLocalDate(t.date), prevDate))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const pendingIncome = transactions
@@ -229,12 +234,11 @@ export const Dashboard: React.FC = () => {
       .reduce((acc, t) => acc + t.amount, 0);
 
     const overdue = transactions
-      .filter(t => t.status === 'pending' && isBefore(new Date(t.date), new Date().setHours(0,0,0,0)))
+      .filter(t => t.status === 'pending' && t.type === 'expense' && isBefore(parseLocalDate(t.date), new Date().setHours(0,0,0,0)))
       .reduce((acc, t) => acc + t.amount, 0);
 
-    const cardDebt = transactions
-      .filter(t => t.cardId && t.type === 'expense' && t.status !== 'cancelled')
-      .reduce((acc, t) => acc + t.amount, 0);
+    // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
+    const cardDebt = cards.reduce((acc, card) => acc + computeCardInvoice(card.id, card.closingDay, transactions, now), 0);
 
     const totalOpenDebts = debts.reduce((acc, d) => acc + d.remainingAmount, 0);
     
@@ -269,7 +273,7 @@ export const Dashboard: React.FC = () => {
     const budgetProgress = CATEGORIES.filter(c => budgets[c.id]).map(cat => {
       const isIncome = cat.type === 'income';
       const realized = transactions
-        .filter(t => t.categoryId === cat.id && t.status === 'completed' && isSameMonth(new Date(t.date), now))
+        .filter(t => t.categoryId === cat.id && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), now))
         .reduce((acc, t) => acc + t.amount, 0);
       const goal = budgets[cat.id];
       const percentage = goal > 0 ? (realized / goal) * 100 : 0;
@@ -298,7 +302,7 @@ export const Dashboard: React.FC = () => {
       expenseTrend: calculateTrend(expenseThisPeriod, expenseLastPeriod),
       budgetProgress
     };
-  }, [transactions, accounts, debts, budgets, now, timeFilter]);
+  }, [transactions, accounts, cards, debts, budgets, now, timeFilter]);
 
   // Chart Data: Last 6 months + Next 6 months projection
   const cashFlowData = useMemo(() => {
@@ -307,10 +311,10 @@ export const Dashboard: React.FC = () => {
     for (let i = 5; i >= 0; i--) {
       const month = subMonths(now, i);
       const monthIncome = transactions
-        .filter(t => t.type === 'income' && t.status === 'completed' && isSameMonth(new Date(t.date), month))
+        .filter(t => t.type === 'income' && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
       const monthExpense = transactions
-        .filter(t => t.type === 'expense' && t.status === 'completed' && isSameMonth(new Date(t.date), month))
+        .filter(t => t.type === 'expense' && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
       
       data.push({
@@ -327,10 +331,10 @@ export const Dashboard: React.FC = () => {
     for (let i = 1; i <= 6; i++) {
       const month = addMonths(now, i);
       const monthIncome = transactions
-        .filter(t => t.type === 'income' && isSameMonth(new Date(t.date), month))
+        .filter(t => t.type === 'income' && isNotCancelled(t) && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
       const monthExpense = transactions
-        .filter(t => t.type === 'expense' && isSameMonth(new Date(t.date), month))
+        .filter(t => t.type === 'expense' && isNotCancelled(t) && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
 
       data.push({
@@ -354,7 +358,7 @@ export const Dashboard: React.FC = () => {
 
     return CATEGORIES.map(cat => {
       const amount = transactions
-        .filter(t => t.categoryId === cat.id && t.type === 'expense' && t.status === 'completed' && filterFn(new Date(t.date)))
+        .filter(t => t.categoryId === cat.id && t.type === 'expense' && t.status === 'completed' && filterFn(parseLocalDate(t.date)))
         .reduce((acc, t) => acc + t.amount, 0);
       return { name: cat.name, value: amount };
     }).filter(c => c.value > 0).sort((a, b) => b.value - a.value).slice(0, 6);
@@ -364,7 +368,7 @@ export const Dashboard: React.FC = () => {
 
   const upcomingBills = useMemo(() => {
     return transactions
-      .filter(t => t.status === 'pending' && isAfter(new Date(t.date), new Date().setHours(0,0,0,0)))
+      .filter(t => t.status === 'pending' && isAfter(parseLocalDate(t.date), new Date().setHours(0,0,0,0)))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 5);
   }, [transactions]);
@@ -797,8 +801,11 @@ export const Dashboard: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <p className="text-sm font-black text-slate-900">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(acc.currentBalance)}
+                  <p className={cn(
+                    "text-sm font-black",
+                    (accountBalances[acc.id] ?? 0) < 0 ? "text-rose-600" : "text-slate-900"
+                  )}>
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(accountBalances[acc.id] ?? acc.currentBalance ?? 0)}
                   </p>
                 </div>
               ))}
@@ -809,10 +816,8 @@ export const Dashboard: React.FC = () => {
             <h3 className="mb-4 text-sm font-black uppercase tracking-widest text-slate-400">Cartões de Crédito</h3>
             <div className="space-y-4">
               {cards.map(card => {
-                const used = transactions
-                  .filter(t => t.cardId === card.id && t.type === 'expense' && t.status !== 'cancelled')
-                  .reduce((acc, t) => acc + t.amount, 0);
-                const usage = (used / card.limit) * 100;
+                const used = computeCardInvoice(card.id, card.closingDay, transactions, now);
+                const usage = card.limit > 0 ? (used / card.limit) * 100 : 0;
                 return (
                   <div key={card.id} className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -858,10 +863,10 @@ export const Dashboard: React.FC = () => {
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col items-center justify-center h-12 w-12 rounded-2xl bg-slate-50 border border-slate-100 group-hover:bg-primary group-hover:border-primary transition-all">
                       <span className="text-[10px] font-black text-slate-400 group-hover:text-white/70 uppercase">
-                        {format(new Date(t.date), 'MMM', { locale: ptBR })}
+                        {format(parseLocalDate(t.date), 'MMM', { locale: ptBR })}
                       </span>
                       <span className="text-lg font-black text-slate-900 group-hover:text-white leading-none">
-                        {format(new Date(t.date), 'dd')}
+                        {format(parseLocalDate(t.date), 'dd')}
                       </span>
                     </div>
                     <div>
@@ -913,7 +918,7 @@ export const Dashboard: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900 truncate max-w-[120px]">{t.description}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">{format(new Date(t.date), 'dd MMM')}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">{format(parseLocalDate(t.date), 'dd MMM')}</p>
                   </div>
                 </div>
                 <p className={cn(

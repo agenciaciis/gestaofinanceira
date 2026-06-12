@@ -6,6 +6,7 @@ import { Transaction } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, startOfMonth, endOfMonth, subMonths, isSameMonth } from 'date-fns';
+import { parseLocalDate, isNotCancelled } from '../lib/finance';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES, MONTHS } from '../constants';
 import { 
@@ -96,7 +97,7 @@ export const Reports: React.FC = () => {
   // Data Aggregation
   const filteredData = useMemo(() => {
     return transactions.filter(t => {
-      const d = new Date(t.date);
+      const d = parseLocalDate(t.date);
       return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
     });
   }, [transactions, selectedMonth, selectedYear]);
@@ -104,8 +105,9 @@ export const Reports: React.FC = () => {
   const stats = useMemo(() => {
     const realizedIncome = filteredData.filter(t => t.type === 'income' && t.status === 'completed').reduce((acc, t) => acc + t.amount, 0);
     const realizedExpense = filteredData.filter(t => t.type === 'expense' && t.status === 'completed').reduce((acc, t) => acc + t.amount, 0);
-    const projectedIncome = filteredData.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-    const projectedExpense = filteredData.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+    // "Projetado" = realizado + pendente (exclui cancelados).
+    const projectedIncome = filteredData.filter(t => t.type === 'income' && isNotCancelled(t)).reduce((acc, t) => acc + t.amount, 0);
+    const projectedExpense = filteredData.filter(t => t.type === 'expense' && isNotCancelled(t)).reduce((acc, t) => acc + t.amount, 0);
     
     return { 
       income: realizedIncome, 
@@ -118,7 +120,7 @@ export const Reports: React.FC = () => {
   }, [filteredData]);
 
   const expenseCategoryData = useMemo(() => {
-    const expenses = filteredData.filter(t => t.type === 'expense');
+    const expenses = filteredData.filter(t => t.type === 'expense' && t.status === 'completed');
     const grouped = expenses.reduce((acc, t) => {
       const cat = CATEGORIES.find(c => c.id === t.categoryId) || CATEGORIES.find(c => c.id === 'outros')!;
       acc[cat.name] = (acc[cat.name] || 0) + t.amount;
@@ -133,7 +135,7 @@ export const Reports: React.FC = () => {
   }, [filteredData]);
 
   const incomeCategoryData = useMemo(() => {
-    const incomes = filteredData.filter(t => t.type === 'income');
+    const incomes = filteredData.filter(t => t.type === 'income' && t.status === 'completed');
     const grouped = incomes.reduce((acc, t) => {
       const cat = CATEGORIES.find(c => c.id === t.categoryId) || CATEGORIES.find(c => c.id === 'outros')!;
       acc[cat.name] = (acc[cat.name] || 0) + t.amount;
@@ -158,8 +160,8 @@ export const Reports: React.FC = () => {
       const y = d.getFullYear();
       
       const monthData = transactions.filter(t => {
-        const td = new Date(t.date);
-        return td.getMonth() === m && td.getFullYear() === y;
+        const td = parseLocalDate(t.date);
+        return td.getMonth() === m && td.getFullYear() === y && isNotCancelled(t);
       });
 
       const income = monthData.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
@@ -274,7 +276,7 @@ export const Reports: React.FC = () => {
     const categoryRows = expenseCategoryData.map(cat => [
       cat.name,
       new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cat.value),
-      `${((cat.value / stats.expense) * 100).toFixed(1)}%`
+      `${(stats.expense > 0 ? (cat.value / stats.expense) * 100 : 0).toFixed(1)}%`
     ]);
 
     autoTable(doc, {
