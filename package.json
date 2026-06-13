@@ -11,7 +11,10 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed": "tsx scripts/seed.ts",
+    "seed:verify": "tsx scripts/verify.ts",
+    "seed:clean": "tsx scripts/clean.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
