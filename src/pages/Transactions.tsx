@@ -98,9 +98,11 @@ export const Transactions: React.FC = () => {
   };
 
   const toggleStatus = async (transaction: Transaction) => {
+    const completing = transaction.status !== 'completed';
+    const newStatus = completing ? 'completed' : 'pending';
+    // Atualização OTIMISTA: reflete na hora (cards e lista), sem esperar o Firestore.
+    setTransactions(prev => prev.map(x => x.id === transaction.id ? { ...x, status: newStatus } : x));
     try {
-      const completing = transaction.status !== 'completed';
-      const newStatus = completing ? 'completed' : 'pending';
       await updateDoc(doc(db, `entities/${transaction.entityId}/transactions/${transaction.id}`), {
         status: newStatus,
         paidAt: completing ? new Date().toISOString().split('T')[0] : null,
@@ -110,6 +112,8 @@ export const Transactions: React.FC = () => {
       showToast(`${transaction.description}: ${verb}. ${completing ? 'Toque no selo verde para desfazer.' : ''}`.trim(), 'success');
     } catch (error) {
       console.error("Error updating status:", error);
+      // Reverte a atualização otimista em caso de falha.
+      setTransactions(prev => prev.map(x => x.id === transaction.id ? { ...x, status: transaction.status } : x));
       showToast('Erro ao atualizar status.', 'error');
     }
   };
@@ -121,15 +125,16 @@ export const Transactions: React.FC = () => {
     return 'Concluído';
   };
 
+  const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
   const filteredTransactions = transactions.filter(t => {
     const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const isOverdue = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
-    
-    const tDate = new Date(t.date);
+    const isOverdue = t.status === 'pending' && parseLocalDate(t.date) < todayStart;
+
+    const tDate = parseLocalDate(t.date);
     const matchesDate = tDate.getMonth() === selectedMonth && tDate.getFullYear() === selectedYear;
 
     if (!matchesDate) return false;
-    
+
     if (statusFilter === 'all') return matchesSearch;
     if (statusFilter === 'pending') return matchesSearch && t.status === 'pending' && !isOverdue;
     if (statusFilter === 'completed') return matchesSearch && t.status === 'completed';
@@ -137,9 +142,14 @@ export const Transactions: React.FC = () => {
     return matchesSearch;
   });
 
-  const summary = filteredTransactions.reduce((acc, t) => {
-    const isOverdue = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
-    
+  // Resumo do mês: sempre sobre TODAS as transações do mês (ignora o filtro de
+  // status), para que os cards e a "sobra do mês" não dependam da aba selecionada.
+  const summary = transactions.reduce((acc, t) => {
+    const tDate = parseLocalDate(t.date);
+    if (tDate.getMonth() !== selectedMonth || tDate.getFullYear() !== selectedYear) return acc;
+    if (t.status === 'cancelled') return acc;
+    const isOverdue = t.status === 'pending' && tDate < todayStart;
+
     if (t.type === 'income') {
       if (t.status === 'completed') acc.received += t.amount;
       else acc.toReceive += t.amount;
@@ -147,11 +157,15 @@ export const Transactions: React.FC = () => {
       if (t.status === 'completed') acc.paid += t.amount;
       else acc.toPay += t.amount;
     }
-    
-    if (isOverdue) acc.overdue += t.amount;
-    
+    if (isOverdue && t.type === 'expense') acc.overdue += t.amount;
+
     return acc;
   }, { received: 0, paid: 0, toReceive: 0, toPay: 0, overdue: 0 });
+
+  // "Sobra do mês"
+  const saldoRealizado = summary.received - summary.paid;                 // já recebido - já pago
+  const saldoProjetado = (summary.received + summary.toReceive) - (summary.paid + summary.toPay); // fim do mês
+  const liquidoPendente = summary.toReceive - summary.toPay;              // a receber - a pagar
 
   const changeMonth = (delta: number) => {
     let newMonth = selectedMonth + delta;
@@ -662,6 +676,31 @@ export const Transactions: React.FC = () => {
         </div>
       </div>
 
+      {/* Painel: Saldo / Sobra do Mês */}
+      <div className="grid gap-4 sm:grid-cols-3 rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:to-gray-900">
+        <div className="sm:border-r sm:border-slate-200 dark:sm:border-gray-800">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sobra projetada do mês</p>
+          <p className="text-[10px] text-slate-400 mb-1">(recebido + a receber) − (pago + a pagar)</p>
+          <p className={cn("text-3xl font-black tracking-tight", saldoProjetado >= 0 ? "text-emerald-600" : "text-rose-600")}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoProjetado)}
+          </p>
+        </div>
+        <div className="sm:px-5 sm:border-r sm:border-slate-200 dark:sm:border-gray-800">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Saldo realizado</p>
+          <p className="text-[10px] text-slate-400 mb-1">recebido − pago (já efetivado)</p>
+          <p className={cn("text-2xl font-black tracking-tight", saldoRealizado >= 0 ? "text-emerald-600" : "text-rose-600")}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoRealizado)}
+          </p>
+        </div>
+        <div className="sm:px-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">A receber − a pagar</p>
+          <p className="text-[10px] text-slate-400 mb-1">o que ainda falta entrar/sair</p>
+          <p className={cn("text-2xl font-black tracking-tight", liquidoPendente >= 0 ? "text-blue-600" : "text-orange-600")}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(liquidoPendente)}
+          </p>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -768,11 +807,11 @@ export const Transactions: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredTransactions.map((t) => {
-                const isOverdue = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
+                const isOverdue = t.status === 'pending' && parseLocalDate(t.date) < todayStart;
                 return (
                   <tr key={t.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="whitespace-nowrap px-6 py-4 text-gray-600">
-                      {new Date(t.date).toLocaleDateString()}
+                      {parseLocalDate(t.date).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
