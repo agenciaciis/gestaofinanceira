@@ -85,15 +85,76 @@
     background-color: #ffffff !important;
   }
 
+  /* Contraste no MODO CLARO: cinzas muito claros ficavam quase ilegíveis.
+     Sobe um tom os textos secundários mais fracos (mantém a hierarquia). */
+  :root:not(.dark) .text-gray-400 { color: #6b7280 !important; }   /* -> gray-500 */
+  :root:not(.dark) .text-slate-400 { color: #64748b !important; }  /* -> slate-500 */
+  :root:not(.dark) .text-gray-500 { color: #4b5563 !important; }   /* -> gray-600 */
+  :root:not(.dark) .text-slate-500 { color: #475569 !important; }  /* -> slate-600 */
+
   .bg-slate-900:not(.dark *) { @apply bg-slate-50 text-slate-900 border border-slate-200; }
   .bg-indigo-900:not(.dark *) { @apply bg-indigo-50 text-indigo-900 border border-indigo-200; }
 }
 
-/* Ensure inputs are always readable */
-input, select, textarea {
-  @apply text-gray-900 dark:text-gray-100;
+/* ===== Legibilidade e modernização dos campos de formulário ===== */
+/* Texto dos campos sempre com bom contraste (cores explícitas para vencer
+   precedência de inheritance no Tailwind v4). */
+input,
+select,
+textarea {
+  color: #0f172a !important;            /* slate-900 */
 }
 
-input::placeholder {
-  @apply text-gray-400;
+/* Placeholder visível porém suave (não "quase branco") */
+input::placeholder,
+textarea::placeholder {
+  color: #64748b !important;            /* slate-500 */
+  opacity: 1;
 }
+
+/* Opção placeholder de selects (value vazio) levemente suave, mas legível */
+select:required:invalid {
+  color: #64748b !important;            /* slate-500 */
+}
+select option {
+  color: #0f172a;                       /* opções do dropdown sempre escuras */
+}
+select option[value=""][disabled],
+select option[value=""] {
+  color: #64748b;
+}
+
+/* Modo escuro */
+.dark input,
+.dark select,
+.dark textarea {
+  color: #f1f5f9 !important;            /* slate-100 */
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8 !important;            /* slate-400 */
+}
+.dark select:required:invalid {
+  color: #94a3b8 !important;
+}
+.dark select option {
+  color: #f1f5f9;
+  background-color: #1f2937;
+}
+
+/* Foco moderno e consistente em todos os campos */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+/* Ícone do seletor de data legível no modo claro */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
