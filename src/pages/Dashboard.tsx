@@ -377,9 +377,10 @@ export const Dashboard: React.FC = () => {
 
   const toggleStatus = async (transaction: Transaction) => {
     try {
-      const newStatus = transaction.status === 'completed' ? 'pending' : 'completed';
+      const completing = transaction.status !== 'completed';
       await updateDoc(doc(db, `entities/${transaction.entityId}/transactions/${transaction.id}`), {
-        status: newStatus
+        status: completing ? 'completed' : 'pending',
+        paidAt: completing ? new Date().toISOString().split('T')[0] : null,
       });
     } catch (error) {
       console.error("Error updating status:", error);
@@ -884,15 +885,16 @@ export const Dashboard: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="flex flex-col items-end gap-1.5">
                     <p className="text-sm font-black text-slate-900">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                     </p>
-                    <button 
+                    <button
                       onClick={() => toggleStatus(t)}
-                      className="text-[10px] font-bold text-primary hover:underline"
+                      className="flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-all hover:bg-emerald-600 hover:shadow active:scale-95"
                     >
-                      Pagar agora
+                      <CheckCircle2 className="h-3 w-3" />
+                      {t.type === 'income' ? 'Receber' : 'Pagar'}
                     </button>
                   </div>
                 </div>

@@ -99,15 +99,26 @@ export const Transactions: React.FC = () => {
 
   const toggleStatus = async (transaction: Transaction) => {
     try {
-      const newStatus = transaction.status === 'completed' ? 'pending' : 'completed';
+      const completing = transaction.status !== 'completed';
+      const newStatus = completing ? 'completed' : 'pending';
       await updateDoc(doc(db, `entities/${transaction.entityId}/transactions/${transaction.id}`), {
-        status: newStatus
+        status: newStatus,
+        paidAt: completing ? new Date().toISOString().split('T')[0] : null,
+        updatedAt: serverTimestamp(),
       });
-      showToast(`Status atualizado para ${newStatus === 'completed' ? 'Pago' : 'Pendente'}.`, 'success');
+      const verb = transaction.type === 'income' ? (completing ? 'Recebido' : 'A receber') : (completing ? 'Pago' : 'Pendente');
+      showToast(`${transaction.description}: ${verb}. ${completing ? 'Toque no selo verde para desfazer.' : ''}`.trim(), 'success');
     } catch (error) {
       console.error("Error updating status:", error);
       showToast('Erro ao atualizar status.', 'error');
     }
+  };
+
+  // Rótulo do botão de ação rápida conforme tipo e estado.
+  const quickActionLabel = (t: Transaction) => {
+    if (t.type === 'income') return t.status === 'completed' ? 'Recebido' : 'Receber';
+    if (t.type === 'expense') return t.status === 'completed' ? 'Pago' : 'Pagar';
+    return 'Concluído';
   };
 
   const filteredTransactions = transactions.filter(t => {
@@ -817,18 +828,40 @@ export const Transactions: React.FC = () => {
                       ) : '-'}
                     </td>
                     <td className="px-6 py-4">
-                      <button 
-                        onClick={() => toggleStatus(t)}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase transition-all",
-                          t.status === 'completed' ? "bg-green-100 text-green-700 hover:bg-green-200" : 
-                          isOverdue ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        )}
-                      >
-                        {t.status === 'completed' ? <CheckCircle2 className="h-3 w-3" /> : 
-                         isOverdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                        {t.status === 'completed' ? 'Pago' : isOverdue ? 'Atrasado' : 'Pendente'}
-                      </button>
+                      {t.status === 'completed' ? (
+                        // Selo discreto — clique para desfazer (volta a pendente)
+                        <button
+                          onClick={() => toggleStatus(t)}
+                          title="Clique para desfazer"
+                          className="group/chip flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase text-green-700 transition-all hover:bg-green-200"
+                        >
+                          <CheckCircle2 className="h-3 w-3" />
+                          {quickActionLabel(t)}
+                        </button>
+                      ) : t.type === 'transfer' ? (
+                        <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-700">
+                          <CheckCircle2 className="h-3 w-3" /> Concluído
+                        </span>
+                      ) : (
+                        // Botão de AÇÃO RÁPIDA — um clique marca como pago/recebido
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleStatus(t)}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-95",
+                              t.type === 'income' ? "bg-emerald-500 hover:bg-emerald-600" : "bg-emerald-500 hover:bg-emerald-600"
+                            )}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {quickActionLabel(t)}
+                          </button>
+                          {isOverdue && (
+                            <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold uppercase text-red-600">
+                              <AlertCircle className="h-2.5 w-2.5" /> Atrasado
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className={cn(
                       "px-6 py-4 text-right font-bold",
