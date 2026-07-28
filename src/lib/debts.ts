@@ -159,3 +159,149 @@ export function rankByCost(views: DebtView[]): RankedDebt[] {
     return (b.monthlyCost as number) - (a.monthlyCost as number);
   });
 }
+
+export type PayoffStrategy = 'avalanche' | 'snowball';
+
+export interface PayoffResult {
+  months: number;
+  freedomDate: Date;
+  totalInterest: number;
+  totalPaid: number;
+  /** Dívidas cuja parcela não cobre nem os juros — ficam de fora da simulação. */
+  neverEnds: DebtView[];
+  /** Ordem de ataque efetiva (ids), da primeira à última. */
+  order: string[];
+  timeline: { month: number; totalBalance: number; interestPaid: number }[];
+}
+
+const MAX_MONTHS = 600; // 50 anos — trava de segurança
+
+interface Simulation {
+  months: number;
+  totalInterest: number;
+  totalPaid: number;
+  order: string[];
+  uncleared: DebtView[];
+  timeline: PayoffResult['timeline'];
+}
+
+/** Roda a simulação mês a mês para um conjunto fixo de dívidas. */
+function simulate(views: DebtView[], extra: number, strategy: PayoffStrategy): Simulation {
+  const active = views
+    .filter(v => v.balance > 0)
+    .map(v => ({ ...v, remaining: v.balance }));
+
+  const order = [...active]
+    .sort((a, b) =>
+      strategy === 'avalanche'
+        ? (b.interestRate ?? 0) - (a.interestRate ?? 0)
+        : a.balance - b.balance
+    )
+    .map(v => v.id);
+
+  const timeline: PayoffResult['timeline'] = [];
+  let totalInterest = 0;
+  let totalPaid = 0;
+  let months = 0;
+
+  while (active.some(d => d.remaining > 0.005) && months < MAX_MONTHS) {
+    months++;
+    let interestThisMonth = 0;
+
+    // 1. Juros do mês sobre o saldo de cada dívida ainda aberta.
+    for (const d of active) {
+      if (d.remaining <= 0) continue;
+      const rate = (d.interestRate ?? 0) / 100;
+      const interest = round2(d.remaining * rate);
+      d.remaining = round2(d.remaining + interest);
+      interestThisMonth = round2(interestThisMonth + interest);
+    }
+    totalInterest = round2(totalInterest + interestThisMonth);
+
+    // 2. Orçamento do mês: parcela de TODAS (inclusive as já quitadas — é o que
+    //    libera a bola de neve) mais o valor extra.
+    let budget = extra;
+    for (const d of active) {
+      budget = round2(budget + d.monthlyPayment);
+    }
+
+    // 3. Paga na ordem de ataque; o que sobrar escorre para a próxima da fila.
+    for (const id of order) {
+      if (budget <= 0) break;
+      const d = active.find(x => x.id === id);
+      if (!d || d.remaining <= 0) continue;
+      const pay = Math.min(budget, d.remaining);
+      d.remaining = round2(d.remaining - pay);
+      budget = round2(budget - pay);
+      totalPaid = round2(totalPaid + pay);
+    }
+
+    timeline.push({
+      month: months,
+      totalBalance: round2(active.reduce((a, d) => a + Math.max(0, d.remaining), 0)),
+      interestPaid: interestThisMonth,
+    });
+  }
+
+  const uncleared = active
+    .filter(d => d.remaining > 0.005)
+    .map(({ remaining, ...v }) => v as DebtView);
+
+  return { months, totalInterest, totalPaid, order, uncleared, timeline };
+}
+
+/**
+ * Simula a quitação de TODAS as dívidas em conjunto, mês a mês.
+ *
+ * O `extraMonthly` vai inteiro na dívida prioritária; quando ela zera, a
+ * parcela dela continua no orçamento e passa a engrossar o ataque à próxima —
+ * é o efeito bola de neve de verdade, não só a ordenação.
+ *
+ * Dívida impagável é detectada **rodando a simulação**, não por uma fórmula
+ * ingênua: uma dívida cujos juros passam da própria parcela ainda pode ser
+ * quitada pelo pagamento extra e pelas parcelas liberadas das outras. Quando
+ * uma realmente não converge, ela é retirada (a mais divergente por vez) e a
+ * simulação roda de novo com as demais — assim uma única dívida impagável não
+ * contamina o resultado inteiro nem trava o plano das outras.
+ */
+export function payoffSchedule(
+  views: DebtView[],
+  extraMonthly: number,
+  strategy: PayoffStrategy,
+  reference: Date = new Date()
+): PayoffResult {
+  const extra = Math.max(0, Number(extraMonthly) || 0);
+  let pool = views.filter(v => v.balance > 0);
+  const neverEnds: DebtView[] = [];
+
+  let sim = simulate(pool, extra, strategy);
+  // Retira uma dívida divergente por vez e re-simula até o plano fechar.
+  for (let guard = 0; guard <= views.length && sim.uncleared.length > 0; guard++) {
+    // A mais divergente: maior sobra de juros por mês sobre a própria parcela.
+    const worst = [...sim.uncleared].sort(
+      (a, b) =>
+        b.balance * ((b.interestRate ?? 0) / 100) - b.monthlyPayment -
+        (a.balance * ((a.interestRate ?? 0) / 100) - a.monthlyPayment)
+    )[0];
+    neverEnds.push(worst);
+    pool = pool.filter(v => v.id !== worst.id);
+    sim = simulate(pool, extra, strategy);
+  }
+
+  // Mês do ÚLTIMO pagamento — é quando a pessoa fica livre, não o mês seguinte.
+  const freedomDate = new Date(
+    reference.getFullYear(),
+    reference.getMonth() + Math.max(0, sim.months - 1),
+    1
+  );
+
+  return {
+    months: sim.months,
+    freedomDate,
+    totalInterest: sim.totalInterest,
+    totalPaid: sim.totalPaid,
+    neverEnds,
+    order: sim.order,
+    timeline: sim.timeline,
+  };
+}

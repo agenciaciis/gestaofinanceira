@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collectDebts, DebtView, rankByCost } from './debts';
+import { collectDebts, DebtView, payoffSchedule, rankByCost } from './debts';
 import { round2 } from './finance';
 import { CreditCard, Debt, Transaction } from '../types';
 
@@ -142,5 +142,75 @@ describe('rankByCost', () => {
     const ranked = rankByCost([view({ id: 'zero', interestRate: 0 })]);
     expect(ranked[0].unknownRate).toBe(false);
     expect(ranked[0].monthlyCost).toBe(0);
+  });
+});
+
+describe('payoffSchedule', () => {
+  it('quita parcelamento sem juros no número exato de meses', () => {
+    const r = payoffSchedule(
+      [view({ id: 'p', source: 'installments', balance: 900, monthlyPayment: 300, interestRate: null })],
+      0, 'avalanche', new Date(2026, 6, 1)
+    );
+    expect(r.months).toBe(3);
+    expect(r.totalInterest).toBe(0);
+    expect(r.neverEnds).toHaveLength(0);
+    expect(r.freedomDate.getFullYear()).toBe(2026);
+    expect(r.freedomDate.getMonth()).toBe(8); // setembro (0-indexed)
+  });
+
+  it('cobra juros sobre o saldo de empréstimo', () => {
+    const r = payoffSchedule([view({ balance: 1000, monthlyPayment: 200, interestRate: 1 })], 0, 'avalanche', new Date(2026, 6, 1));
+    expect(r.totalInterest).toBeGreaterThan(0);
+    expect(r.months).toBeGreaterThan(5);
+  });
+
+  it('avalanche ataca a de maior juros; bola de neve, a de menor saldo', () => {
+    const debts = [
+      view({ id: 'juros-alto', balance: 2000, monthlyPayment: 100, interestRate: 10 }),
+      view({ id: 'saldo-baixo', balance: 300, monthlyPayment: 100, interestRate: 1 }),
+    ];
+    const av = payoffSchedule(debts, 500, 'avalanche', new Date(2026, 6, 1));
+    const sn = payoffSchedule(debts, 500, 'snowball', new Date(2026, 6, 1));
+    expect(av.order[0]).toBe('juros-alto');
+    expect(sn.order[0]).toBe('saldo-baixo');
+    expect(av.totalInterest).toBeLessThan(sn.totalInterest);
+  });
+
+  it('libera a parcela da dívida quitada para a próxima (bola de neve real)', () => {
+    const semLiberacao = payoffSchedule([view({ id: 'a', balance: 100, monthlyPayment: 100, interestRate: 0 })], 0, 'avalanche', new Date(2026, 6, 1));
+    const comDuas = payoffSchedule([
+      view({ id: 'a', balance: 100, monthlyPayment: 100, interestRate: 0 }),
+      view({ id: 'b', balance: 300, monthlyPayment: 100, interestRate: 0 }),
+    ], 0, 'snowball', new Date(2026, 6, 1));
+    expect(semLiberacao.months).toBe(1);
+    // mês 1: orçamento 200 → a=100 quita, sobra 100 em b (resta 200)
+    // mês 2: orçamento 200 (a liberou a parcela) → b zera
+    expect(comDuas.months).toBe(2);
+  });
+
+  it('isola dívida impagável em neverEnds sem contaminar as demais', () => {
+    const r = payoffSchedule([
+      view({ id: 'impagavel', balance: 10000, monthlyPayment: 50, interestRate: 10 }),
+      view({ id: 'ok', balance: 300, monthlyPayment: 300, interestRate: 0 }),
+    ], 0, 'avalanche', new Date(2026, 6, 1));
+    expect(r.neverEnds.map(d => d.id)).toEqual(['impagavel']);
+    expect(r.months).toBe(1);
+    expect(Number.isFinite(r.totalInterest)).toBe(true);
+  });
+
+  it('lista vazia devolve resultado zerado, não NaN', () => {
+    const r = payoffSchedule([], 0, 'avalanche', new Date(2026, 6, 1));
+    expect(r.months).toBe(0);
+    expect(r.totalInterest).toBe(0);
+    expect(r.timeline).toHaveLength(0);
+  });
+
+  it('não paga além do saldo e o extra sobra para a próxima', () => {
+    const r = payoffSchedule([
+      view({ id: 'a', balance: 50, monthlyPayment: 100, interestRate: 0 }),
+      view({ id: 'b', balance: 50, monthlyPayment: 100, interestRate: 0 }),
+    ], 0, 'avalanche', new Date(2026, 6, 1));
+    expect(r.months).toBe(1);
+    expect(r.totalPaid).toBe(100);
   });
 });
