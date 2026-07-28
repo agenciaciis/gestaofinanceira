@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collectDebts, DebtView, payoffSchedule, rankByCost } from './debts';
+import { collectDebts, compareExtraPayment, DebtView, payoffSchedule, rankByCost } from './debts';
 import { round2 } from './finance';
 import { CreditCard, Debt, Transaction } from '../types';
 
@@ -212,5 +212,29 @@ describe('payoffSchedule', () => {
     ], 0, 'avalanche', new Date(2026, 6, 1));
     expect(r.months).toBe(1);
     expect(r.totalPaid).toBe(100);
+  });
+});
+
+describe('compareExtraPayment', () => {
+  it('mostra meses e juros economizados com o pagamento extra', () => {
+    const debts = [view({ balance: 5000, monthlyPayment: 300, interestRate: 2 })];
+    const c = compareExtraPayment(debts, 300, 'avalanche', new Date(2026, 6, 1));
+    expect(c.monthsSaved).toBeGreaterThan(0);
+    expect(c.interestSaved).toBeGreaterThan(0);
+    expect(c.withExtra.months).toBeLessThan(c.baseline.months);
+  });
+
+  it('extra zero não economiza nada', () => {
+    const c = compareExtraPayment([view({ balance: 900, monthlyPayment: 300, interestRate: 0 })], 0, 'avalanche', new Date(2026, 6, 1));
+    expect(c.monthsSaved).toBe(0);
+    expect(c.interestSaved).toBe(0);
+  });
+
+  it('extra maior economiza mais', () => {
+    const debts = [view({ balance: 8000, monthlyPayment: 400, interestRate: 3 })];
+    const pouco = compareExtraPayment(debts, 100, 'avalanche', new Date(2026, 6, 1));
+    const muito = compareExtraPayment(debts, 800, 'avalanche', new Date(2026, 6, 1));
+    expect(muito.monthsSaved).toBeGreaterThan(pouco.monthsSaved);
+    expect(muito.interestSaved).toBeGreaterThan(pouco.interestSaved);
   });
 });

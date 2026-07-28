@@ -305,3 +305,31 @@ export function payoffSchedule(
     timeline: sim.timeline,
   };
 }
+
+export interface ExtraComparison {
+  monthsSaved: number;
+  interestSaved: number;
+  baseline: PayoffResult;
+  withExtra: PayoffResult;
+}
+
+/**
+ * Responde "e se eu pagar mais por mês?" comparando as duas simulações.
+ * É o número que motiva a decisão: quantos meses a menos e quanto de juros
+ * a pessoa deixa de pagar.
+ */
+export function compareExtraPayment(
+  views: DebtView[],
+  extraMonthly: number,
+  strategy: PayoffStrategy,
+  reference: Date = new Date()
+): ExtraComparison {
+  const baseline = payoffSchedule(views, 0, strategy, reference);
+  const withExtra = payoffSchedule(views, extraMonthly, strategy, reference);
+  return {
+    monthsSaved: Math.max(0, baseline.months - withExtra.months),
+    interestSaved: round2(Math.max(0, baseline.totalInterest - withExtra.totalInterest)),
+    baseline,
+    withExtra,
+  };
+}
