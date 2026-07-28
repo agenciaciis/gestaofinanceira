@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Transaction, BankAccount, Debt } from '../types';
+import { Transaction, BankAccount, Debt, CreditCard } from '../types';
 import { 
   Heart, 
   Target, 
@@ -39,16 +39,38 @@ import { cn } from '../lib/utils';
 import { format, addMonths, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GoogleGenAI } from "@google/genai";
-import { computeBalances, daysUntilDueDay } from '../lib/finance';
+import { computeBalances, daysUntilDueDay, round2 } from '../lib/finance';
+import {
+  collectDebts,
+  compareExtraPayment,
+  payoffSchedule,
+  rankByCost,
+  DebtMeta,
+  DebtSource,
+  DebtView,
+  PayoffStrategy,
+} from '../lib/debts';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+const fmt = (n: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
 
 export const FinancialHealth: React.FC = () => {
   const { selectedEntity } = useEntity();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [cards, setCards] = useState<CreditCard[]>([]);
+  const [debtMeta, setDebtMeta] = useState<DebtMeta>({});
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
+
+  // Plano de quitação
+  const [extraPayment, setExtraPayment] = useState('');
+  const [strategy, setStrategy] = useState<PayoffStrategy>('avalanche');
+  const [editingRateId, setEditingRateId] = useState<string | null>(null);
+  const [rateInput, setRateInput] = useState('');
+
   const [aiAdvice, setAiAdvice] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [simulationPayments, setSimulationPayments] = useState<Record<string, string>>({});
@@ -84,39 +106,62 @@ export const FinancialHealth: React.FC = () => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BankAccount[]);
     }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/bank_accounts`));
 
+    const unsubCards = onSnapshot(query(collection(db, `entities/${selectedEntity.id}/credit_cards`)), (snapshot) => {
+      setCards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CreditCard[]);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/credit_cards`));
+
+    // Taxas informadas manualmente para parcelamentos e faturas de cartão.
+    const unsubMeta = onSnapshot(query(collection(db, `entities/${selectedEntity.id}/debt_meta`)), (snapshot) => {
+      const meta: DebtMeta = {};
+      snapshot.docs.forEach(d => {
+        const rate = Number(d.data().interestRate);
+        if (Number.isFinite(rate)) meta[d.id] = { interestRate: rate };
+      });
+      setDebtMeta(meta);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/debt_meta`));
+
     return () => {
       unsubDebts();
       unsubTrans();
       unsubAccs();
+      unsubCards();
+      unsubMeta();
     };
   }, [selectedEntity]);
 
-  const totalDebt = useMemo(() => debts.reduce((acc, d) => acc + d.remainingAmount, 0), [debts]);
+  /**
+   * Todas as dívidas do usuário vindas das TRÊS fontes: parcelamentos em
+   * aberto, dívidas com juros cadastradas e fatura de cartão. É a única fonte
+   * de verdade do "quanto eu devo" — nada aqui é digitado à mão.
+   */
+  const debtViews = useMemo(
+    () => collectDebts(transactions, debts, cards, debtMeta),
+    [transactions, debts, cards, debtMeta]
+  );
+
+  const totalDebt = useMemo(
+    () => round2(debtViews.reduce((acc, v) => acc + v.balance, 0)),
+    [debtViews]
+  );
+
+  /** Subtotal por fonte, para o usuário ver de onde vem o que ele deve. */
+  const debtBySource = useMemo(() => {
+    const acc: Record<DebtSource, number> = { installments: 0, loan: 0, card: 0 };
+    for (const v of debtViews) acc[v.source] = round2(acc[v.source] + v.balance);
+    return acc;
+  }, [debtViews]);
+
+  const ranked = useMemo(() => rankByCost(debtViews), [debtViews]);
+
+  const comparison = useMemo(
+    () => compareExtraPayment(debtViews, Number(extraPayment) || 0, strategy),
+    [debtViews, extraPayment, strategy]
+  );
+
   const totalBalance = useMemo(() => {
     const balances = computeBalances(accounts, transactions);
     return Object.values(balances).reduce((acc, v) => acc + v, 0);
   }, [accounts, transactions]);
-
-  const debtStats = useMemo(() => {
-    let totalEstimatedInterest = 0;
-    let maxMonths = 0;
-    
-    debts.forEach(debt => {
-      const simPayment = simulationPayments[debt.id] ? Number(simulationPayments[debt.id]) : debt.monthlyPayment;
-      const { months, totalInterest } = calculatePayoff(debt.remainingAmount, simPayment, debt.interestRate);
-      if (months !== Infinity) {
-        totalEstimatedInterest += totalInterest;
-        maxMonths = Math.max(maxMonths, months);
-      }
-    });
-
-    return {
-      totalEstimatedInterest,
-      maxMonths,
-      totalRemaining: totalDebt,
-      totalOriginal: debts.reduce((acc, d) => acc + d.totalAmount, 0)
-    };
-  }, [debts, simulationPayments, totalDebt]);
 
   const healthScore = useMemo(() => {
     if (totalDebt === 0) return 100;
@@ -127,34 +172,37 @@ export const FinancialHealth: React.FC = () => {
     return 30;
   }, [totalBalance, totalDebt]);
 
-  const debtChartData = useMemo(() => {
-    return debts.map(debt => ({
-      name: debt.name,
-      'Valor Total': debt.totalAmount,
-      'Valor Restante': debt.remainingAmount,
-      'Pago': debt.totalAmount - debt.remainingAmount
-    }));
-  }, [debts]);
+  const debtChartData = useMemo(
+    () => debtViews.map(v => ({ name: v.name, 'Saldo Devedor': v.balance })),
+    [debtViews]
+  );
 
-  function calculatePayoff(remaining: number, monthly: number, interestRate: number) {
-    if (!(monthly > 0)) return { months: Infinity, totalInterest: Infinity };
-    
-    const monthlyRate = interestRate / 100;
-    let currentBalance = remaining;
-    let totalInterest = 0;
-    let months = 0;
-    const MAX_MONTHS = 1200; // 100 years safety limit
+  /** Simula UMA dívida isolada, para o cartão individual de cada dívida cadastrada. */
+  const simulateOne = (view: DebtView, monthlyPayment: number) => {
+    const r = payoffSchedule([{ ...view, monthlyPayment }], 0, 'avalanche');
+    const ends = r.neverEnds.length === 0;
+    return { months: ends ? r.months : Infinity, totalInterest: ends ? r.totalInterest : Infinity };
+  };
 
-    while (currentBalance > 0 && months < MAX_MONTHS) {
-      const interest = currentBalance * monthlyRate;
-      if (interest >= monthly && currentBalance > 0.01) return { months: Infinity, totalInterest: Infinity };
-      
-      totalInterest += interest;
-      currentBalance = currentBalance + interest - monthly;
-      months++;
+  /** Grava a taxa mensal informada pelo usuário na fonte certa. */
+  const saveInterestRate = async (view: DebtView, rate: number) => {
+    if (!selectedEntity) return;
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) return;
+    try {
+      if (view.source === 'loan') {
+        await updateDoc(doc(db, `entities/${selectedEntity.id}/debts`, view.id), { interestRate: rate });
+      } else {
+        await setDoc(
+          doc(db, `entities/${selectedEntity.id}/debt_meta`, view.id),
+          { interestRate: rate, updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+      }
+      setEditingRateId(null);
+      setRateInput('');
+    } catch (error) {
+      console.error('Erro ao salvar taxa de juros:', error);
     }
-
-    return { months, totalInterest };
   };
 
   const activeAlerts = useMemo(() => {
@@ -436,33 +484,210 @@ export const FinancialHealth: React.FC = () => {
           </button>
         </div>
 
-        {debts.length > 0 ? (
+        {debtViews.length > 0 ? (
           <div className="space-y-8">
-            {/* Debt Summary Cards */}
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Restante</p>
-                <p className="mt-1 text-2xl font-black text-slate-900">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(debtStats.totalRemaining)}
-                </p>
+            {/* Total devido, com a origem de cada real */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="rounded-3xl bg-rose-50 dark:bg-rose-950/40 p-8 border border-rose-100 dark:border-rose-900/40">
+                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Total que você deve</p>
+                <p className="mt-1 text-4xl font-black tracking-tighter text-rose-700 dark:text-rose-300">{fmt(totalDebt)}</p>
+                <div className="mt-6 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400 font-medium">Parcelamentos em aberto</span>
+                    <span className="font-black text-slate-900 dark:text-slate-100">{fmt(debtBySource.installments)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400 font-medium">Dívidas com juros</span>
+                    <span className="font-black text-slate-900 dark:text-slate-100">{fmt(debtBySource.loan)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400 font-medium">Fatura de cartão</span>
+                    <span className="font-black text-slate-900 dark:text-slate-100">{fmt(debtBySource.card)}</span>
+                  </div>
+                </div>
               </div>
-              <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Juros Estimados</p>
-                <p className="mt-1 text-2xl font-black text-amber-600">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(debtStats.totalEstimatedInterest)}
-                </p>
+
+              {/* Quando eu fico livre */}
+              <div className="lg:col-span-2 rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-sm border border-slate-100 dark:border-gray-800">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <h4 className="text-lg font-black text-slate-900 dark:text-gray-100 flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                    Quando eu fico livre
+                  </h4>
+                  <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-gray-800 p-1">
+                    <button
+                      onClick={() => setStrategy('avalanche')}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-bold rounded-lg transition-all',
+                        strategy === 'avalanche' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-500'
+                      )}
+                      title="Ataca primeiro a dívida de maior juros — economiza mais dinheiro"
+                    >
+                      Avalanche
+                    </button>
+                    <button
+                      onClick={() => setStrategy('snowball')}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-bold rounded-lg transition-all',
+                        strategy === 'snowball' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-500'
+                      )}
+                      title="Ataca primeiro a menor dívida — quita mais rápido a primeira"
+                    >
+                      Bola de neve
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-6 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data de libertação</p>
+                    <p className="mt-1 text-2xl font-black text-emerald-600 capitalize">
+                      {comparison.withExtra.months === 0
+                        ? 'Você está livre'
+                        : format(comparison.withExtra.freedomDate, "MMM 'de' yyyy", { locale: ptBR })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tempo restante</p>
+                    <p className="mt-1 text-2xl font-black text-indigo-600">
+                      {comparison.withExtra.months === 0 ? '-' : `${comparison.withExtra.months} meses`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Juros até lá</p>
+                    <p className="mt-1 text-2xl font-black text-amber-600">{fmt(comparison.withExtra.totalInterest)}</p>
+                  </div>
+                </div>
+
+                {/* E se eu pagar mais por mês? */}
+                <div className="mt-8 rounded-2xl bg-slate-50 dark:bg-gray-800/60 p-5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    E se eu pagar mais por mês?
+                  </label>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">R$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        value={extraPayment}
+                        onChange={(e) => setExtraPayment(e.target.value)}
+                        placeholder="0"
+                        className="w-40 rounded-xl border border-slate-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    {comparison.monthsSaved > 0 ? (
+                      <p className="text-sm font-medium text-slate-700 dark:text-gray-300">
+                        Você sai <strong className="text-emerald-600">{comparison.monthsSaved} {comparison.monthsSaved === 1 ? 'mês' : 'meses'}</strong> antes
+                        {comparison.interestSaved > 0 && (
+                          <> e economiza <strong className="text-emerald-600">{fmt(comparison.interestSaved)}</strong> de juros</>
+                        )}.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-slate-500">Informe um valor extra para ver quanto tempo e juros você economiza.</p>
+                    )}
+                  </div>
+                </div>
+
+                {comparison.withExtra.neverEnds.length > 0 && (
+                  <div className="mt-6 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 p-5">
+                    <p className="text-sm font-black text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Essas dívidas não acabam no ritmo atual
+                    </p>
+                    <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">
+                      Os juros comem mais do que você paga por mês. Renegocie ou aumente o pagamento.
+                    </p>
+                    <ul className="mt-3 space-y-1">
+                      {comparison.withExtra.neverEnds.map(d => (
+                        <li key={d.id} className="text-sm font-bold text-rose-800 dark:text-rose-200 flex justify-between">
+                          <span>{d.name}</span>
+                          <span>{fmt(d.balance)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tempo para Quitação</p>
-                <p className="mt-1 text-2xl font-black text-indigo-600">
-                  {debtStats.maxMonths === 0 ? '-' : `${debtStats.maxMonths} meses`}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Economia Potencial</p>
-                <p className="mt-1 text-2xl font-black text-emerald-600">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(debtStats.totalOriginal - debtStats.totalRemaining)}
-                </p>
+            </div>
+
+            {/* Qual atacar primeiro */}
+            <div className="rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-sm border border-slate-100 dark:border-gray-800">
+              <h4 className="text-lg font-black text-slate-900 dark:text-gray-100 flex items-center gap-2">
+                <Target className="h-5 w-5 text-rose-500" />
+                Qual atacar primeiro
+              </h4>
+              <p className="text-sm text-slate-500 mt-1">
+                Ordenado pelo que cada dívida custa de juros por mês — não pelo tamanho.
+              </p>
+
+              <div className="mt-6 space-y-3">
+                {ranked.map((r, i) => (
+                  <div
+                    key={r.id}
+                    className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-100 dark:border-gray-800 p-4"
+                  >
+                    <span className={cn(
+                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black',
+                      i === 0 && !r.unknownRate ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 dark:bg-gray-800 text-slate-500'
+                    )}>
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900 dark:text-gray-100 truncate">{r.name}</p>
+                      <p className="text-[11px] font-medium text-slate-400">
+                        {r.source === 'installments'
+                          ? `${r.installmentsLeft} ${r.installmentsLeft === 1 ? 'parcela restante' : 'parcelas restantes'}`
+                          : r.source === 'card' ? 'Fatura em aberto' : 'Dívida com juros'}
+                        {r.overdue && <span className="ml-2 text-rose-600 font-black uppercase">Atrasada</span>}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo</p>
+                      <p className="font-black text-slate-900 dark:text-gray-100">{fmt(r.balance)}</p>
+                    </div>
+                    <div className="text-right min-w-[9rem]">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Custo por mês</p>
+                      {r.unknownRate ? (
+                        editingRateId === r.id ? (
+                          <div className="mt-1 flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              autoFocus
+                              value={rateInput}
+                              onChange={(e) => setRateInput(e.target.value)}
+                              placeholder="% a.m."
+                              className="w-20 rounded-lg border border-slate-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 px-2 py-1 text-sm outline-none focus:border-indigo-500"
+                            />
+                            <button
+                              onClick={() => saveInterestRate(r, Number(rateInput))}
+                              className="rounded-lg bg-indigo-600 px-2 py-1 text-xs font-bold text-white hover:bg-indigo-700"
+                            >
+                              Salvar
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingRateId(r.id); setRateInput(''); }}
+                            className="mt-1 text-xs font-bold text-amber-600 hover:text-amber-700 text-right"
+                            title="Informe a taxa mensal para eu calcular o custo real"
+                          >
+                            ⚠️ taxa não informada
+                          </button>
+                        )
+                      ) : (
+                        <p className="font-black text-amber-600">
+                          {fmt(r.monthlyCost || 0)}
+                          <span className="ml-1 text-[10px] font-bold text-slate-400">{r.interestRate}% a.m.</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -470,7 +695,7 @@ export const FinancialHealth: React.FC = () => {
             <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 mb-8">
                 <TrendingUp className="h-5 w-5 text-indigo-500" />
-                Comparativo: Valor Total vs Restante
+                Saldo devedor por dívida
               </h3>
               <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -502,8 +727,7 @@ export const FinancialHealth: React.FC = () => {
                       iconType="circle"
                       wrapperStyle={{ paddingBottom: '20px', fontSize: '12px', fontWeight: 'bold' }}
                     />
-                    <Bar dataKey="Valor Total" fill="#e2e8f0" radius={[4, 4, 0, 0]} barSize={40} name="Dívida Original" animationDuration={900} />
-                    <Bar dataKey="Valor Restante" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} name="Saldo Devedor" animationDuration={900} animationBegin={150} />
+                    <Bar dataKey="Saldo Devedor" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} name="Saldo Devedor" animationDuration={900} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -513,7 +737,10 @@ export const FinancialHealth: React.FC = () => {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {debts.map(debt => {
                 const simPayment = simulationPayments[debt.id] ? Number(simulationPayments[debt.id]) : debt.monthlyPayment;
-                const { months: monthsToPay, totalInterest } = calculatePayoff(debt.remainingAmount, simPayment, debt.interestRate);
+                const debtView = debtViews.find(v => v.source === 'loan' && v.id === debt.id);
+                const { months: monthsToPay, totalInterest } = debtView
+                  ? simulateOne(debtView, simPayment)
+                  : { months: 0, totalInterest: 0 };
                 const payoffDate = monthsToPay === Infinity ? null : addMonths(new Date(), monthsToPay);
                 const progress = ((debt.totalAmount - debt.remainingAmount) / debt.totalAmount) * 100;
 
@@ -662,9 +889,10 @@ export const FinancialHealth: React.FC = () => {
                           >
                             <p className="text-[10px] font-black text-indigo-900 uppercase mb-2">Impacto da Simulação</p>
                             {(() => {
-                              const original = calculatePayoff(debt.remainingAmount, debt.monthlyPayment, debt.interestRate);
+                              if (!debtView) return null;
+                              const original = simulateOne(debtView, debt.monthlyPayment);
                               const simulated = { months: monthsToPay, totalInterest };
-                              
+
                               if (simulated.months === Infinity || original.months === Infinity) return null;
                               
                               const monthDiff = original.months - simulated.months;
