@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collectDebts } from './debts';
+import { collectDebts, DebtView, rankByCost } from './debts';
 import { round2 } from './finance';
 import { CreditCard, Debt, Transaction } from '../types';
 
@@ -108,5 +108,39 @@ describe('collectDebts — juros e cartão', () => {
     ];
     const views = collectDebts(txs, [debt({})], [card({})], {}, new Date(2026, 6, 3));
     expect(round2(views.reduce((a, v) => a + v.balance, 0))).toBe(8500);
+  });
+});
+
+const view = (over: Partial<DebtView>): DebtView => ({
+  id: 'v', source: 'loan', name: 'V', balance: 1000, monthlyPayment: 100,
+  interestRate: 1, dueDay: 10, installmentsLeft: null, overdue: false, ...over,
+});
+
+describe('rankByCost', () => {
+  it('ordena por custo em reais, não por saldo', () => {
+    const ranked = rankByCost([
+      view({ id: 'grande', balance: 50000, interestRate: 0.5 }),  // R$ 250/mês
+      view({ id: 'cara', balance: 3000, interestRate: 14 }),      // R$ 420/mês
+    ]);
+    expect(ranked.map(r => r.id)).toEqual(['cara', 'grande']);
+    expect(ranked[0].monthlyCost).toBe(420);
+    expect(ranked[1].monthlyCost).toBe(250);
+  });
+
+  it('joga taxa desconhecida para o fim e marca unknownRate', () => {
+    const ranked = rankByCost([
+      view({ id: 'sem-taxa', interestRate: null, balance: 90000 }),
+      view({ id: 'com-taxa', interestRate: 1, balance: 1000 }),
+    ]);
+    expect(ranked.map(r => r.id)).toEqual(['com-taxa', 'sem-taxa']);
+    expect(ranked[1].unknownRate).toBe(true);
+    expect(ranked[1].monthlyCost).toBeNull();
+    expect(ranked[0].unknownRate).toBe(false);
+  });
+
+  it('taxa zero informada não é desconhecida', () => {
+    const ranked = rankByCost([view({ id: 'zero', interestRate: 0 })]);
+    expect(ranked[0].unknownRate).toBe(false);
+    expect(ranked[0].monthlyCost).toBe(0);
   });
 });

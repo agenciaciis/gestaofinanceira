@@ -132,3 +132,30 @@ export function collectDebts(
     ...fromCards(cards, transactions, meta, today),
   ];
 }
+
+export interface RankedDebt extends DebtView {
+  /** Quanto essa dívida custa de juros por mês, em reais. `null` se a taxa é desconhecida. */
+  monthlyCost: number | null;
+  unknownRate: boolean;
+}
+
+/**
+ * Ordena as dívidas pelo que elas realmente custam por mês (saldo × taxa), não
+ * pelo tamanho — a dívida cara e pequena sangra mais que a grande e barata.
+ *
+ * Dívida sem taxa informada vai para o fim, marcada, para a UI pedir a
+ * informação em vez de fingir que o custo é zero e enganar a decisão.
+ */
+export function rankByCost(views: DebtView[]): RankedDebt[] {
+  const ranked: RankedDebt[] = views.map(v => ({
+    ...v,
+    monthlyCost: v.interestRate === null ? null : round2(v.balance * (v.interestRate / 100)),
+    unknownRate: v.interestRate === null,
+  }));
+
+  return ranked.sort((a, b) => {
+    if (a.unknownRate !== b.unknownRate) return a.unknownRate ? 1 : -1;
+    if (a.unknownRate) return b.balance - a.balance;
+    return (b.monthlyCost as number) - (a.monthlyCost as number);
+  });
+}
