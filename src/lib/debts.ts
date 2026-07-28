@@ -75,6 +75,49 @@ function fromInstallments(
   return views;
 }
 
+function fromLoans(debts: Debt[]): DebtView[] {
+  return debts
+    .map(d => ({
+      id: d.id,
+      source: 'loan' as const,
+      name: d.name,
+      balance: round2(Number(d.remainingAmount) || 0),
+      monthlyPayment: round2(Number(d.monthlyPayment) || 0),
+      interestRate: Number.isFinite(Number(d.interestRate)) ? Number(d.interestRate) : null,
+      dueDay: Number(d.dueDate) || 1,
+      installmentsLeft: null,
+      overdue: false,
+    }))
+    .filter(v => v.balance > 0);
+}
+
+function fromCards(
+  cards: CreditCard[],
+  transactions: Transaction[],
+  meta: DebtMeta,
+  today: Date
+): DebtView[] {
+  const views: DebtView[] = [];
+  for (const c of cards) {
+    const invoice = computeCardInvoice(c.id, c.closingDay, transactions, today);
+    if (invoice <= 0) continue;
+    const id = `card:${c.id}`;
+    views.push({
+      id,
+      source: 'card',
+      name: `Fatura ${c.name}`,
+      balance: round2(invoice),
+      // Premissa: a fatura é paga integralmente no vencimento.
+      monthlyPayment: round2(invoice),
+      interestRate: meta[id]?.interestRate ?? null,
+      dueDay: Number(c.dueDay) || 1,
+      installmentsLeft: null,
+      overdue: false,
+    });
+  }
+  return views;
+}
+
 export function collectDebts(
   transactions: Transaction[],
   debts: Debt[],
@@ -83,5 +126,9 @@ export function collectDebts(
   reference: Date = new Date()
 ): DebtView[] {
   const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
-  return [...fromInstallments(transactions, meta, today)];
+  return [
+    ...fromInstallments(transactions, meta, today),
+    ...fromLoans(debts),
+    ...fromCards(cards, transactions, meta, today),
+  ];
 }

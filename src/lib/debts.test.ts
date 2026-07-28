@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { collectDebts } from './debts';
-import { Transaction } from '../types';
+import { round2 } from './finance';
+import { CreditCard, Debt, Transaction } from '../types';
 
 const tx = (over: Partial<Transaction>): Transaction => ({
   id: 'x', description: 'x', amount: 0, type: 'expense', date: '2026-08-10',
@@ -53,5 +54,59 @@ describe('collectDebts — parcelamentos', () => {
   it('receita parcelada não é dívida', () => {
     const txs = [tx({ id: '1', description: 'A receber (1/2)', amount: 100, type: 'income', installmentGroupId: 'g5' })];
     expect(collectDebts(txs, [], [], {}, new Date(2026, 6, 1))).toHaveLength(0);
+  });
+});
+
+const debt = (over: Partial<Debt>): Debt => ({
+  id: 'd1', name: 'Empréstimo', totalAmount: 10000, remainingAmount: 8000,
+  interestRate: 2, monthlyPayment: 500, dueDate: 10, entityId: 'e', createdAt: null, ...over,
+});
+
+const card = (over: Partial<CreditCard>): CreditCard => ({
+  id: 'c1', name: 'Nubank', brand: 'visa', limit: 5000, dueDay: 15, closingDay: 5, entityId: 'e', ...over,
+});
+
+describe('collectDebts — juros e cartão', () => {
+  it('mapeia dívida com juros preservando taxa zero informada', () => {
+    const views = collectDebts([], [debt({}), debt({ id: 'd2', interestRate: 0 })], [], {}, new Date(2026, 6, 1));
+    const loans = views.filter(v => v.source === 'loan');
+    expect(loans).toHaveLength(2);
+    expect(loans[0].balance).toBe(8000);
+    expect(loans[0].interestRate).toBe(2);
+    expect(loans[1].interestRate).toBe(0); // zero informado ≠ desconhecido
+    expect(loans[0].installmentsLeft).toBeNull();
+  });
+
+  it('inclui a fatura em aberto do cartão como dívida', () => {
+    const txs = [tx({ id: '1', description: 'Mercado', amount: 250, status: 'completed', cardId: 'c1', date: '2026-07-02' })];
+    const views = collectDebts(txs, [], [card({})], {}, new Date(2026, 6, 3));
+    const cardView = views.find(v => v.source === 'card');
+    expect(cardView?.id).toBe('card:c1');
+    expect(cardView?.balance).toBe(250);
+    expect(cardView?.monthlyPayment).toBe(250);
+    expect(cardView?.dueDay).toBe(15);
+  });
+
+  it('cartão sem fatura em aberto não vira dívida', () => {
+    expect(collectDebts([], [], [card({})], {}, new Date(2026, 6, 3)).filter(v => v.source === 'card')).toHaveLength(0);
+  });
+
+  it('aplica taxa informada em debt_meta a parcelamento e cartão', () => {
+    const txs = [
+      tx({ id: '1', description: 'TV (1/2)', amount: 400, installmentGroupId: 'g9', date: '2026-08-10' }),
+      tx({ id: '2', description: 'Posto', amount: 100, status: 'completed', cardId: 'c1', date: '2026-07-02' }),
+    ];
+    const views = collectDebts(txs, [], [card({})], { g9: { interestRate: 1.5 }, 'card:c1': { interestRate: 12 } }, new Date(2026, 6, 3));
+    expect(views.find(v => v.id === 'g9')?.interestRate).toBe(1.5);
+    expect(views.find(v => v.id === 'card:c1')?.interestRate).toBe(12);
+  });
+
+  it('soma as três fontes no total devido', () => {
+    const txs = [
+      tx({ id: '1', description: 'TV (1/2)', amount: 400, installmentGroupId: 'g9', date: '2026-08-10' }),
+      tx({ id: '2', description: 'Posto', amount: 100, status: 'completed', cardId: 'c1', date: '2026-07-02' }),
+    ];
+    const views = collectDebts(txs, [debt({})], [card({})], {}, new Date(2026, 6, 3));
+    expect(round2(views.reduce((a, v) => a + v.balance, 0))).toBe(8500);
   });
 });
