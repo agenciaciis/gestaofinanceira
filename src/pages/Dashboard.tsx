@@ -46,7 +46,8 @@ import { cn } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth, isAfter, isBefore, isSameDay, isSameYear, subDays, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice } from '../lib/finance';
+import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice, round2 } from '../lib/finance';
+import { collectDebts, payoffSchedule } from '../lib/debts';
 
 const StatCard: React.FC<{
   title: string; 
@@ -242,29 +243,11 @@ export const Dashboard: React.FC = () => {
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
     const cardDebt = cards.reduce((acc, card) => acc + computeCardInvoice(card.id, card.closingDay, transactions, now), 0);
 
-    const totalOpenDebts = debts.reduce((acc, d) => acc + d.remainingAmount, 0);
-    
-    const calculatePayoff = (remaining: number, monthly: number, interestRate: number) => {
-      if (monthly <= 0) return { months: Infinity, totalInterest: Infinity };
-      const monthlyRate = interestRate / 100;
-      let currentBalance = remaining;
-      let totalInterest = 0;
-      let months = 0;
-      const MAX_MONTHS = 1200;
-      while (currentBalance > 0 && months < MAX_MONTHS) {
-        const interest = currentBalance * monthlyRate;
-        if (interest >= monthly && currentBalance > 0.01) return { months: Infinity, totalInterest: Infinity };
-        totalInterest += interest;
-        currentBalance = currentBalance + interest - monthly;
-        months++;
-      }
-      return { months, totalInterest };
-    };
-
-    const totalEstimatedInterest = debts.reduce((acc, debt) => {
-      const { totalInterest } = calculatePayoff(debt.remainingAmount, debt.monthlyPayment, debt.interestRate);
-      return acc + (totalInterest === Infinity ? 0 : totalInterest);
-    }, 0);
+    // Mesma fonte de verdade da tela de Saúde Financeira: parcelamentos em
+    // aberto + dívidas com juros + fatura de cartão. Os dois números batem.
+    const debtViews = collectDebts(transactions, debts, cards, {}, now);
+    const totalOpenDebts = round2(debtViews.reduce((acc, v) => acc + v.balance, 0));
+    const totalEstimatedInterest = payoffSchedule(debtViews, 0, 'avalanche', now).totalInterest;
 
     const calculateTrend = (current: number, last: number) => {
       if (last === 0) return { value: 0, isPositive: true };
@@ -299,7 +282,9 @@ export const Dashboard: React.FC = () => {
       cardDebt,
       totalOpenDebts,
       totalEstimatedInterest,
-      netWorth: totalBankBalance - cardDebt - totalOpenDebts,
+      // A fatura de cartão já está dentro de totalOpenDebts — subtrair de novo
+      // contaria a mesma dívida duas vezes.
+      netWorth: round2(totalBankBalance - totalOpenDebts),
       incomeTrend: calculateTrend(incomeThisPeriod, incomeLastPeriod),
       expenseTrend: calculateTrend(expenseThisPeriod, expenseLastPeriod),
       budgetProgress
