@@ -39,7 +39,9 @@ import { cn } from '../lib/utils';
 import { format, addMonths, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getFinancialAdvice } from "../services/geminiService";
-import { computeBalances, daysUntilDueDay, round2 } from '../lib/finance';
+import { computeBalances, daysUntilDueDay, parseLocalDate, round2 } from '../lib/finance';
+import { averageMonthlyExpense, averageMonthlyIncome } from '../lib/spendable';
+import { computeHealthScore } from '../lib/health';
 import {
   collectDebts,
   compareExtraPayment,
@@ -161,14 +163,26 @@ export const FinancialHealth: React.FC = () => {
     return Object.values(balances).reduce((acc, v) => acc + v, 0);
   }, [accounts, transactions]);
 
-  const healthScore = useMemo(() => {
-    if (totalDebt === 0) return 100;
-    const ratio = totalBalance / totalDebt;
-    if (ratio >= 1) return 90;
-    if (ratio >= 0.5) return 70;
-    if (ratio >= 0.2) return 50;
-    return 30;
-  }, [totalBalance, totalDebt]);
+  const health = useMemo(() => {
+    const monthlyIncome = averageMonthlyIncome(transactions, new Date(), 3);
+    const monthlyExpense = averageMonthlyExpense(transactions, new Date(), 3);
+    const monthlyDebtPayment = debtViews.reduce((a, v) => a + v.monthlyPayment, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const overdueAmount = transactions
+      .filter(t => t.type === 'expense' && t.status === 'pending' && parseLocalDate(t.date) < today)
+      .reduce((a, t) => a + (Number(t.amount) || 0), 0);
+
+    return computeHealthScore({
+      monthlyIncome,
+      monthlyExpense,
+      monthlyDebtPayment,
+      totalDebt,
+      balance: totalBalance,
+      overdueAmount,
+    });
+  }, [transactions, debtViews, totalDebt, totalBalance]);
+
+  const healthScore = health.score;
 
   const debtChartData = useMemo(
     () => debtViews.map(v => ({ name: v.name, 'Saldo Devedor': v.balance })),
@@ -420,9 +434,7 @@ export const FinancialHealth: React.FC = () => {
               </span>
               <div className="pb-2">
                 <p className="text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Pontos de 100</p>
-                <p className="text-lg font-black text-slate-900 dark:text-gray-100">
-                  {healthScore >= 80 ? "Excelente!" : healthScore >= 50 ? "Pode Melhorar" : "Atenção Crítica"}
-                </p>
+                <p className="text-lg font-black text-slate-900 dark:text-gray-100">{health.label}</p>
               </div>
             </div>
             <div className="mt-8 h-3 w-full rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
@@ -435,9 +447,36 @@ export const FinancialHealth: React.FC = () => {
                 )}
               />
             </div>
-            <p className="mt-4 text-sm text-slate-500 dark:text-gray-400 font-medium">
-              Sua saúde financeira é calculada baseada na relação entre seu saldo disponível e suas dívidas totais.
-            </p>
+            {/* De onde vem a nota — sem isso o número não ajuda ninguém a agir. */}
+            <div className="mt-6 space-y-2">
+              {health.parts.map(part => (
+                <div key={part.key} className="flex items-center gap-3">
+                  <div className="w-40 shrink-0">
+                    <p className="text-xs font-bold text-slate-700 dark:text-gray-300">{part.label}</p>
+                    <p className="text-[10px] text-slate-400">{part.detail}</p>
+                  </div>
+                  <div className="h-2 flex-1 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full',
+                        part.points / part.max >= 0.7 ? 'bg-emerald-500'
+                          : part.points / part.max >= 0.4 ? 'bg-amber-500' : 'bg-rose-500'
+                      )}
+                      style={{ width: `${(part.points / part.max) * 100}%` }}
+                    />
+                  </div>
+                  <span className="w-14 shrink-0 text-right text-xs font-black text-slate-500 tabular-nums">
+                    {Math.round(part.points)}/{part.max}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {!health.hasEnoughData && (
+              <p className="mt-4 text-sm font-medium text-amber-600">
+                Sem receitas registradas, não dá para medir comprometimento nem endividamento — lance suas entradas para a nota fazer sentido.
+              </p>
+            )}
           </div>
           <div className="absolute -right-12 -bottom-12 h-64 w-64 bg-slate-50 dark:bg-gray-800/20 rounded-full opacity-50" />
         </div>

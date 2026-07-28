@@ -48,8 +48,43 @@ export interface SpendableResult {
   daysLeft: number;
 }
 
-function isExpenseRealizada(t: Transaction): boolean {
-  return t.type === 'expense' && t.status === 'completed';
+/**
+ * Média mensal de um tipo de lançamento sobre os meses COMPLETOS anteriores,
+ * dividindo pelos meses que têm movimento. Base de `averageMonthlyExpense` e
+ * `averageMonthlyIncome`.
+ */
+function averageMonthlyByType(
+  transactions: Transaction[],
+  type: 'income' | 'expense',
+  reference: Date,
+  months: number
+): number {
+  const count = Math.max(1, Math.floor(months));
+  const firstOfCurrent = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const start = new Date(reference.getFullYear(), reference.getMonth() - count, 1);
+
+  let total = 0;
+  const monthsWithData = new Set<string>();
+  for (const t of transactions) {
+    if (t.type !== type || t.status !== 'completed') continue;
+    const d = parseLocalDate(t.date);
+    if (Number.isNaN(d.getTime())) continue;
+    if (d < start || d >= firstOfCurrent) continue;
+    total += Number(t.amount) || 0;
+    monthsWithData.add(`${d.getFullYear()}-${d.getMonth()}`);
+  }
+
+  if (monthsWithData.size === 0) return 0;
+  return round2(total / monthsWithData.size);
+}
+
+/** Receita média por mês — base para medir comprometimento da renda. */
+export function averageMonthlyIncome(
+  transactions: Transaction[],
+  reference: Date = new Date(),
+  months = 3
+): number {
+  return averageMonthlyByType(transactions, 'income', reference, months);
 }
 
 /**
@@ -66,23 +101,7 @@ export function averageMonthlyExpense(
   reference: Date = new Date(),
   months = 3
 ): number {
-  const count = Math.max(1, Math.floor(months));
-  const firstOfCurrent = new Date(reference.getFullYear(), reference.getMonth(), 1);
-  const start = new Date(reference.getFullYear(), reference.getMonth() - count, 1);
-
-  let total = 0;
-  const monthsWithData = new Set<string>();
-  for (const t of transactions) {
-    if (!isExpenseRealizada(t)) continue;
-    const d = parseLocalDate(t.date);
-    if (Number.isNaN(d.getTime())) continue;
-    if (d < start || d >= firstOfCurrent) continue;
-    total += Number(t.amount) || 0;
-    monthsWithData.add(`${d.getFullYear()}-${d.getMonth()}`);
-  }
-
-  if (monthsWithData.size === 0) return 0;
-  return round2(total / monthsWithData.size);
+  return averageMonthlyByType(transactions, 'expense', reference, months);
 }
 
 /**

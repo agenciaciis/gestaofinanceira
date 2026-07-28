@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { averageMonthlyExpense, suggestReserve, computeSpendable } from './spendable';
+import { averageMonthlyExpense, averageMonthlyIncome, suggestReserve, computeSpendable } from './spendable';
 import { BankAccount, CreditCard, Transaction } from '../types';
 
 const tx = (over: Partial<Transaction>): Transaction => ({
@@ -42,6 +42,23 @@ describe('averageMonthlyExpense', () => {
 
   it('sem histórico devolve zero, não NaN', () => {
     expect(averageMonthlyExpense([], REF, 3)).toBe(0);
+  });
+});
+
+describe('averageMonthlyIncome', () => {
+  it('faz a média só das receitas concluídas dos meses completos', () => {
+    const txs = [
+      tx({ id: '1', amount: 8000, date: '2026-05-05', type: 'income' }),
+      tx({ id: '2', amount: 12000, date: '2026-06-05', type: 'income' }),
+      tx({ id: '3', amount: 9999, date: '2026-06-06', type: 'income', status: 'pending' }),
+      tx({ id: '4', amount: 9999, date: '2026-06-07', type: 'expense' }),
+      tx({ id: '5', amount: 9999, date: '2026-07-05', type: 'income' }), // mês corrente
+    ];
+    expect(averageMonthlyIncome(txs, REF, 3)).toBe(10000);
+  });
+
+  it('sem receita devolve zero', () => {
+    expect(averageMonthlyIncome([], REF, 3)).toBe(0);
   });
 });
 
