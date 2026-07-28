@@ -48,6 +48,10 @@ import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth, is
 import { ptBR } from 'date-fns/locale';
 import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice, round2 } from '../lib/finance';
 import { collectDebts, payoffSchedule } from '../lib/debts';
+import { computeSpendable, suggestReserve } from '../lib/spendable';
+
+/** Chave da reserva protegida — preferência deste dispositivo. */
+const RESERVE_STORAGE_KEY = 'finanflow:reserva-protegida';
 
 const StatCard: React.FC<{
   title: string; 
@@ -112,6 +116,10 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [timeFilter, setTimeFilter] = useState<'today' | 'month' | 'year'>('month');
+  // Vazio = usar a reserva sugerida pelo sistema.
+  const [reserveOverride, setReserveOverride] = useState<string>(
+    () => (typeof localStorage !== 'undefined' && localStorage.getItem(RESERVE_STORAGE_KEY)) || ''
+  );
 
   useEffect(() => {
     console.log('Dashboard: useEffect triggered', { entitiesCount: entities.length, filterType });
@@ -291,6 +299,41 @@ export const Dashboard: React.FC = () => {
     };
   }, [transactions, accounts, cards, debts, budgets, now, timeFilter]);
 
+  /**
+   * "Posso gastar?" — quanto sobra hoje já descontando tudo que está
+   * comprometido até o fim do mês, o gasto variável esperado e a reserva.
+   */
+  const reserveSuggestion = useMemo(
+    () => suggestReserve(transactions, now, stats.totalOpenDebts > 0),
+    [transactions, now, stats.totalOpenDebts]
+  );
+
+  const activeReserve = reserveOverride.trim() === ''
+    ? reserveSuggestion.amount
+    : Math.max(0, Number(reserveOverride) || 0);
+
+  const spendable = useMemo(
+    () => computeSpendable({
+      accounts,
+      transactions,
+      cards,
+      loans: debts.map(d => ({ id: d.id, name: d.name, monthlyPayment: d.monthlyPayment })),
+      reserve: activeReserve,
+      reference: now,
+    }),
+    [accounts, transactions, cards, debts, activeReserve, now]
+  );
+
+  const saveReserve = (value: string) => {
+    setReserveOverride(value);
+    try {
+      if (value.trim() === '') localStorage.removeItem(RESERVE_STORAGE_KEY);
+      else localStorage.setItem(RESERVE_STORAGE_KEY, value);
+    } catch {
+      // localStorage indisponível (aba privada): segue só em memória.
+    }
+  };
+
   // Chart Data: Last 6 months + Next 6 months projection
   const cashFlowData = useMemo(() => {
     const data = [];
@@ -432,9 +475,101 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Posso gastar? */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className={cn(
+          'rounded-3xl p-8 border',
+          spendable.spendable >= 0
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/40'
+            : 'bg-rose-50 dark:bg-rose-950/40 border-rose-100 dark:border-rose-900/40'
+        )}>
+          <p className={cn(
+            'text-[10px] font-black uppercase tracking-widest',
+            spendable.spendable >= 0 ? 'text-emerald-600' : 'text-rose-500'
+          )}>
+            Posso gastar
+          </p>
+          <p className={cn(
+            'mt-1 text-4xl font-black tracking-tighter',
+            spendable.spendable >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
+          )}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(spendable.spendable)}
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+            {spendable.spendable >= 0
+              ? `Livre para gastar nos ${spendable.daysLeft} dias que faltam do mês, sem furar nenhum compromisso.`
+              : 'Seus compromissos do mês já passam do que você tem. Não assuma gasto novo — veja o que dá para adiar ou renegociar.'}
+          </p>
+        </div>
+
+        {/* De onde sai esse número */}
+        <div className="lg:col-span-2 rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-sm border border-slate-100 dark:border-gray-800">
+          <h4 className="text-sm font-black text-slate-900 dark:text-gray-100 uppercase tracking-widest">
+            De onde sai esse número
+          </h4>
+          <div className="mt-4 space-y-2 text-sm">
+            {[
+              { label: 'Saldo real nas contas', value: spendable.balance, positive: true },
+              { label: 'Contas a pagar até o fim do mês', value: -spendable.billsDueThisMonth },
+              { label: 'Fatura de cartão em aberto', value: -spendable.cardInvoices },
+              { label: 'Parcela de empréstimos cadastrados', value: -spendable.loanPayments },
+              { label: `Gasto variável esperado (${spendable.daysLeft} dias)`, value: -spendable.expectedVariable },
+              { label: 'Reserva protegida', value: -spendable.reserve },
+            ].map(row => (
+              <div key={row.label} className="flex justify-between border-b border-slate-50 dark:border-gray-800 pb-1.5">
+                <span className="text-slate-600 dark:text-slate-400 font-medium">{row.label}</span>
+                <span className={cn(
+                  'font-black tabular-nums',
+                  row.positive ? 'text-slate-900 dark:text-gray-100' : 'text-rose-600'
+                )}>
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-slate-50 dark:bg-gray-800/60 p-5">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              Reserva de emergência protegida
+            </label>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">R$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={reserveOverride}
+                  onChange={(e) => saveReserve(e.target.value)}
+                  placeholder={String(Math.round(reserveSuggestion.amount))}
+                  className="w-44 rounded-xl border border-slate-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-emerald-500"
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 flex-1 min-w-[16rem]">
+                {reserveSuggestion.monthlyExpense === 0 ? (
+                  <>Ainda não tenho histórico para sugerir um valor. Informe quanto você quer manter intocado.</>
+                ) : stats.totalOpenDebts > 0 ? (
+                  <>
+                    Sugestão: <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(reserveSuggestion.amount)}</strong> —
+                    1 mês da sua despesa média. Enquanto há dívida, uma reserva pequena basta como para-choque;
+                    o resto rende mais atacando a dívida. Quitada, suba para 6 meses.
+                  </>
+                ) : (
+                  <>
+                    Sugestão: <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(reserveSuggestion.amount)}</strong> —
+                    6 meses da sua despesa média. Sem dívida, agora é hora do colchão de verdade.
+                  </>
+                )}
+                {reserveOverride.trim() !== '' && <> <em>(usando o seu valor; apague para voltar à sugestão)</em></>}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Primary Stats */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard 
+        <StatCard
           title="Patrimônio Líquido" 
           value={stats.netWorth} 
           type="balance" 
