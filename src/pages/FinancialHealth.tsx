@@ -38,7 +38,7 @@ import {
 import { cn } from '../lib/utils';
 import { format, addMonths, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { GoogleGenAI } from "@google/genai";
+import { getFinancialAdvice } from "../services/geminiService";
 import { computeBalances, daysUntilDueDay, round2 } from '../lib/finance';
 import {
   collectDebts,
@@ -50,8 +50,6 @@ import {
   DebtView,
   PayoffStrategy,
 } from '../lib/debts';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
@@ -249,21 +247,14 @@ export const FinancialHealth: React.FC = () => {
     if (!selectedEntity || isAnalyzing) return;
     setIsAnalyzing(true);
     try {
-      const dataSummary = {
+      // Manda as dívidas REAIS (as três fontes), não só a coleção `debts`.
+      const advice = await getFinancialAdvice({
         balance: totalBalance,
-        debts: debts.map(d => ({ name: d.name, amount: d.remainingAmount, interest: d.interestRate })),
-        recentTransactions: transactions.slice(0, 10).map(t => ({ desc: t.description, amount: t.amount, type: t.type }))
-      };
-
-      const prompt = `Como um consultor financeiro profissional, analise os seguintes dados financeiros e forneça 3 dicas práticas e curtas para melhorar a saúde financeira, focar em quitar dívidas e onde investir se sobrar dinheiro. Seja direto e motivador. Responda em Português do Brasil.
-      Dados: ${JSON.stringify(dataSummary)}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
+        debts: debtViews.map(v => ({ name: v.name, amount: v.balance, interest: v.interestRate })),
+        recentTransactions: transactions.slice(0, 10).map(t => ({ desc: t.description, amount: t.amount, type: t.type })),
       });
 
-      setAiAdvice(response.text || "Não foi possível gerar a análise no momento.");
+      setAiAdvice(advice || "Não foi possível gerar a análise no momento.");
     } catch (error) {
       console.error("AI Error:", error);
       setAiAdvice("Não foi possível gerar a análise no momento. Tente novamente mais tarde.");

@@ -8,6 +8,7 @@ import axios from 'axios';
 import { parseFinanceMessage } from './src/lib/whatsappParse';
 import { extractTransactionFromText, extractTransactionFromImage, ExtractedTransaction } from './whatsapp-ai';
 import { computeBalances } from './src/lib/finance';
+import { registerAiRoutes } from './ai-routes';
 
 // Guarda o último lançamento criado por número (para "corrigir/apagar último").
 const lastTxBySender = new Map<string, { entityId: string; txId: string }>();
@@ -54,13 +55,17 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json());
+  // Limite alto o bastante para o upload de extrato em PDF/imagem (base64).
+  app.use(express.json({ limit: '25mb' }));
 
   // API Routes
   app.get('/api/health', (req, res) => {
     console.log('Health check requested');
     res.json({ status: 'ok' });
   });
+
+  // Endpoints de IA (a chave do Gemini fica só aqui, nunca no navegador).
+  registerAiRoutes(app, admin);
 
   // WhatsApp Status Proxy
   app.get('/api/whatsapp/status/:entityId', async (req, res) => {

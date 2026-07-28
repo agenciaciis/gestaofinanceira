@@ -7,13 +7,12 @@ import { defineConfig, loadEnv } from 'vite';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
+    // NÃO injetar segredos aqui: tudo que entra em `define` vai literalmente
+    // para o bundle e fica legível para qualquer visitante. As chamadas de IA
+    // passam por /api/ai/* no servidor (ver ai-routes.ts).
     build: {
       chunkSizeWarningLimit: 900,
       rollupOptions: {

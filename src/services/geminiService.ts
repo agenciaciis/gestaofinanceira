@@ -1,87 +1,100 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { CATEGORIES } from "../constants";
-import { parseAmountBR, parseFlexibleDate, ParsedRow } from "../lib/statementParsers";
+/**
+ * Fachada de IA do cliente.
+ *
+ * Nada aqui fala com o Gemini diretamente: a chave mora no servidor. Este
+ * módulo só envia os dados para /api/ai/* com o token do usuário logado.
+ */
+import { auth } from '../firebase';
+import { parseAmountBR, parseFlexibleDate, ParsedRow } from '../lib/statementParsers';
 
-export const suggestCategories = async (descriptions: string[], type: 'income' | 'expense') => {
+/** Chama um endpoint de IA autenticado. Lança em erro de rede/servidor. */
+async function callAi<T>(path: string, body: unknown): Promise<T> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Você precisa estar logado para usar a IA.');
+  const token = await user.getIdToken();
+
+  const response = await fetch(`/api/ai/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}));
+    throw new Error(detail?.error || 'Falha ao consultar a IA.');
+  }
+  return response.json() as Promise<T>;
+}
+
+/**
+ * Sugere a categoria de várias descrições de uma vez.
+ * Nunca lança: em erro, devolve 'outros' para todas — a importação continua.
+ */
+export const suggestCategories = async (
+  descriptions: string[],
+  type: 'income' | 'expense'
+): Promise<string[]> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-    const prompt = `Analise as seguintes descrições de transações financeiras e sugira a categoria mais adequada para cada uma entre as seguintes opções: ${CATEGORIES.map(c => c.name).join(', ')}. 
-    Tipo das transações: ${type === 'income' ? 'Receita' : 'Despesa'}
-    
-    Descrições:
-    ${descriptions.map((d, i) => `${i + 1}. ${d}`).join('\n')}
-    
-    Responda em formato JSON, um array de strings com os NOMES das categorias sugeridas na mesma ordem das descrições.`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.STRING
-          }
-        }
-      }
+    const { categoryIds } = await callAi<{ categoryIds: string[] }>('suggest-categories', {
+      descriptions,
+      type,
     });
-
-    const suggestions = JSON.parse(response.text || '[]');
-    return suggestions.map((s: string) => {
-      const category = CATEGORIES.find(c => c.name.toLowerCase() === s.toLowerCase());
-      return category ? category.id : 'outros';
-    });
+    return descriptions.map((_, i) => categoryIds[i] || 'outros');
   } catch (error) {
-    console.error("Error suggesting categories:", error);
+    console.error('Erro ao sugerir categorias:', error);
     return descriptions.map(() => 'outros');
   }
 };
 
 /**
- * Extrai as transações de um extrato/fatura em PDF usando a IA (Gemini),
- * enviando o arquivo diretamente (sem precisar de parser de PDF no navegador).
- * Retorna linhas já normalizadas (data 'YYYY-MM-DD', valor com sinal).
+ * Sugere a categoria de UMA descrição (usado no formulário de lançamento).
+ * Devolve `null` quando não consegue sugerir, para o formulário não mexer no
+ * que o usuário já escolheu.
+ */
+export const suggestCategory = async (
+  description: string,
+  type: 'income' | 'expense'
+): Promise<string | null> => {
+  if (!description.trim()) return null;
+  try {
+    const { categoryIds } = await callAi<{ categoryIds: string[] }>('suggest-categories', {
+      descriptions: [description],
+      type,
+    });
+    return categoryIds[0] || null;
+  } catch (error) {
+    console.error('Erro ao sugerir categoria:', error);
+    return null;
+  }
+};
+
+export interface FinancialAdviceInput {
+  balance: number;
+  debts: { name: string; amount: number; interest: number | null }[];
+  recentTransactions: { desc: string; amount: number; type: string }[];
+}
+
+/** Análise da saúde financeira com foco em quitar dívidas. */
+export const getFinancialAdvice = async (input: FinancialAdviceInput): Promise<string> => {
+  const { advice } = await callAi<{ advice: string }>('financial-advice', input);
+  return advice;
+};
+
+/**
+ * Extrai as transações de um extrato/fatura em PDF usando a IA, enviando o
+ * arquivo ao servidor. Retorna linhas já normalizadas (data 'YYYY-MM-DD',
+ * valor com sinal).
  */
 export const extractStatementFromPdf = async (
   base64: string,
   mimeType: string
 ): Promise<ParsedRow[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  const { rows } = await callAi<{ rows: { date: string; description: string; amount: number }[] }>(
+    'parse-statement',
+    { base64, mimeType }
+  );
 
-  const prompt = `Você é um extrator de extratos bancários e faturas de cartão.
-Extraia TODAS as transações deste documento. Para cada uma retorne:
-- date: a data no formato YYYY-MM-DD
-- description: a descrição/histórico
-- amount: o valor numérico. Use NEGATIVO para saídas/despesas/débitos e POSITIVO para entradas/receitas/créditos. Use ponto como separador decimal e não inclua símbolo de moeda.
-Ignore linhas de saldo, totais e cabeçalhos. Responda apenas o JSON do array.`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [
-      { inlineData: { data: base64, mimeType } },
-      { text: prompt },
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            date: { type: Type.STRING },
-            description: { type: Type.STRING },
-            amount: { type: Type.NUMBER },
-          },
-          required: ["date", "description", "amount"],
-        },
-      },
-    },
-  });
-
-  const raw = JSON.parse(response.text || '[]') as { date: string; description: string; amount: number }[];
-  return raw
+  return (rows || [])
     .map((r) => ({
       date: parseFlexibleDate(r.date),
       description: String(r.description || 'Lançamento importado'),

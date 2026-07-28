@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
 import { addMonths, format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { GoogleGenAI } from "@google/genai";
+import { suggestCategory as aiSuggestCategory } from "../services/geminiService";
 import { Sparkles, Loader2 } from 'lucide-react';
 
 import { CATEGORIES, MONTHS } from '../constants';
@@ -71,27 +71,8 @@ export const Transactions: React.FC = () => {
     if (!description) return;
     setIsAiLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-      const prompt = `Analise a descrição de uma transação financeira e sugira a categoria mais adequada entre as seguintes opções: ${CATEGORIES.map(c => c.name).join(', ')}. 
-      Descrição: "${description}"
-      Tipo: ${type === 'income' ? 'Receita' : 'Despesa'}
-      Responda APENAS o nome da categoria sugerida.`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-      });
-
-      const text = response.text?.trim();
-      if (!text) return;
-
-      const category = CATEGORIES.find(c => c.name.toLowerCase() === text.toLowerCase());
-      if (category) {
-        setCategoryId(category.id);
-      }
-    } catch (error) {
-      console.error("Error suggesting category:", error);
+      const suggestedId = await aiSuggestCategory(description, type === 'income' ? 'income' : 'expense');
+      if (suggestedId) setCategoryId(suggestedId);
     } finally {
       setIsAiLoading(false);
     }
