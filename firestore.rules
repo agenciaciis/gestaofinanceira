@@ -223,6 +223,18 @@ service cloud.firestore {
         allow delete: if isEntityWriter(entityId);
       }
 
+      // Taxa de juros informada pelo usuário para dívidas que não têm campo
+      // próprio: parcelamentos (chave = installmentGroupId) e faturas de
+      // cartão (chave = "card:<cardId>").
+      match /debt_meta/{debtViewId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update: if isEntityWriter(entityId)
+          && request.resource.data.interestRate is number
+          && request.resource.data.interestRate >= 0
+          && request.resource.data.interestRate <= 100;
+        allow delete: if isEntityWriter(entityId);
+      }
+
       match /services/{serviceId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
         allow create, update, delete: if isEntityWriter(entityId);
