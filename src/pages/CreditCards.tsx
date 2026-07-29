@@ -7,6 +7,7 @@ import { CreditCard, Transaction } from '../types';
 import { Plus, CreditCard as CardIcon, Trash2, Edit2, AlertCircle, Calendar, Info, BarChart3, X, ReceiptText, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -42,6 +43,7 @@ export const CreditCards: React.FC = () => {
   const [dueDay, setDueDay] = useState('');
   const [closingDay, setClosingDay] = useState('');
   const [targetEntityId, setTargetEntityId] = useState('');
+  const [color, setColor] = useState('');
 
   useEffect(() => {
     if (entities.length === 0) return;
@@ -101,6 +103,7 @@ export const CreditCards: React.FC = () => {
       dueDay: Number(dueDay),
       closingDay: Number(closingDay),
       entityId: targetEntityId,
+      color: normalizeHex(color) || null,
       ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
       collaboratorsEmails: entities.find(e => e.id === targetEntityId)?.collaboratorsEmails || [],
     };
@@ -131,6 +134,7 @@ export const CreditCards: React.FC = () => {
     setDueDay(card.dueDay.toString());
     setClosingDay(card.closingDay.toString());
     setTargetEntityId(card.entityId);
+    setColor(card.color || '');
     setIsModalOpen(true);
   };
 
@@ -142,6 +146,7 @@ export const CreditCards: React.FC = () => {
     setDueDay('');
     setClosingDay('');
     setTargetEntityId('');
+    setColor('');
   };
 
   const handleDelete = async (entityId: string, cardId: string) => {
@@ -223,15 +228,26 @@ export const CreditCards: React.FC = () => {
           const availableLimit = card.limit - usedLimit;
           const usagePercentage = Math.min((usedLimit / card.limit) * 100, 100);
 
+          const gradient = cardGradient(card.color);
+          const fg = readableForeground(gradient.from);
+          const fgMuted = mutedForeground(gradient.from);
+
           return (
-            <motion.div 
+            <motion.div
               key={card.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 dark:from-slate-900 dark:to-slate-950 p-6 text-white shadow-xl dark:shadow-none border border-white/10 dark:border-slate-800"
+              /* A cor do cartão é FIXA (escolhida pelo usuário), não segue o tema.
+                 Por isso o texto por cima vem de readableForeground e não de um
+                 token de tema — senão no tema claro o rótulo escurece e some. */
+              style={{
+                background: `linear-gradient(135deg, ${gradient.from} 0%, ${gradient.to} 100%)`,
+                color: fg,
+              }}
+              className="group relative overflow-hidden rounded-2xl p-6 shadow-xl border border-white/10"
             >
               <div className="flex items-center justify-between">
-                <CardIcon className="h-8 w-8 text-content-subtle" />
+                <CardIcon className="h-8 w-8" style={{ color: fgMuted }} />
                 <div className="flex gap-2">
                   <button 
                     onClick={() => handleEdit(card)}
@@ -249,36 +265,40 @@ export const CreditCards: React.FC = () => {
               </div>
               
               <div className="mt-6">
-                <p className="text-xs font-medium uppercase tracking-widest text-content-subtle">{card.brand || 'Cartão'}</p>
+                <p style={{ color: fgMuted }} className="text-xs font-medium uppercase tracking-widest">{card.brand || 'Cartão'}</p>
                 <h3 className="text-xl font-bold">{card.name}</h3>
               </div>
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <div className="mb-1 flex justify-between text-[10px] uppercase tracking-wider text-content-subtle">
+                  <div style={{ color: fgMuted }} className="mb-1 flex justify-between text-[10px] uppercase tracking-wider">
                     <span>Limite Utilizado</span>
                     <span>{usagePercentage.toFixed(1)}%</span>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-700">
-                    <div 
-                      className={cn(
-                        "h-full transition-all duration-500",
-                        usagePercentage > 90 ? "bg-red-500" : usagePercentage > 80 ? "bg-yellow-500" : "bg-primary"
-                      )}
-                      style={{ width: `${usagePercentage}%` }}
+                  <div style={{ backgroundColor: fg === '#ffffff' ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.18)' }} className="h-1.5 w-full overflow-hidden rounded-full">
+                    <div
+                      className="h-full transition-all duration-500"
+                      /* Estado normal usa a cor do TEXTO do cartão: garante
+                         contraste em qualquer cor de marca (azul fixo sumia no
+                         roxo do Nubank e no laranja do Inter). Vermelho fica
+                         reservado ao estouro, onde a cor carrega significado. */
+                      style={{
+                        width: `${usagePercentage}%`,
+                        backgroundColor: usagePercentage > 90 ? '#ef4444' : fg,
+                      }}
                     />
                   </div>
                 </div>
 
                 <div className="flex justify-between">
                   <div>
-                    <p className="text-[10px] uppercase text-content-subtle">Disponível</p>
+                    <p style={{ color: fgMuted }} className="text-[10px] uppercase">Disponível</p>
                     <p className="text-sm font-bold text-green-400">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(availableLimit)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] uppercase text-content-subtle">Limite Total</p>
+                    <p style={{ color: fgMuted }} className="text-[10px] uppercase">Limite Total</p>
                     <p className="text-sm font-bold">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.limit)}
                     </p>
@@ -605,6 +625,63 @@ export const CreditCards: React.FC = () => {
                     className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   />
+                </div>
+              </div>
+
+              {/* Cor do cartão */}
+              <div>
+                <label className="block text-sm font-medium text-content-muted">Cor do cartão</label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {BANK_PRESETS.map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      title={preset.name}
+                      onClick={() => setColor(preset.color)}
+                      style={{ backgroundColor: preset.color }}
+                      className={cn(
+                        'h-8 w-8 rounded-full border transition-all',
+                        normalizeHex(color) === preset.color
+                          ? 'ring-2 ring-primary ring-offset-2 border-transparent scale-110'
+                          : 'border-line hover:scale-110'
+                      )}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={normalizeHex(color) || '#111827'}
+                    onChange={(e) => setColor(e.target.value)}
+                    title="Escolher qualquer cor"
+                    className="h-9 w-14 cursor-pointer rounded-lg border border-line bg-transparent p-1"
+                  />
+                  <span className="text-xs text-content-subtle">
+                    {color ? BANK_PRESETS.find(p => p.color === normalizeHex(color))?.name || normalizeHex(color) : 'Sem cor — usa o visual escuro padrão'}
+                  </span>
+                  {color && (
+                    <button
+                      type="button"
+                      onClick={() => setColor('')}
+                      className="ml-auto text-xs font-bold text-content-subtle hover:text-rose-600"
+                    >
+                      Remover cor
+                    </button>
+                  )}
+                </div>
+
+                {/* Prévia com o texto já na cor que o sistema vai calcular */}
+                <div
+                  className="mt-3 rounded-xl p-4"
+                  style={{
+                    background: `linear-gradient(135deg, ${cardGradient(color).from} 0%, ${cardGradient(color).to} 100%)`,
+                    color: readableForeground(cardGradient(color).from),
+                  }}
+                >
+                  <p className="text-[10px] uppercase tracking-widest" style={{ color: mutedForeground(cardGradient(color).from) }}>
+                    {brand || 'Bandeira'}
+                  </p>
+                  <p className="text-lg font-bold">{name || 'Nome do cartão'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

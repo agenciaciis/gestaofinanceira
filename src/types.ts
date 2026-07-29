@@ -40,6 +40,8 @@ export interface BankAccount {
   initialBalance: number;
   currentBalance: number;
   entityId: string;
+  /** Cor da marca (hex). Sem valor = visual padrão. */
+  color?: string;
 }
 
 export interface Debt {
@@ -68,6 +70,8 @@ export interface CreditCard {
   dueDay: number;
   closingDay: number;
   entityId: string;
+  /** Cor da marca (hex). Sem valor = visual escuro padrão. */
+  color?: string;
 }
 
 export interface Transaction {

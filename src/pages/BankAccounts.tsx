@@ -7,6 +7,7 @@ import { BankAccount, Transaction } from '../types';
 import { Plus, Landmark, Trash2, Edit2, Wallet } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
 import { computeBalances } from '../lib/finance';
 
 export const BankAccounts: React.FC = () => {
@@ -20,6 +21,7 @@ export const BankAccounts: React.FC = () => {
 
   // Form state
   const [bankName, setBankName] = useState('');
+  const [color, setColor] = useState('');
   const [type, setType] = useState<'corrente' | 'poupanca' | 'investimento' | 'caixa' | 'reserva'>('corrente');
   const [initialBalance, setInitialBalance] = useState('');
 
@@ -54,6 +56,7 @@ export const BankAccounts: React.FC = () => {
 
   const resetForm = () => {
     setBankName('');
+    setColor('');
     setType('corrente');
     setInitialBalance('');
     setEditingAccount(null);
@@ -62,6 +65,7 @@ export const BankAccounts: React.FC = () => {
   const handleEdit = (account: BankAccount) => {
     setEditingAccount(account);
     setBankName(account.bankName);
+    setColor(account.color || '');
     setType(account.type);
     setInitialBalance(String(account.initialBalance ?? ''));
     setIsModalOpen(true);
@@ -75,6 +79,7 @@ export const BankAccounts: React.FC = () => {
       if (editingAccount) {
         await updateDoc(doc(db, `entities/${selectedEntity.id}/bank_accounts`, editingAccount.id), {
           bankName,
+          color: normalizeHex(color) || null,
           type,
           initialBalance: Number(initialBalance),
         });
@@ -82,6 +87,7 @@ export const BankAccounts: React.FC = () => {
       } else {
         await addDoc(collection(db, `entities/${selectedEntity.id}/bank_accounts`), {
           bankName,
+          color: normalizeHex(color) || null,
           type,
           initialBalance: Number(initialBalance),
           currentBalance: Number(initialBalance),
@@ -185,15 +191,32 @@ export const BankAccounts: React.FC = () => {
             key={account.id}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="group relative rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-xl hover:border-primary/20 transition-all"
+            className="group relative overflow-hidden rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-xl hover:border-primary/20 transition-all"
           >
+            {/* Faixa com a cor do banco. A conta segue o tema (fundo claro ou
+                escuro), então a cor entra como acento — pintar o card inteiro
+                brigaria com o tema e atrapalharia a leitura do saldo. */}
+            {normalizeHex(account.color) && (
+              <div
+                className="absolute inset-x-0 top-0 h-1.5"
+                style={{ backgroundColor: normalizeHex(account.color)! }}
+              />
+            )}
             <div className="flex items-center justify-between">
-              <div className={cn(
-                "flex h-12 w-12 items-center justify-center rounded-2xl",
-                account.type === 'investimento' ? "bg-blue-50 text-blue-600" :
-                account.type === 'reserva' ? "bg-amber-50 text-amber-600" :
-                account.type === 'caixa' ? "bg-surface-muted text-content-muted" : "bg-emerald-50 text-emerald-600"
-              )}>
+              <div
+                className={cn(
+                  "flex h-12 w-12 items-center justify-center rounded-2xl",
+                  !normalizeHex(account.color) && (
+                    account.type === 'investimento' ? "bg-blue-50 text-blue-600" :
+                    account.type === 'reserva' ? "bg-amber-50 text-amber-600" :
+                    account.type === 'caixa' ? "bg-surface-muted text-content-muted" : "bg-emerald-50 text-emerald-600"
+                  )
+                )}
+                style={normalizeHex(account.color) ? {
+                  backgroundColor: normalizeHex(account.color)!,
+                  color: readableForeground(normalizeHex(account.color)!),
+                } : undefined}
+              >
                 <Landmark className="h-6 w-6" />
               </div>
               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -265,6 +288,50 @@ export const BankAccounts: React.FC = () => {
                   className="mt-1 w-full rounded-lg border border-line px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-content-muted">Cor do banco</label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {BANK_PRESETS.map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      title={preset.name}
+                      onClick={() => setColor(preset.color)}
+                      style={{ backgroundColor: preset.color }}
+                      className={cn(
+                        'h-7 w-7 rounded-full border transition-all',
+                        normalizeHex(color) === preset.color
+                          ? 'ring-2 ring-primary ring-offset-2 border-transparent scale-110'
+                          : 'border-line hover:scale-110'
+                      )}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={normalizeHex(color) || '#2563eb'}
+                    onChange={(e) => setColor(e.target.value)}
+                    title="Escolher qualquer cor"
+                    className="h-9 w-14 cursor-pointer rounded-lg border border-line bg-transparent p-1"
+                  />
+                  <span className="text-xs text-content-subtle">
+                    {color
+                      ? BANK_PRESETS.find(p => p.color === normalizeHex(color))?.name || normalizeHex(color)
+                      : 'Sem cor — usa o ícone padrão pelo tipo de conta'}
+                  </span>
+                  {color && (
+                    <button
+                      type="button"
+                      onClick={() => setColor('')}
+                      className="ml-auto text-xs font-bold text-content-subtle hover:text-rose-600"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-content-muted">Tipo de Conta</label>
