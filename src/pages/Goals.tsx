@@ -196,10 +196,7 @@ export const Goals: React.FC = () => {
               <li>Clique em <strong>Publicar</strong></li>
             </ol>
             <p className="mt-4 text-sm font-bold text-amber-900 dark:text-amber-200">Ou, pelo terminal:</p>
-            <pre className="mt-2 overflow-x-auto rounded-xl bg-amber-900 p-4 text-xs text-amber-50">
-npm i -g firebase-tools
-firebase login
-firebase deploy --only firestore:rules</pre>
+            <pre className="mt-2 overflow-x-auto rounded-xl bg-amber-900 p-4 text-xs text-amber-50 whitespace-pre">{`npm i -g firebase-tools\nfirebase login\nfirebase deploy --only firestore:rules`}</pre>
             <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
               Isso também libera o score do Serasa e a taxa de juros dos parcelamentos, que
               dependem das mesmas regras novas.
