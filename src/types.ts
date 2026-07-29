@@ -108,6 +108,11 @@ export interface Transaction {
   counterpartEntityId?: string;
   /** Despesa pessoal paga pela empresa — o que o contador precisa enxergar. */
   personalExpense?: boolean;
+  /**
+   * Etiquetas livres, cruzando categorias ("reforma 2026", "cliente X").
+   * Ideia trazida da planilha antiga: categoria classifica, etiqueta agrupa.
+   */
+  tags?: string[];
   /** Vínculo com uma meta/caixinha. */
   goalId?: string;
   /**
