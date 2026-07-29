@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Goal, Transaction, BankAccount } from '../types';
 import { PiggyBank, Plus, Trash2, Edit2, Target, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
@@ -16,6 +16,7 @@ import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus } from '../lib/goals';
+import { goalsDocPath, readGoals, upsertGoal, removeGoal } from '../lib/goalStore';
 import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
 import { formatLocalDate } from '../lib/finance';
 
@@ -77,21 +78,17 @@ export const Goals: React.FC = () => {
     let allAcc: BankAccount[] = [];
 
     visibleEntities.forEach(entity => {
-      unsubs.push(onSnapshot(query(collection(db, `entities/${entity.id}/goals`)), snap => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Goal[];
+      unsubs.push(onSnapshot(doc(db, goalsDocPath(entity.id)), snap => {
+        const list = readGoals(snap.data(), entity.id);
         allGoals = [...allGoals.filter(g => g.entityId !== entity.id), ...list];
         setGoals([...allGoals]);
         setLoading(false);
       }, e => {
-        // Sem isto o loading ficava true para sempre e a página travava no
-        // círculo girando — falha silenciosa, o pior tipo.
+        // Erro TAMBÉM encerra o carregamento: sem isto a página ficava presa no
+        // círculo girando, uma falha silenciosa.
         setLoading(false);
-        setLoadError(
-          (e as { code?: string })?.code === 'permission-denied'
-            ? 'permission-denied'
-            : 'unknown'
-        );
-        handleFirestoreError(e, OperationType.LIST, `entities/${entity.id}/goals`);
+        setLoadError((e as { code?: string })?.code === 'permission-denied' ? 'permission-denied' : 'unknown');
+        handleFirestoreError(e, OperationType.GET, goalsDocPath(entity.id));
       }));
 
       unsubs.push(onSnapshot(query(collection(db, `entities/${entity.id}/transactions`)), snap => {
@@ -142,13 +139,23 @@ export const Goals: React.FC = () => {
     };
 
     try {
-      if (editing) {
-        await updateDoc(doc(db, `entities/${editing.entityId}/goals`, editing.id), data);
-        showToast('Caixinha atualizada!', 'success');
-      } else {
-        await addDoc(collection(db, `entities/${entityId}/goals`), { ...data, createdAt: serverTimestamp() });
-        showToast('Caixinha criada! Marque um lançamento com ela para começar a guardar.', 'success');
-      }
+      const daEntidade = goals.filter(g => g.entityId === entityId);
+      const registro: Goal = {
+        id: editing?.id || crypto.randomUUID(),
+        name: data.name,
+        targetAmount: data.targetAmount,
+        deadline: data.deadline || undefined,
+        description: data.description || undefined,
+        color: data.color || undefined,
+        entityId,
+        createdAt: editing?.createdAt ?? new Date().toISOString(),
+      };
+      await setDoc(
+        doc(db, goalsDocPath(entityId)),
+        { items: upsertGoal(daEntidade, registro), updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+      showToast(editing ? 'Caixinha atualizada!' : 'Caixinha criada! Agora registre seus depósitos nela.', 'success');
       setIsModalOpen(false); resetForm();
     } catch (error) {
       console.error('Erro ao salvar caixinha:', error);
@@ -173,17 +180,40 @@ export const Goals: React.FC = () => {
     if (!moving || savingMove) return;
     const value = Number(moveAmount);
     if (!Number.isFinite(value) || value <= 0) { showToast('Informe um valor maior que zero.', 'error'); return; }
-    if (!fromAccount || !toAccount) { showToast('Escolha a conta de origem e a de destino.', 'error'); return; }
-    if (fromAccount === toAccount) { showToast('Origem e destino precisam ser contas diferentes.', 'error'); return; }
+    // Só uma das contas escolhida não faz sentido: ou as duas, ou nenhuma.
+    if ((fromAccount && !toAccount) || (!fromAccount && toAccount)) {
+      showToast('Para mexer no saldo, escolha as DUAS contas. Ou deixe as duas em branco para só registrar.', 'error');
+      return;
+    }
+    if (fromAccount && fromAccount === toAccount) {
+      showToast('Origem e destino precisam ser contas diferentes.', 'error'); return;
+    }
 
     const origem = accounts.find(a => a.id === fromAccount);
     const destino = accounts.find(a => a.id === toAccount);
-    if (!origem || !destino) { showToast('Conta não encontrada.', 'error'); return; }
-
     const guardando = moving.mode === 'guardar';
     setSavingMove(true);
     try {
-      if (origem.entityId === destino.entityId) {
+      if (!origem || !destino) {
+        // Caminho simples: você depositou no banco por fora e só está
+        // apontando aqui. Sem conta, o lançamento NÃO mexe em saldo nenhum —
+        // serve só para o progresso da caixinha.
+        const entity = entities.find(en => en.id === moving.goal.entityId);
+        await addDoc(collection(db, `entities/${moving.goal.entityId}/transactions`), {
+          description: `${guardando ? 'Depósito em' : 'Resgate de'} ${moving.goal.name}`,
+          amount: value,
+          type: 'transfer',
+          date: moveDate,
+          categoryId: 'transferencia',
+          status: 'completed',
+          entityId: moving.goal.entityId,
+          goalId: moving.goal.id,
+          goalDirection: guardando ? 'in' : 'out',
+          ownerUid: entity?.ownerUid,
+          collaboratorsEmails: entity?.collaboratorsEmails || [],
+          createdAt: serverTimestamp(),
+        });
+      } else if (origem.entityId === destino.entityId) {
         // Mesma entidade: uma transferência resolve.
         const entity = entities.find(en => en.id === origem.entityId);
         await addDoc(collection(db, `entities/${origem.entityId}/transactions`), {
@@ -251,7 +281,12 @@ export const Goals: React.FC = () => {
     });
     if (!ok) return;
     try {
-      await deleteDoc(doc(db, `entities/${g.entityId}/goals`, g.id));
+      const daEntidade = goals.filter(x => x.entityId === g.entityId);
+      await setDoc(
+        doc(db, goalsDocPath(g.entityId)),
+        { items: removeGoal(daEntidade, g.id), updatedAt: serverTimestamp() },
+        { merge: true }
+      );
       showToast('Caixinha excluída.', 'success');
     } catch (error) {
       console.error('Erro ao excluir caixinha:', error);
@@ -488,8 +523,8 @@ export const Goals: React.FC = () => {
               {moving.mode === 'guardar' ? 'Guardar em' : 'Resgatar de'} {moving.goal.name}
             </h3>
             <p className="text-sm text-content-subtle">
-              Vira uma transferência entre contas. O saldo das duas fica certo e o progresso da
-              caixinha anda junto — um lançamento só.
+              Depositou no banco? Informe o valor aqui e o progresso anda. Se quiser que o saldo das
+              suas contas também mexa, escolha as contas abaixo.
             </p>
 
             <form onSubmit={handleMove} className="mt-6 space-y-4">
@@ -508,10 +543,10 @@ export const Goals: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-content-muted">Sai de qual conta</label>
-                <select required value={fromAccount} onChange={e => setFromAccount(e.target.value)}
+                <label className="block text-sm font-medium text-content-muted">Sai de qual conta <span className="font-normal text-content-subtle">(opcional)</span></label>
+                <select value={fromAccount} onChange={e => setFromAccount(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20">
-                  <option value="">Escolha...</option>
+                  <option value="">Não mexer em saldo — só registrar</option>
                   {accounts.map(a => (
                     <option key={a.id} value={a.id}>
                       {a.bankName} — {entities.find(en => en.id === a.entityId)?.name} ({entities.find(en => en.id === a.entityId)?.type})
@@ -521,10 +556,10 @@ export const Goals: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-content-muted">Entra em qual conta</label>
-                <select required value={toAccount} onChange={e => setToAccount(e.target.value)}
+                <label className="block text-sm font-medium text-content-muted">Entra em qual conta <span className="font-normal text-content-subtle">(opcional)</span></label>
+                <select value={toAccount} onChange={e => setToAccount(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20">
-                  <option value="">Escolha...</option>
+                  <option value="">Não mexer em saldo — só registrar</option>
                   {accounts.map(a => (
                     <option key={a.id} value={a.id}>
                       {a.bankName} — {entities.find(en => en.id === a.entityId)?.name} ({entities.find(en => en.id === a.entityId)?.type})
@@ -532,9 +567,9 @@ export const Goals: React.FC = () => {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-content-subtle">
-                  Pode ser entre bancos seus ou entre pessoas e empresa. Quando as contas são de
-                  entidades diferentes, eu crio as duas pontas vinculadas, senão o dinheiro
-                  apareceria de graça num lado.
+                  Deixando as duas em branco, só o progresso da caixinha anda — nenhum saldo é
+                  alterado. Preenchendo as duas, viram transferência de verdade, e pode ser entre
+                  bancos seus ou entre pessoas e empresa.
                 </p>
               </div>
 
@@ -549,6 +584,35 @@ export const Goals: React.FC = () => {
                     <strong>{entities.find(en => en.id === d.entityId)?.name}</strong>. No consolidado
                     do grupo isso não conta como receita nova — é o mesmo dinheiro mudando de bolso.
                   </p>
+                );
+              })()}
+
+              {/* Depois deste depósito, quanto ainda falta e em que ritmo */}
+              {Number(moveAmount) > 0 && (() => {
+                const atual = computeGoalProgress(moving.goal, transactions);
+                const delta = moving.mode === 'guardar' ? Number(moveAmount) : -Number(moveAmount);
+                const novoGuardado = atual.saved + delta;
+                const faltando = Math.max(0, (Number(moving.goal.targetAmount) || 0) - novoGuardado);
+                const porMes = monthlyNeeded(faltando, moving.goal.deadline);
+                return (
+                  <div className="rounded-2xl bg-surface-muted p-4 text-sm">
+                    <p className="text-content-muted">
+                      Depois disso você terá <strong className="text-content">{fmt(novoGuardado)}</strong> guardado
+                      {faltando > 0
+                        ? <> e faltarão <strong className="text-content">{fmt(faltando)}</strong>.</>
+                        : <> — <strong className="text-emerald-600">objetivo alcançado!</strong></>}
+                    </p>
+                    {faltando > 0 && porMes !== null && (
+                      <p className="mt-1 text-content-muted">
+                        Para chegar no prazo, precisa guardar <strong className="text-primary">{fmt(porMes)}</strong> por mês.
+                      </p>
+                    )}
+                    {faltando > 0 && porMes === null && (
+                      <p className="mt-1 text-content-subtle text-xs">
+                        Sem prazo definido nesta caixinha — edite e coloque uma data para eu calcular o ritmo.
+                      </p>
+                    )}
+                  </div>
                 );
               })()}
 
@@ -623,11 +687,27 @@ export const Goals: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-content-muted">Até quando (opcional)</label>
+                  <label className="block text-sm font-medium text-content-muted">Em quanto tempo?</label>
+                  <div className="mt-1 flex gap-1">
+                    {[6, 12, 24, 36].map(meses => (
+                      <button
+                        key={meses}
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          // Último dia do mês alvo, para não cair no dia 31 de mês curto.
+                          setDeadline(formatLocalDate(new Date(d.getFullYear(), d.getMonth() + meses + 1, 0)));
+                        }}
+                        className="flex-1 rounded-lg border border-line py-2 text-xs font-bold text-content-muted hover:border-primary hover:text-primary transition-all"
+                      >
+                        {meses}m
+                      </button>
+                    ))}
+                  </div>
                   <input
                     type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
                     min={formatLocalDate(new Date())}
-                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-2 w-full rounded-lg border border-line px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
