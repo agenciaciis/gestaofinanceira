@@ -42,6 +42,7 @@ import { getFinancialAdvice } from "../services/geminiService";
 import { computeBalances, daysUntilDueDay, parseLocalDate, round2 } from '../lib/finance';
 import { averageMonthlyExpense, averageMonthlyIncome } from '../lib/spendable';
 import { computeHealthScore } from '../lib/health';
+import { CreditScorePanel } from '../components/CreditScorePanel';
 import {
   collectDebts,
   compareExtraPayment,
@@ -494,6 +495,8 @@ export const FinancialHealth: React.FC = () => {
           <div className="absolute -right-8 -top-8 h-32 w-32 bg-indigo-200/20 dark:bg-white/10 rounded-full blur-2xl" />
         </div>
       </div>
+
+      {selectedEntity && <CreditScorePanel entity={selectedEntity} />}
 
       {/* Quitação de Dívidas Section */}
       <div className="space-y-6">
