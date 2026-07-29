@@ -40,9 +40,10 @@ import {
   Line
 } from 'recharts';
 import { cn } from '../lib/utils';
+import { DREPanel } from '../components/DREPanel';
 
 export const Reports: React.FC = () => {
-  const { entities, filterType } = useEntity();
+  const { entities, filterType, selectedEntity } = useEntity();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -292,6 +293,14 @@ export const Reports: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {selectedEntity && (
+        <DREPanel
+          entity={selectedEntity}
+          transactions={transactions}
+          reference={new Date(selectedYear, selectedMonth, 15)}
+        />
+      )}
+
       {/* Header & Month Selector */}
       <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>

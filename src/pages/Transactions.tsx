@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, where, writeBatch, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, where, writeBatch, doc, updateDoc, deleteDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Transaction, BankAccount, CreditCard, Client, Goal } from '../types';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Search, Filter, Calendar, Tag, Wallet, CreditCard as CardIcon, ArrowRightLeft, Repeat, Download, CheckCircle2, Clock, AlertCircle, ChevronLeft, ChevronRight, Edit2, Trash2, Upload } from 'lucide-react';
@@ -17,6 +17,7 @@ import { CATEGORIES, MONTHS } from '../constants';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { splitInstallments, parseLocalDate } from '../lib/finance';
 import { planRecurringRenewals } from '../lib/recurring';
+import { tagsDocPath, readTags, parseTags, mergeTags, matchesAllTags } from '../lib/tags';
 
 const PAYMENT_TYPES: { id: NonNullable<Transaction['paymentType']>; label: string }[] = [
   { id: 'pix', label: 'PIX' },
@@ -56,6 +57,9 @@ export const Transactions: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalId, setGoalId] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [knownTags, setKnownTags] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
 
   // Installment state
   const [isInstallment, setIsInstallment] = useState(false);
@@ -118,6 +122,8 @@ export const Transactions: React.FC = () => {
     const matchesDate = tDate.getMonth() === selectedMonth && tDate.getFullYear() === selectedYear;
 
     if (!matchesDate) return false;
+
+    if (!matchesAllTags(t.tags, tagFilter)) return false;
 
     if (statusFilter === 'all') return matchesSearch;
     if (statusFilter === 'pending') return matchesSearch && t.status === 'pending' && !isOverdue;
@@ -186,6 +192,7 @@ export const Transactions: React.FC = () => {
     setPaymentType(t.paymentType || '');
     setPersonalExpense(!!t.personalExpense);
     setGoalId(t.goalId || '');
+    setTagsInput((t.tags || []).join(', '));
     setClientId(t.clientId || '');
     setIsInstallment(!!t.installmentGroupId);
     setTotalInstallments(t.totalInstallments?.toString() || '1');
@@ -333,6 +340,12 @@ export const Transactions: React.FC = () => {
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/goals`));
       unsubscribes.push(unsubG);
 
+      // Etiquetas já usadas nesta entidade, para sugerir em vez de digitar de novo.
+      const unsubTags = onSnapshot(doc(db, tagsDocPath(entity.id)), (snap) => {
+        setKnownTags(prev => mergeTags(prev, readTags(snap.data())));
+      }, (error) => handleFirestoreError(error, OperationType.GET, tagsDocPath(entity.id)));
+      unsubscribes.push(unsubTags);
+
       // Transactions
       const tQ = query(collection(db, `entities/${entity.id}/transactions`), orderBy('date', 'desc'));
       const unsubT = onSnapshot(tQ, (snapshot) => {
@@ -418,6 +431,14 @@ export const Transactions: React.FC = () => {
   }, [transactions, entities]);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // Registra etiquetas novas na lista da entidade, para sugerir depois.
+    const novasTags = parseTags(tagsInput);
+    if (novasTags.length > 0 && targetEntityId) {
+      setDoc(doc(db, tagsDocPath(targetEntityId)),
+        { items: mergeTags(knownTags, novasTags), updatedAt: serverTimestamp() },
+        { merge: true }
+      ).catch(err => console.error('Erro ao salvar etiquetas:', err));
+    }
     e.preventDefault();
     if (!targetEntityId) return;
 
@@ -459,6 +480,7 @@ export const Transactions: React.FC = () => {
                   paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
+            tags: parseTags(tagsInput),
                   clientId: clientId || null,
                   clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
                 });
@@ -484,6 +506,7 @@ export const Transactions: React.FC = () => {
           paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
+            tags: parseTags(tagsInput),
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           isRecurring,
@@ -528,6 +551,7 @@ export const Transactions: React.FC = () => {
             paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
+            tags: parseTags(tagsInput),
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 1 ? 'completed' : 'pending',
@@ -570,6 +594,7 @@ export const Transactions: React.FC = () => {
             paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
+            tags: parseTags(tagsInput),
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 0 ? 'completed' : 'pending',
@@ -595,6 +620,7 @@ export const Transactions: React.FC = () => {
           paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
+            tags: parseTags(tagsInput),
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           status: 'completed',
@@ -627,6 +653,7 @@ export const Transactions: React.FC = () => {
     setPaymentType('');
     setPersonalExpense(false);
     setGoalId('');
+    setTagsInput('');
     setClientId('');
     setIsInstallment(false);
     setTotalInstallments('1');
@@ -768,6 +795,29 @@ export const Transactions: React.FC = () => {
           </button>
         </div>
 
+        {knownTags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Etiquetas:</span>
+            {knownTags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => setTagFilter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+                className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold transition-all',
+                  tagFilter.includes(tag)
+                    ? 'bg-primary text-white'
+                    : 'border border-line text-content-muted hover:border-primary hover:text-primary')}
+              >
+                {tag}
+              </button>
+            ))}
+            {tagFilter.length > 0 && (
+              <button onClick={() => setTagFilter([])}
+                className="ml-1 text-[11px] font-bold text-content-subtle hover:text-rose-600">
+                limpar
+              </button>
+            )}
+          </div>
+        )}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-content-subtle" />
           <input 
@@ -1200,6 +1250,39 @@ export const Transactions: React.FC = () => {
                       </p>
                     </div>
                   )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-content-muted">
+                      Etiquetas <span className="font-normal text-content-subtle">(opcional, separe por vírgula)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={tagsInput}
+                      onChange={(e) => setTagsInput(e.target.value)}
+                      placeholder="Ex: reforma 2026, obra casa"
+                      className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    {knownTags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {knownTags.slice(0, 14).map(tag => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              const atuais = parseTags(tagsInput);
+                              if (!atuais.includes(tag)) setTagsInput([...atuais, tag].join(', '));
+                            }}
+                            className="rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-content-muted hover:border-primary hover:text-primary transition-all"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-1 text-xs text-content-subtle">
+                      Categoria classifica; etiqueta agrupa por assunto e cruza categorias.
+                    </p>
+                  </div>
 
                   {/* Caixinha: marca o lançamento como depósito num objetivo */}
                   {type !== 'income' && goals.length > 0 && (
