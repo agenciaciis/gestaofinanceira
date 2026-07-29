@@ -41,6 +41,7 @@ import {
 } from 'recharts';
 import { cn } from '../lib/utils';
 import { DREPanel } from '../components/DREPanel';
+import { PeriodComparePanel } from '../components/PeriodComparePanel';
 
 export const Reports: React.FC = () => {
   const { entities, filterType, selectedEntity } = useEntity();
@@ -293,6 +294,8 @@ export const Reports: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      <PeriodComparePanel transactions={transactions} />
+
       {selectedEntity && (
         <DREPanel
           entity={selectedEntity}

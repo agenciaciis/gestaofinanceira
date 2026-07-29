@@ -58,6 +58,8 @@ export const Transactions: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalId, setGoalId] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [plannedAmount, setPlannedAmount] = useState('');
+  const [subcategory, setSubcategory] = useState('');
   const [knownTags, setKnownTags] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
 
@@ -82,6 +84,22 @@ export const Transactions: React.FC = () => {
       if (suggestedId) setCategoryId(suggestedId);
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+  /** Marca/desmarca "conferido contra o extrato do banco". */
+  const toggleReconciled = async (transaction: Transaction) => {
+    const novo = !transaction.reconciled;
+    setTransactions(prev => prev.map(x => x.id === transaction.id ? { ...x, reconciled: novo } : x));
+    try {
+      await updateDoc(doc(db, `entities/${transaction.entityId}/transactions/${transaction.id}`), {
+        reconciled: novo,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao conciliar:', error);
+      setTransactions(prev => prev.map(x => x.id === transaction.id ? { ...x, reconciled: transaction.reconciled } : x));
+      showToast('Erro ao marcar conciliação.', 'error');
     }
   };
 
@@ -193,6 +211,8 @@ export const Transactions: React.FC = () => {
     setPersonalExpense(!!t.personalExpense);
     setGoalId(t.goalId || '');
     setTagsInput((t.tags || []).join(', '));
+    setPlannedAmount(t.plannedAmount != null ? String(t.plannedAmount) : '');
+    setSubcategory(t.subcategory || '');
     setClientId(t.clientId || '');
     setIsInstallment(!!t.installmentGroupId);
     setTotalInstallments(t.totalInstallments?.toString() || '1');
@@ -481,6 +501,8 @@ export const Transactions: React.FC = () => {
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
             tags: parseTags(tagsInput),
+            plannedAmount: plannedAmount === '' ? null : Number(plannedAmount) || null,
+            subcategory: subcategory.trim() || null,
                   clientId: clientId || null,
                   clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
                 });
@@ -507,6 +529,8 @@ export const Transactions: React.FC = () => {
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
             tags: parseTags(tagsInput),
+            plannedAmount: plannedAmount === '' ? null : Number(plannedAmount) || null,
+            subcategory: subcategory.trim() || null,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           isRecurring,
@@ -552,6 +576,8 @@ export const Transactions: React.FC = () => {
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
             tags: parseTags(tagsInput),
+            plannedAmount: plannedAmount === '' ? null : Number(plannedAmount) || null,
+            subcategory: subcategory.trim() || null,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 1 ? 'completed' : 'pending',
@@ -595,6 +621,8 @@ export const Transactions: React.FC = () => {
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
             tags: parseTags(tagsInput),
+            plannedAmount: plannedAmount === '' ? null : Number(plannedAmount) || null,
+            subcategory: subcategory.trim() || null,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 0 ? 'completed' : 'pending',
@@ -621,6 +649,8 @@ export const Transactions: React.FC = () => {
             personalExpense: type === 'expense' ? personalExpense : false,
             goalId: goalId || null,
             tags: parseTags(tagsInput),
+            plannedAmount: plannedAmount === '' ? null : Number(plannedAmount) || null,
+            subcategory: subcategory.trim() || null,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           status: 'completed',
@@ -654,6 +684,8 @@ export const Transactions: React.FC = () => {
     setPersonalExpense(false);
     setGoalId('');
     setTagsInput('');
+    setPlannedAmount('');
+    setSubcategory('');
     setClientId('');
     setIsInstallment(false);
     setTotalInstallments('1');
@@ -926,6 +958,20 @@ export const Transactions: React.FC = () => {
                       ) : '-'}
                     </td>
                     <td className="px-6 py-4">
+                      {t.status === 'completed' && (
+                        <button
+                          onClick={() => toggleReconciled(t)}
+                          title={t.reconciled ? 'Conferido no extrato — clique para desmarcar' : 'Marcar como conferido no extrato do banco'}
+                          className={cn(
+                            'mb-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase transition-all',
+                            t.reconciled
+                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
+                              : 'border border-line text-content-subtle hover:border-indigo-400 hover:text-indigo-600'
+                          )}
+                        >
+                          {t.reconciled ? '✓ conciliado' : 'conciliar'}
+                        </button>
+                      )}
                       {t.status === 'completed' ? (
                         // Selo discreto — clique para desfazer (volta a pendente)
                         <button
@@ -1250,6 +1296,43 @@ export const Transactions: React.FC = () => {
                       </p>
                     </div>
                   )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-content-muted">
+                        Valor previsto <span className="font-normal text-content-subtle">(opcional)</span>
+                      </label>
+                      <input
+                        type="number" step="0.01" min="0"
+                        value={plannedAmount}
+                        onChange={(e) => setPlannedAmount(e.target.value)}
+                        placeholder="quanto você esperava"
+                        className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                      {Number(plannedAmount) > 0 && Number(amount) > 0 && (
+                        <p className={cn('mt-1 text-xs font-bold',
+                          Number(amount) > Number(plannedAmount) ? 'text-rose-600' : 'text-emerald-600')}>
+                          {Number(amount) > Number(plannedAmount)
+                            ? `Passou ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(amount) - Number(plannedAmount))} do previsto`
+                            : Number(amount) < Number(plannedAmount)
+                              ? `Economizou ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(plannedAmount) - Number(amount))}`
+                              : 'Bateu o previsto'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-content-muted">
+                        Subcategoria <span className="font-normal text-content-subtle">(opcional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={subcategory}
+                        onChange={(e) => setSubcategory(e.target.value)}
+                        placeholder="Ex: energia, aluguel, combustível"
+                        className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-content-muted">

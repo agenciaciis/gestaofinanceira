@@ -109,6 +109,15 @@ export interface Transaction {
   /** Despesa pessoal paga pela empresa — o que o contador precisa enxergar. */
   personalExpense?: boolean;
   /**
+   * Valor PREVISTO/orçado deste lançamento. O campo `amount` continua sendo o
+   * valor real pago — assim nada do que já foi lançado muda de significado.
+   */
+  plannedAmount?: number;
+  /** Detalhamento livre abaixo da categoria ("aluguel", "energia"). */
+  subcategory?: string;
+  /** Conferido contra o extrato do banco. */
+  reconciled?: boolean;
+  /**
    * Etiquetas livres, cruzando categorias ("reforma 2026", "cliente X").
    * Ideia trazida da planilha antiga: categoria classifica, etiqueta agrupa.
    */
