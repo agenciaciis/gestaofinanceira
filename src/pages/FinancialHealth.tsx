@@ -112,14 +112,17 @@ export const FinancialHealth: React.FC = () => {
     }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/credit_cards`));
 
     // Taxas informadas manualmente para parcelamentos e faturas de cartão.
-    const unsubMeta = onSnapshot(query(collection(db, `entities/${selectedEntity.id}/debt_meta`)), (snapshot) => {
+    // Um documento em `config` (já liberado) em vez de subcoleção nova, para
+    // não depender de publicar regra no Firebase.
+    const unsubMeta = onSnapshot(doc(db, `entities/${selectedEntity.id}/config/debt_meta`), (snap) => {
+      const rates = (snap.data()?.rates || {}) as Record<string, unknown>;
       const meta: DebtMeta = {};
-      snapshot.docs.forEach(d => {
-        const rate = Number(d.data().interestRate);
-        if (Number.isFinite(rate)) meta[d.id] = { interestRate: rate };
-      });
+      for (const [id, value] of Object.entries(rates)) {
+        const rate = Number(value);
+        if (Number.isFinite(rate)) meta[id] = { interestRate: rate };
+      }
       setDebtMeta(meta);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/debt_meta`));
+    }, (error) => handleFirestoreError(error, OperationType.GET, `entities/${selectedEntity.id}/config/debt_meta`));
 
     return () => {
       unsubDebts();
@@ -206,8 +209,8 @@ export const FinancialHealth: React.FC = () => {
         await updateDoc(doc(db, `entities/${selectedEntity.id}/debts`, view.id), { interestRate: rate });
       } else {
         await setDoc(
-          doc(db, `entities/${selectedEntity.id}/debt_meta`, view.id),
-          { interestRate: rate, updatedAt: serverTimestamp() },
+          doc(db, `entities/${selectedEntity.id}/config/debt_meta`),
+          { rates: { ...Object.fromEntries(Object.entries(debtMeta).map(([k, v]) => [k, (v as { interestRate: number }).interestRate])), [view.id]: rate }, updatedAt: serverTimestamp() },
           { merge: true }
         );
       }

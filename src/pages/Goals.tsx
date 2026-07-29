@@ -314,36 +314,13 @@ export const Goals: React.FC = () => {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/40 p-8">
-        <h2 className="text-xl font-black text-amber-900 dark:text-amber-200">
-          As caixinhas ainda não estão liberadas no banco
-        </h2>
-        {loadError === 'permission-denied' ? (
-          <>
-            <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
-              A regra de acesso desta coleção existe no arquivo do projeto, mas ainda não foi
-              publicada no Firebase. Enquanto isso, o banco recusa a leitura e a gravação.
-            </p>
-            <p className="mt-4 text-sm font-bold text-amber-900 dark:text-amber-200">
-              Jeito mais rápido, sem instalar nada:
-            </p>
-            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-amber-800 dark:text-amber-300">
-              <li>Abra o Console do Firebase → Firestore Database → aba <strong>Regras</strong></li>
-              <li>Cole o conteúdo do arquivo <code className="rounded bg-amber-900/20 px-1">firestore.rules</code> do projeto</li>
-              <li>Clique em <strong>Publicar</strong></li>
-            </ol>
-            <p className="mt-4 text-sm font-bold text-amber-900 dark:text-amber-200">Ou, pelo terminal:</p>
-            <pre className="mt-2 overflow-x-auto rounded-xl bg-amber-900 p-4 text-xs text-amber-50 whitespace-pre">{`npm i -g firebase-tools\nfirebase login\nfirebase deploy --only firestore:rules`}</pre>
-            <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
-              Isso também libera o score do Serasa e a taxa de juros dos parcelamentos, que
-              dependem das mesmas regras novas.
-            </p>
-          </>
-        ) : (
-          <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
-            Não consegui carregar as caixinhas. Veja o console do navegador para o erro completo.
-          </p>
-        )}
+      <div className="mx-auto max-w-lg rounded-3xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/40 p-8">
+        <h2 className="text-lg font-black text-rose-900 dark:text-rose-200">Não consegui carregar as caixinhas</h2>
+        <p className="mt-2 text-sm text-rose-800 dark:text-rose-300">
+          {loadError === 'permission-denied'
+            ? 'Seu usuário não tem permissão de acesso a esta entidade. Confira em Equipe se o e-mail está como colaborador com permissão de escrita.'
+            : 'Houve uma falha de conexão com o banco. Recarregue a página; se persistir, veja o console do navegador.'}
+        </p>
       </div>
     );
   }

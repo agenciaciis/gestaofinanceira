@@ -6,7 +6,7 @@
  * dois num número só esconderia os dois.
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { onSnapshot, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { CreditScoreEntry, Entity } from '../types';
 import { Gauge, Plus, Trash2, TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
@@ -33,17 +33,32 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
   const [notes, setNotes] = useState('');
   const [blocked, setBlocked] = useState(false);
 
+  // Histórico num documento de `config` (já liberado), não em subcoleção nova:
+  // são poucas dezenas de registros e evita depender de publicar regra.
+  const docPath = `entities/${entity.id}/config/credit_scores`;
+
   useEffect(() => {
-    const q = query(collection(db, `entities/${entity.id}/credit_scores`), orderBy('date', 'desc'));
-    return onSnapshot(q, snap => {
-      setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() })) as CreditScoreEntry[]);
+    return onSnapshot(doc(db, docPath), snap => {
+      const raw = snap.data()?.items;
+      const list = Array.isArray(raw) ? raw : [];
+      setEntries(
+        list
+          .filter((e: any) => e && Number.isFinite(Number(e.score)) && typeof e.date === 'string')
+          .map((e: any) => ({
+            id: String(e.id || e.date),
+            provider: ['serasa', 'spc', 'boavista'].includes(e.provider) ? e.provider : 'serasa',
+            score: Number(e.score),
+            date: e.date,
+            notes: typeof e.notes === 'string' ? e.notes : undefined,
+            entityId: entity.id,
+            createdAt: e.createdAt ?? null,
+          })) as CreditScoreEntry[]
+      );
     }, e => {
-      // Sem isto a tela diria "nenhum score anotado" quando na verdade o banco
-      // recusou o acesso — engana mais que mostrar o erro.
       if ((e as { code?: string })?.code === 'permission-denied') setBlocked(true);
-      handleFirestoreError(e, OperationType.LIST, `entities/${entity.id}/credit_scores`);
+      handleFirestoreError(e, OperationType.GET, docPath);
     });
-  }, [entity.id]);
+  }, [entity.id, docPath]);
 
   const trend = useMemo(() => scoreTrend(entries.map(e => ({ score: e.score, date: e.date }))), [entries]);
   const latest = entries.length > 0
@@ -65,13 +80,17 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
     const value = Number(score);
     if (!Number.isFinite(value) || value < 0 || value > SCORE_MAX) return;
     try {
-      await addDoc(collection(db, `entities/${entity.id}/credit_scores`), {
-        provider, score: value, date, notes: notes.trim() || null,
-        entityId: entity.id,
-        ownerUid: entity.ownerUid,
-        collaboratorsEmails: entity.collaboratorsEmails || [],
-        createdAt: serverTimestamp(),
-      });
+      const novo = {
+        id: crypto.randomUUID(), provider, score: value, date,
+        notes: notes.trim() || null, createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, docPath), {
+        items: [...entries.map(e => ({
+          id: e.id, provider: e.provider, score: e.score, date: e.date,
+          notes: e.notes ?? null, createdAt: e.createdAt ?? null,
+        })), novo],
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
       setIsOpen(false); setScore(''); setNotes(''); setDate(formatLocalDate(new Date()));
     } catch (error) {
       console.error('Erro ao salvar score:', error);
@@ -208,7 +227,13 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
                   <span className="flex items-center gap-3">
                     <strong className="text-sm font-black" style={{ color: scoreBand(e.score).color }}>{e.score}</strong>
                     <button
-                      onClick={() => deleteDoc(doc(db, `entities/${entity.id}/credit_scores`, e.id))}
+                      onClick={() => setDoc(doc(db, docPath), {
+                        items: entries.filter(x => x.id !== e.id).map(x => ({
+                          id: x.id, provider: x.provider, score: x.score, date: x.date,
+                          notes: x.notes ?? null, createdAt: x.createdAt ?? null,
+                        })),
+                        updatedAt: serverTimestamp(),
+                      }, { merge: true })}
                       className="opacity-0 group-hover:opacity-100 text-content-subtle hover:text-rose-600"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
