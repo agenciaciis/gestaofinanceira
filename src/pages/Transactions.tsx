@@ -3,7 +3,7 @@ import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, where, writeBatch, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Transaction, BankAccount, CreditCard, Client } from '../types';
+import { Transaction, BankAccount, CreditCard, Client, Goal } from '../types';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Search, Filter, Calendar, Tag, Wallet, CreditCard as CardIcon, ArrowRightLeft, Repeat, Download, CheckCircle2, Clock, AlertCircle, ChevronLeft, ChevronRight, Edit2, Trash2, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -54,6 +54,8 @@ export const Transactions: React.FC = () => {
   const [personalExpense, setPersonalExpense] = useState(false);
   const [clientId, setClientId] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalId, setGoalId] = useState('');
 
   // Installment state
   const [isInstallment, setIsInstallment] = useState(false);
@@ -183,6 +185,7 @@ export const Transactions: React.FC = () => {
     setToAccountId(t.toAccountId || '');
     setPaymentType(t.paymentType || '');
     setPersonalExpense(!!t.personalExpense);
+    setGoalId(t.goalId || '');
     setClientId(t.clientId || '');
     setIsInstallment(!!t.installmentGroupId);
     setTotalInstallments(t.totalInstallments?.toString() || '1');
@@ -309,6 +312,8 @@ export const Transactions: React.FC = () => {
     let allCards: CreditCard[] = [];
     let allClients: Client[] = [];
 
+    let allGoals: Goal[] = [];
+
     filteredEntities.forEach(entity => {
       // Clients (para vincular receitas a um cliente)
       const clQ = query(collection(db, `entities/${entity.id}/clients`));
@@ -318,6 +323,15 @@ export const Transactions: React.FC = () => {
         setClients([...allClients]);
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/clients`));
       unsubscribes.push(unsubCl);
+
+      // Caixinhas (para marcar um lançamento como depósito num objetivo)
+      const gQ = query(collection(db, `entities/${entity.id}/goals`));
+      const unsubG = onSnapshot(gQ, (snapshot) => {
+        const entityG = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Goal[];
+        allGoals = [...allGoals.filter(g => g.entityId !== entity.id), ...entityG];
+        setGoals([...allGoals]);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/goals`));
+      unsubscribes.push(unsubG);
 
       // Transactions
       const tQ = query(collection(db, `entities/${entity.id}/transactions`), orderBy('date', 'desc'));
@@ -444,6 +458,7 @@ export const Transactions: React.FC = () => {
                   toAccountId: type === 'transfer' ? toAccountId : null,
                   paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
+            goalId: goalId || null,
                   clientId: clientId || null,
                   clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
                 });
@@ -468,6 +483,7 @@ export const Transactions: React.FC = () => {
           toAccountId: type === 'transfer' ? toAccountId : null,
           paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
+            goalId: goalId || null,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           isRecurring,
@@ -511,6 +527,7 @@ export const Transactions: React.FC = () => {
             cardId: paymentMethod === 'card' ? cardId : null,
             paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
+            goalId: goalId || null,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 1 ? 'completed' : 'pending',
@@ -552,6 +569,7 @@ export const Transactions: React.FC = () => {
             cardId: paymentMethod === 'card' ? cardId : null,
             paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
+            goalId: goalId || null,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 0 ? 'completed' : 'pending',
@@ -576,6 +594,7 @@ export const Transactions: React.FC = () => {
           cardId: paymentMethod === 'card' ? cardId : null,
           paymentType: paymentType || null,
             personalExpense: type === 'expense' ? personalExpense : false,
+            goalId: goalId || null,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           status: 'completed',
@@ -607,6 +626,7 @@ export const Transactions: React.FC = () => {
     setPaymentMethod('account');
     setPaymentType('');
     setPersonalExpense(false);
+    setGoalId('');
     setClientId('');
     setIsInstallment(false);
     setTotalInstallments('1');
@@ -1177,6 +1197,28 @@ export const Transactions: React.FC = () => {
                       </label>
                       <p className="mt-1 text-xs text-amber-700">
                         Some no aviso do consolidado para você saber quanto tirar como pró-labore.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Caixinha: marca o lançamento como depósito num objetivo */}
+                  {type !== 'income' && goals.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-content-muted">
+                        Guardar numa caixinha? (opcional)
+                      </label>
+                      <select
+                        value={goalId}
+                        onChange={(e) => setGoalId(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="">Nenhuma</option>
+                        {goals
+                          .filter(g => !targetEntityId || g.entityId === targetEntityId)
+                          .map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                      <p className="mt-1 text-xs text-content-subtle">
+                        Marcando aqui, o valor entra sozinho no progresso da caixinha.
                       </p>
                     </div>
                   )}

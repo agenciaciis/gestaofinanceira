@@ -108,6 +108,33 @@ export interface Transaction {
   counterpartEntityId?: string;
   /** Despesa pessoal paga pela empresa — o que o contador precisa enxergar. */
   personalExpense?: boolean;
+  /** Vínculo com uma meta/caixinha. Despesa/transferência = depósito; receita = resgate. */
+  goalId?: string;
+}
+
+/** Meta de poupança — praia, carro, reserva. O guardado é derivado dos lançamentos. */
+export interface Goal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  /** Prazo opcional 'YYYY-MM-DD'. Sem prazo, não há ritmo exigido. */
+  deadline?: string;
+  description?: string;
+  color?: string;
+  entityId: string;
+  createdAt: any;
+  archived?: boolean;
+}
+
+/** Score de crédito informado pelo usuário (Serasa, SPC, Boa Vista). */
+export interface CreditScoreEntry {
+  id: string;
+  provider: 'serasa' | 'spc' | 'boavista';
+  score: number;
+  date: string;
+  notes?: string;
+  entityId: string;
+  createdAt: any;
 }
 
 export type CrossEntityKind = 'prolabore' | 'distribuicao' | 'aporte' | 'reembolso';

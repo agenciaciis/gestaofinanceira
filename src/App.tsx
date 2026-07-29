@@ -20,6 +20,7 @@ const CreditCards = lazy(() => import('./pages/CreditCards').then(m => ({ defaul
 const Transactions = lazy(() => import('./pages/Transactions').then(m => ({ default: m.Transactions })));
 const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
 const Budgets = lazy(() => import('./pages/Budgets').then(m => ({ default: m.Budgets })));
+const Goals = lazy(() => import('./pages/Goals').then(m => ({ default: m.Goals })));
 const Clients = lazy(() => import('./pages/Clients').then(m => ({ default: m.Clients })));
 const Suppliers = lazy(() => import('./pages/Suppliers').then(m => ({ default: m.Suppliers })));
 const FinancialHealth = lazy(() => import('./pages/FinancialHealth').then(m => ({ default: m.FinancialHealth })));
@@ -39,7 +40,7 @@ console.log('App component rendering');
 const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedEntity, entities, loading: entityLoading } = useEntity();
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'quotes' | 'team'>('dashboard');
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'quotes' | 'team'>('dashboard');
   const [showTimeout, setShowTimeout] = useState(false);
 
   useEffect(() => {
@@ -88,6 +89,7 @@ const AppContent: React.FC = () => {
          currentPage === 'transactions' ? <Transactions /> :
          currentPage === 'reports' ? <Reports /> :
          currentPage === 'budgets' ? <Budgets /> :
+         currentPage === 'goals' ? <Goals /> :
          currentPage === 'clients' ? <Clients /> :
          currentPage === 'suppliers' ? <Suppliers /> :
          currentPage === 'health' ? <FinancialHealth /> :

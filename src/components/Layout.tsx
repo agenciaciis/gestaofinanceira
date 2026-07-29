@@ -26,7 +26,7 @@ import {
   Moon,
   Package,
   FileText
-} from 'lucide-react';
+, PiggyBank } from 'lucide-react';
 import { Notifications } from './Notifications';
 import { cn } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
@@ -200,6 +200,12 @@ export const Layout: React.FC<{
               active={currentPage === 'budgets'}
               onClick={() => onNavigate('budgets')}
             />
+            <NavItem
+              icon={PiggyBank}
+              label="Caixinhas"
+              active={currentPage === 'goals'}
+              onClick={() => onNavigate('goals')}
+            />
             <NavItem 
               icon={Users} 
               label="Clientes" 
@@ -283,6 +289,7 @@ export const Layout: React.FC<{
                currentPage === 'transactions' ? 'Lançamentos' : 
                currentPage === 'reports' ? 'Relatórios' : 
                currentPage === 'budgets' ? 'Metas Financeiras' :
+               currentPage === 'goals' ? 'Caixinhas & Objetivos' :
                currentPage === 'clients' ? 'Gestão de Clientes' :
                currentPage === 'services' ? 'Serviços e Planos' :
                currentPage === 'quotes' ? 'Orçamentos' :

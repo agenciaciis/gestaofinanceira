@@ -235,6 +235,27 @@ service cloud.firestore {
         allow delete: if isEntityWriter(entityId);
       }
 
+      // Caixinhas / objetivos de poupança.
+      match /goals/{goalId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update: if isEntityWriter(entityId)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() < 120
+          && request.resource.data.targetAmount is number
+          && request.resource.data.targetAmount > 0;
+        allow delete: if isEntityWriter(entityId);
+      }
+
+      // Score de crédito informado pelo usuário (Serasa/SPC/Boa Vista).
+      match /credit_scores/{scoreId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update: if isEntityWriter(entityId)
+          && request.resource.data.score is number
+          && request.resource.data.score >= 0
+          && request.resource.data.score <= 1000;
+        allow delete: if isEntityWriter(entityId);
+      }
+
       match /services/{serviceId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
         allow create, update, delete: if isEntityWriter(entityId);
