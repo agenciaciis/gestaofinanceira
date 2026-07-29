@@ -1,16 +1,47 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* O tema é controlado pelo BOTÃO do app (classe .dark na raiz, ver
+   ThemeContext), não pela preferência do sistema operacional. Sem esta linha o
+   Tailwind v4 compila todo `dark:` como @media (prefers-color-scheme: dark) —
+   e aí o botão não faz efeito nenhum enquanto as classes `dark:` disparam
+   sozinhas quando o SO está escuro. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  
+
   --color-primary: #2563eb;
   --color-primary-foreground: #ffffff;
-  
+
+  /* ---- Tokens semânticos ----
+     Trocam de valor sob .dark (ver bloco abaixo). Use estes em vez de
+     bg-white / text-slate-900: quem usa token nasce certo nos dois temas,
+     inclusive em hover, que a camada de overrides nunca cobriu. */
+  --color-canvas: #f9fafb;          /* fundo da página */
+  --color-surface: #ffffff;         /* cartão, painel */
+  --color-surface-muted: #f8fafc;   /* painel interno, faixa */
+  --color-content: #0f172a;         /* texto principal */
+  --color-content-muted: #475569;   /* texto secundário */
+  --color-content-subtle: #64748b;  /* rótulo, legenda */
+  --color-line: #e2e8f0;            /* borda */
+
   --radius-lg: 0.5rem;
   --radius-md: calc(0.5rem - 2px);
   --radius-sm: calc(0.5rem - 4px);
+}
+
+/* Valores dos tokens no tema escuro. Batem com os que a camada de !important
+   já aplicava, para a migração não mudar a aparência — só a mecânica. */
+.dark {
+  --color-canvas: #030712;
+  --color-surface: #111827;
+  --color-surface-muted: #1f2937;
+  --color-content: #f9fafb;
+  --color-content-muted: #d1d5db;
+  --color-content-subtle: #9ca3af;
+  --color-line: #374151;
 }
 
 @layer base {
@@ -22,19 +53,10 @@
   }
 }
 
-.light {
-  background-color: #f9fafb !important;
-  color: #111827 !important;
-}
-
-.light .bg-white { background-color: #ffffff !important; }
-.light .bg-gray-50 { background-color: #f9fafb !important; }
-.light .text-gray-900 { color: #111827 !important; }
-.light .text-slate-900 { color: #111827 !important; }
-.light header { background-color: #ffffff !important; }
-.light aside { background-color: #ffffff !important; }
-
-/* Global Dark Mode Overrides for hardcoded light-mode classes */
+/* Global Dark Mode Overrides for hardcoded light-mode classes.
+   TRANSITÓRIO: some conforme as telas migram para os tokens semânticos.
+   Enquanto existir, o !important daqui vence as classes `dark:` dos
+   componentes — por isso a migração precisa terminar. */
 @layer utilities {
   .dark .bg-white { background-color: #111827 !important; }
   .dark .bg-gray-50 { background-color: #030712 !important; }
