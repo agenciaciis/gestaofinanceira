@@ -95,7 +95,25 @@ export interface Transaction {
   isRecurring?: boolean;
   recurringPeriod?: 'monthly' | 'weekly' | 'yearly';
   recurringGroupId?: string;
+  // --- Movimento entre entidades (PF <-> PJ) ---
+  // As duas pontas (saída na origem, entrada no destino) compartilham o mesmo
+  // crossEntityGroupId. No consolidado elas se anulam: não é receita nova,
+  // é o mesmo dinheiro mudando de bolso.
+  crossEntityGroupId?: string;
+  crossEntityKind?: CrossEntityKind;
+  counterpartEntityId?: string;
+  /** Despesa pessoal paga pela empresa — o que o contador precisa enxergar. */
+  personalExpense?: boolean;
 }
+
+export type CrossEntityKind = 'prolabore' | 'distribuicao' | 'aporte' | 'reembolso';
+
+export const CROSS_ENTITY_KIND_LABELS: Record<CrossEntityKind, string> = {
+  prolabore: 'Pró-labore',
+  distribuicao: 'Distribuição de lucros',
+  aporte: 'Aporte na empresa',
+  reembolso: 'Reembolso',
+};
 
 export interface Client {
   id: string;

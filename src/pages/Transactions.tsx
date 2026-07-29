@@ -51,6 +51,7 @@ export const Transactions: React.FC = () => {
   const [toAccountId, setToAccountId] = useState('');
   const [cardId, setCardId] = useState('');
   const [paymentType, setPaymentType] = useState<'' | NonNullable<Transaction['paymentType']>>('');
+  const [personalExpense, setPersonalExpense] = useState(false);
   const [clientId, setClientId] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
 
@@ -181,6 +182,7 @@ export const Transactions: React.FC = () => {
     }
     setToAccountId(t.toAccountId || '');
     setPaymentType(t.paymentType || '');
+    setPersonalExpense(!!t.personalExpense);
     setClientId(t.clientId || '');
     setIsInstallment(!!t.installmentGroupId);
     setTotalInstallments(t.totalInstallments?.toString() || '1');
@@ -441,6 +443,7 @@ export const Transactions: React.FC = () => {
                   cardId: paymentMethod === 'card' ? cardId : null,
                   toAccountId: type === 'transfer' ? toAccountId : null,
                   paymentType: paymentType || null,
+            personalExpense: type === 'expense' ? personalExpense : false,
                   clientId: clientId || null,
                   clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
                 });
@@ -464,6 +467,7 @@ export const Transactions: React.FC = () => {
           cardId: paymentMethod === 'card' ? cardId : null,
           toAccountId: type === 'transfer' ? toAccountId : null,
           paymentType: paymentType || null,
+            personalExpense: type === 'expense' ? personalExpense : false,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           isRecurring,
@@ -506,6 +510,7 @@ export const Transactions: React.FC = () => {
             accountId: paymentMethod === 'account' ? accountId : null,
             cardId: paymentMethod === 'card' ? cardId : null,
             paymentType: paymentType || null,
+            personalExpense: type === 'expense' ? personalExpense : false,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 1 ? 'completed' : 'pending',
@@ -546,6 +551,7 @@ export const Transactions: React.FC = () => {
             accountId: paymentMethod === 'account' ? accountId : null,
             cardId: paymentMethod === 'card' ? cardId : null,
             paymentType: paymentType || null,
+            personalExpense: type === 'expense' ? personalExpense : false,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
             status: i === 0 ? 'completed' : 'pending',
@@ -569,6 +575,7 @@ export const Transactions: React.FC = () => {
           accountId: paymentMethod === 'account' ? accountId : null,
           cardId: paymentMethod === 'card' ? cardId : null,
           paymentType: paymentType || null,
+            personalExpense: type === 'expense' ? personalExpense : false,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
           status: 'completed',
@@ -599,6 +606,7 @@ export const Transactions: React.FC = () => {
     setCardId('');
     setPaymentMethod('account');
     setPaymentType('');
+    setPersonalExpense(false);
     setClientId('');
     setIsInstallment(false);
     setTotalInstallments('1');
@@ -1152,6 +1160,26 @@ export const Transactions: React.FC = () => {
                       </select>
                     </div>
                   </div>
+
+                  {/* Gasto pessoal pago pela empresa — o que a contabilidade precisa enxergar. */}
+                  {type === 'expense' && entities.find(e => e.id === targetEntityId)?.type === 'PJ' && (
+                    <div className="rounded-xl bg-amber-50 p-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={personalExpense}
+                          onChange={(e) => setPersonalExpense(e.target.checked)}
+                          className="rounded text-amber-600"
+                        />
+                        <span className="text-sm font-bold text-amber-800">
+                          Este gasto é pessoal, mas foi pago pela empresa
+                        </span>
+                      </label>
+                      <p className="mt-1 text-xs text-amber-700">
+                        Some no aviso do consolidado para você saber quanto tirar como pró-labore.
+                      </p>
+                    </div>
+                  )}
 
                   {!editingTransaction && (
                     <div className="space-y-4">

@@ -121,6 +121,42 @@ export function suggestReserve(
   return { months, amount: round2(monthlyExpense * months), monthlyExpense };
 }
 
+/**
+ * Empréstimos cadastrados que provavelmente JÁ estão lançados como conta a
+ * pagar do mês — nesse caso a parcela é descontada duas vezes.
+ *
+ * Não corrige sozinho de propósito: adivinhar errado esconderia um
+ * compromisso real. Avisa e deixa o usuário decidir.
+ */
+export function detectDuplicateLoanCommitments(
+  loans: LoanCommitment[],
+  transactions: Transaction[],
+  reference: Date = new Date()
+): LoanCommitment[] {
+  const monthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const monthEnd = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
+
+  const pendingThisMonth = transactions.filter(t => {
+    if (t.type !== 'expense' || t.status !== 'pending' || t.cardId) return false;
+    const d = parseLocalDate(t.date);
+    return !Number.isNaN(d.getTime()) && d >= monthStart && d < monthEnd;
+  });
+
+  return loans.filter(loan => {
+    const payment = Number(loan.monthlyPayment) || 0;
+    if (payment <= 0) return false;
+    return pendingThisMonth.some(t => {
+      const amount = Number(t.amount) || 0;
+      // Mesmo valor (1% de folga) OU descrição que cita o nome do empréstimo.
+      const sameAmount = Math.abs(amount - payment) <= Math.max(0.01, payment * 0.01);
+      const nameMentioned =
+        loan.name.trim().length > 2 &&
+        t.description.toLowerCase().includes(loan.name.trim().toLowerCase());
+      return sameAmount || nameMentioned;
+    });
+  });
+}
+
 export function computeSpendable(input: SpendableInput): SpendableResult {
   const reference = input.reference ?? new Date();
   const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());

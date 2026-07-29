@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { averageMonthlyExpense, averageMonthlyIncome, suggestReserve, computeSpendable } from './spendable';
+import {
+  averageMonthlyExpense, averageMonthlyIncome, suggestReserve, computeSpendable,
+  detectDuplicateLoanCommitments,
+} from './spendable';
 import { BankAccount, CreditCard, Transaction } from '../types';
 
 const tx = (over: Partial<Transaction>): Transaction => ({
@@ -75,6 +78,33 @@ describe('suggestReserve', () => {
     const r = suggestReserve(txs, REF, false);
     expect(r.months).toBe(6);
     expect(r.amount).toBe(18000);
+  });
+});
+
+describe('detectDuplicateLoanCommitments', () => {
+  const loan = { id: 'l1', name: 'Empréstimo Itaú', monthlyPayment: 700 };
+
+  it('acusa quando existe conta a pagar do mesmo valor no mês', () => {
+    const txs = [tx({ id: '1', amount: 700, date: '2026-07-20', status: 'pending', accountId: 'a1' })];
+    expect(detectDuplicateLoanCommitments([loan], txs, REF).map(l => l.id)).toEqual(['l1']);
+  });
+
+  it('acusa quando a descrição cita o nome do empréstimo', () => {
+    const txs = [tx({ id: '1', amount: 123, date: '2026-07-20', status: 'pending', description: 'Parcela Empréstimo Itaú' })];
+    expect(detectDuplicateLoanCommitments([loan], txs, REF)).toHaveLength(1);
+  });
+
+  it('não acusa valor diferente e descrição não relacionada', () => {
+    const txs = [tx({ id: '1', amount: 250, date: '2026-07-20', status: 'pending', description: 'Mercado' })];
+    expect(detectDuplicateLoanCommitments([loan], txs, REF)).toHaveLength(0);
+  });
+
+  it('não acusa lançamento já pago nem de outro mês', () => {
+    const txs = [
+      tx({ id: '1', amount: 700, date: '2026-07-20', status: 'completed' }),
+      tx({ id: '2', amount: 700, date: '2026-08-20', status: 'pending' }),
+    ];
+    expect(detectDuplicateLoanCommitments([loan], txs, REF)).toHaveLength(0);
   });
 });
 

@@ -48,7 +48,9 @@ import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth, is
 import { ptBR } from 'date-fns/locale';
 import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice, round2 } from '../lib/finance';
 import { collectDebts, payoffSchedule } from '../lib/debts';
-import { computeSpendable, suggestReserve } from '../lib/spendable';
+import { computeSpendable, detectDuplicateLoanCommitments, suggestReserve } from '../lib/spendable';
+import { consolidate } from '../lib/crossEntity';
+import { CrossEntityTransferModal } from '../components/CrossEntityTransferModal';
 
 /** Chave da reserva protegida — preferência deste dispositivo. */
 const RESERVE_STORAGE_KEY = 'finanflow:reserva-protegida';
@@ -120,6 +122,7 @@ export const Dashboard: React.FC = () => {
   const [reserveOverride, setReserveOverride] = useState<string>(
     () => (typeof localStorage !== 'undefined' && localStorage.getItem(RESERVE_STORAGE_KEY)) || ''
   );
+  const [isCrossEntityOpen, setIsCrossEntityOpen] = useState(false);
 
   useEffect(() => {
     console.log('Dashboard: useEffect triggered', { entitiesCount: entities.length, filterType });
@@ -324,6 +327,18 @@ export const Dashboard: React.FC = () => {
     [accounts, transactions, cards, debts, activeReserve, now]
   );
 
+  const duplicateLoans = useMemo(
+    () => detectDuplicateLoanCommitments(
+      debts.map(d => ({ id: d.id, name: d.name, monthlyPayment: d.monthlyPayment })),
+      transactions,
+      now
+    ),
+    [debts, transactions, now]
+  );
+
+  /** Consolidação PF × PJ do mês, com o movimento interno anulado. */
+  const group = useMemo(() => consolidate(transactions, entities, now), [transactions, entities, now]);
+
   const saveReserve = (value: string) => {
     setReserveOverride(value);
     try {
@@ -469,6 +484,15 @@ export const Dashboard: React.FC = () => {
               Ano
             </button>
           </div>
+          {entities.length > 1 && (
+            <button
+              onClick={() => setIsCrossEntityOpen(true)}
+              className="rounded-xl border border-slate-200 dark:border-gray-700 px-4 py-2 text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 transition-all"
+              title="Pró-labore, distribuição de lucros, aporte ou reembolso entre PF e PJ"
+            >
+              Movimento PF ⇄ PJ
+            </button>
+          )}
           <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
             <Plus className="h-5 w-5" />
           </button>
@@ -566,6 +590,86 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {duplicateLoans.length > 0 && (
+        <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 p-5">
+          <p className="text-sm font-black text-amber-800 dark:text-amber-300">
+            Possível cobrança em dobro no "Posso gastar"
+          </p>
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+            {duplicateLoans.map(l => l.name).join(', ')} {duplicateLoans.length === 1 ? 'está cadastrado' : 'estão cadastrados'} em
+            Dívidas <strong>e</strong> também {duplicateLoans.length === 1 ? 'aparece' : 'aparecem'} como conta a pagar deste mês.
+            A parcela pode estar sendo descontada duas vezes. Mantenha só um dos dois — não corrijo sozinho para não esconder um compromisso real.
+          </p>
+        </div>
+      )}
+
+      {/* Consolidado PF x PJ */}
+      {entities.length > 1 && (
+        <div className="rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-sm border border-slate-100 dark:border-gray-800">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-black text-slate-900 dark:text-gray-100 uppercase tracking-widest">
+                Consolidado do mês — PF e PJ
+              </h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Dinheiro que só mudou de bolso entre suas entidades não conta como receita nem despesa aqui.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {(['PF', 'PJ'] as const).map(t => (
+              <div key={t} className="rounded-2xl border border-slate-100 dark:border-gray-800 p-5">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}</p>
+                <p className={cn(
+                  'mt-1 text-2xl font-black tracking-tighter',
+                  group.byType[t].net >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                )}>
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(group.byType[t].net)}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Entrou {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(group.byType[t].income)} ·
+                  Saiu {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(group.byType[t].expense)}
+                </p>
+              </div>
+            ))}
+
+            <div className="rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50 dark:bg-indigo-950/40 p-5">
+              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Resultado do grupo</p>
+              <p className={cn(
+                'mt-1 text-2xl font-black tracking-tighter',
+                group.consolidated.net >= 0 ? 'text-emerald-600' : 'text-rose-600'
+              )}>
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(group.consolidated.net)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Sem o movimento interno</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 dark:border-gray-800 p-5">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Movimento interno</p>
+              <p className="mt-1 text-2xl font-black tracking-tighter text-slate-700 dark:text-gray-300">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(group.internalFlow)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">Pró-labore, aportes e afins</p>
+            </div>
+          </div>
+
+          {group.personalExpensePaidByCompany > 0 && (
+            <div className="mt-6 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/40 p-4">
+              <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                A empresa pagou {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(group.personalExpensePaidByCompany)} de despesa pessoal este mês
+              </p>
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                Misturar as contas confunde o resultado da empresa e costuma dar problema com a contabilidade.
+                O certo é tirar como pró-labore e pagar pela PF.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isCrossEntityOpen && <CrossEntityTransferModal onClose={() => setIsCrossEntityOpen(false)} />}
 
       {/* Primary Stats */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
