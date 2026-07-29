@@ -21,11 +21,11 @@ export const EntitySelector: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Bem-vindo, {user?.displayName}</h2>
-          <p className="mt-2 text-gray-600">Selecione ou crie uma entidade para gerenciar</p>
+          <h2 className="text-3xl font-bold text-content">Bem-vindo, {user?.displayName}</h2>
+          <p className="mt-2 text-content-muted">Selecione ou crie uma entidade para gerenciar</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -39,7 +39,7 @@ export const EntitySelector: React.FC = () => {
                 "relative flex items-center gap-4 rounded-xl border-2 p-6 text-left transition-all",
                 selectedEntity?.id === entity.id 
                   ? "border-primary bg-primary/5 ring-1 ring-primary" 
-                  : "border-white bg-white hover:border-gray-200 shadow-sm"
+                  : "border-white bg-surface hover:border-line shadow-sm"
               )}
             >
               <div className={cn(
@@ -49,8 +49,8 @@ export const EntitySelector: React.FC = () => {
                 {entity.type === 'PF' ? <User className="h-6 w-6" /> : <Briefcase className="h-6 w-6" />}
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">{entity.name}</h3>
-                <p className="text-sm text-gray-500">{entity.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}</p>
+                <h3 className="font-bold text-content">{entity.name}</h3>
+                <p className="text-sm text-content-subtle">{entity.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}</p>
               </div>
               {selectedEntity?.id === entity.id && (
                 <div className="absolute right-4 top-4 text-primary">
@@ -62,7 +62,7 @@ export const EntitySelector: React.FC = () => {
 
           <button
             onClick={() => setIsCreating(true)}
-            className="flex items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-300 p-6 text-gray-500 hover:border-primary hover:text-primary transition-all"
+            className="flex items-center justify-center gap-3 rounded-xl border-2 border-dashed border-line p-6 text-content-subtle hover:border-primary hover:text-primary transition-all"
           >
             <Plus className="h-6 w-6" />
             <span className="font-semibold">Nova Entidade</span>
@@ -75,29 +75,29 @@ export const EntitySelector: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           >
-            <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-              <h3 className="text-xl font-bold text-gray-900">Criar Nova Entidade</h3>
+            <div className="w-full max-w-md rounded-2xl bg-surface p-8 shadow-2xl">
+              <h3 className="text-xl font-bold text-content">Criar Nova Entidade</h3>
               <form onSubmit={handleCreate} className="mt-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Nome</label>
+                  <label className="block text-sm font-medium text-content-muted">Nome</label>
                   <input
                     type="text"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Ex: Minhas Finanças ou Empresa X"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Tipo</label>
+                  <label className="block text-sm font-medium text-content-muted">Tipo</label>
                   <div className="mt-2 grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setNewType('PF')}
                       className={cn(
                         "flex items-center justify-center gap-2 rounded-lg border py-2 text-sm font-medium transition-all",
-                        newType === 'PF' ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        newType === 'PF' ? "border-primary bg-primary/5 text-primary" : "border-line text-content-muted hover:bg-canvas"
                       )}
                     >
                       <User className="h-4 w-4" /> Pessoa Física
@@ -107,7 +107,7 @@ export const EntitySelector: React.FC = () => {
                       onClick={() => setNewType('PJ')}
                       className={cn(
                         "flex items-center justify-center gap-2 rounded-lg border py-2 text-sm font-medium transition-all",
-                        newType === 'PJ' ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        newType === 'PJ' ? "border-primary bg-primary/5 text-primary" : "border-line text-content-muted hover:bg-canvas"
                       )}
                     >
                       <Briefcase className="h-4 w-4" /> Pessoa Jurídica
@@ -118,7 +118,7 @@ export const EntitySelector: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsCreating(false)}
-                    className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                    className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-content-muted hover:bg-canvas"
                   >
                     Cancelar
                   </button>

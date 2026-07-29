@@ -45,7 +45,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, active, onClick })
       "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
       active 
         ? "bg-primary text-white shadow-md" 
-        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
+        : "text-content-muted dark:text-gray-400 hover:bg-surface-muted dark:hover:bg-gray-800 hover:text-content dark:hover:text-gray-100"
     )}
   >
     <Icon className="h-5 w-5" />
@@ -81,7 +81,7 @@ export const Layout: React.FC<{
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+    <div className="flex min-h-screen bg-canvas dark:bg-gray-950 transition-colors duration-300">
       {/* Mobile Backdrop */}
       {isSidebarOpen && (
         <div 
@@ -92,7 +92,7 @@ export const Layout: React.FC<{
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 transform bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-xl transition-transform duration-300 ease-in-out lg:static lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-64 transform bg-surface dark:bg-gray-900 border-r border-line dark:border-gray-800 shadow-xl transition-transform duration-300 ease-in-out lg:static lg:translate-x-0",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex h-full flex-col p-4">
@@ -102,11 +102,11 @@ export const Layout: React.FC<{
                 <Briefcase className="h-6 w-6" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tighter">AGÊNCIA CIIS</span>
+                <span className="text-xl font-black text-content dark:text-gray-100 tracking-tighter">AGÊNCIA CIIS</span>
                 <span className="text-[10px] font-bold text-primary uppercase tracking-widest">FinanFlow</span>
               </div>
             </div>
-            <button className="lg:hidden text-gray-500" onClick={() => setIsSidebarOpen(false)}>
+            <button className="lg:hidden text-content-subtle" onClick={() => setIsSidebarOpen(false)}>
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -115,7 +115,7 @@ export const Layout: React.FC<{
           <div className="relative mb-8">
             <button 
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-              className="flex w-full items-center justify-between rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 p-3 text-left transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex w-full items-center justify-between rounded-xl border border-line dark:border-gray-800 bg-canvas dark:bg-gray-800/50 p-3 text-left transition-all hover:bg-surface-muted dark:hover:bg-gray-800"
             >
               <div className="flex items-center gap-3">
                 <div className={cn(
@@ -126,15 +126,15 @@ export const Layout: React.FC<{
                   {getFilterIcon(filterType)}
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Visualização</p>
-                  <p className="text-sm font-bold text-gray-900 truncate max-w-[120px]">{getFilterLabel(filterType)}</p>
+                  <p className="text-xs font-medium text-content-subtle">Visualização</p>
+                  <p className="text-sm font-bold text-content truncate max-w-[120px]">{getFilterLabel(filterType)}</p>
                 </div>
               </div>
-              <ChevronDown className={cn("h-4 w-4 text-gray-400 transition-transform", isFilterMenuOpen && "rotate-180")} />
+              <ChevronDown className={cn("h-4 w-4 text-content-subtle transition-transform", isFilterMenuOpen && "rotate-180")} />
             </button>
 
             {isFilterMenuOpen && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2 shadow-2xl">
+              <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-line dark:border-gray-800 bg-surface dark:bg-gray-900 p-2 shadow-2xl">
                 {(['ALL', 'PF', 'PJ'] as FilterType[]).map((type) => (
                   <button
                     key={type}
@@ -144,7 +144,7 @@ export const Layout: React.FC<{
                     }}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all",
-                      filterType === type ? "bg-primary/5 text-primary" : "text-gray-600 hover:bg-gray-50"
+                      filterType === type ? "bg-primary/5 text-primary" : "text-content-muted hover:bg-canvas"
                     )}
                   >
                     {getFilterIcon(type)}
@@ -154,7 +154,7 @@ export const Layout: React.FC<{
                 <div className="my-1 border-t" />
                 <button 
                   onClick={() => onNavigate('entities')}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-content-muted hover:bg-canvas"
                 >
                   <Settings className="h-4 w-4" />
                   Gerenciar Entidades
@@ -249,12 +249,12 @@ export const Layout: React.FC<{
               <img 
                 src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName}`} 
                 alt="User" 
-                className="h-10 w-10 rounded-full border border-gray-200 dark:border-gray-700"
+                className="h-10 w-10 rounded-full border border-line dark:border-gray-700"
                 referrerPolicy="no-referrer"
               />
               <div className="flex-1 truncate">
-                <p className="text-sm font-bold text-gray-900">{user?.displayName}</p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                <p className="text-sm font-bold text-content">{user?.displayName}</p>
+                <p className="text-xs text-content-subtle truncate">{user?.email}</p>
               </div>
             </div>
             <button 
@@ -269,14 +269,14 @@ export const Layout: React.FC<{
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 bg-gray-50 dark:bg-gray-950">
+      <main className="flex-1 bg-canvas dark:bg-gray-950">
         {/* Header */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 lg:px-8">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line dark:border-gray-800 bg-surface dark:bg-gray-900 px-4 lg:px-8">
           <button className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
-            <Menu className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+            <Menu className="h-6 w-6 text-content-muted dark:text-gray-400" />
           </button>
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 lg:text-xl">
+            <h1 className="text-lg font-bold text-content dark:text-gray-100 lg:text-xl">
               {currentPage === 'dashboard' ? 'Dashboard' : 
                currentPage === 'accounts' ? 'Contas Bancárias' : 
                currentPage === 'cards' ? 'Cartões de Crédito' :
@@ -301,7 +301,7 @@ export const Layout: React.FC<{
           <div className="flex items-center gap-2">
             <button 
               onClick={toggleTheme}
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-all"
+              className="rounded-full p-2 text-content-subtle hover:bg-surface-muted dark:hover:bg-gray-800 hover:text-content-muted dark:hover:text-gray-300 transition-all"
               title={theme === 'light' ? 'Mudar para Modo Escuro' : 'Mudar para Modo Claro'}
             >
               {theme === 'light' ? <Sun className="h-5 w-5 text-amber-500" /> : <Moon className="h-5 w-5 text-blue-400" />}
@@ -309,7 +309,7 @@ export const Layout: React.FC<{
             <Notifications />
             <button 
               onClick={() => onNavigate('settings')}
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300"
+              className="rounded-full p-2 text-content-subtle hover:bg-surface-muted dark:hover:bg-gray-800 hover:text-content-muted dark:hover:text-gray-300"
             >
               <Settings className="h-5 w-5" />
             </button>

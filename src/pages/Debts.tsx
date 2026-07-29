@@ -157,7 +157,7 @@ export const Debts: React.FC = () => {
       <div className="rounded-[2.5rem] bg-red-50 dark:bg-gradient-to-br dark:from-red-900 dark:to-rose-950 p-8 text-red-900 dark:text-white shadow-xl shadow-red-100 dark:shadow-none relative overflow-hidden border border-red-100 dark:border-red-900/30">
         <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white dark:bg-white/10 backdrop-blur-md border border-red-200 dark:border-white/30 shadow-inner">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-surface dark:bg-white/10 backdrop-blur-md border border-red-200 dark:border-white/30 shadow-inner">
               <AlertCircle className="h-10 w-10 text-red-600 dark:text-white" />
             </div>
             <div>
@@ -176,12 +176,12 @@ export const Debts: React.FC = () => {
 
       {/* Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 rounded-xl bg-gray-100 p-1">
+        <div className="flex items-center gap-2 rounded-xl bg-surface-muted p-1">
           <button 
             onClick={() => setFilter('pending')}
             className={cn(
               "px-4 py-2 text-xs font-bold rounded-lg transition-all",
-              filter === 'pending' ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-700"
+              filter === 'pending' ? "bg-surface text-primary shadow-sm" : "text-content-subtle hover:text-content-muted"
             )}
           >
             Pendentes
@@ -190,7 +190,7 @@ export const Debts: React.FC = () => {
             onClick={() => setFilter('overdue')}
             className={cn(
               "px-4 py-2 text-xs font-bold rounded-lg transition-all",
-              filter === 'overdue' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              filter === 'overdue' ? "bg-surface text-red-600 shadow-sm" : "text-content-subtle hover:text-content-muted"
             )}
           >
             Atrasados
@@ -199,7 +199,7 @@ export const Debts: React.FC = () => {
             onClick={() => setFilter('all')}
             className={cn(
               "px-4 py-2 text-xs font-bold rounded-lg transition-all",
-              filter === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              filter === 'all' ? "bg-surface text-content shadow-sm" : "text-content-subtle hover:text-content-muted"
             )}
           >
             Todos
@@ -207,13 +207,13 @@ export const Debts: React.FC = () => {
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-2.5 h-5 w-5 text-content-subtle" />
           <input 
             type="text"
             placeholder="Buscar pendência..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 py-2 text-sm outline-none focus:border-primary transition-all"
+            className="w-full rounded-xl border border-line bg-surface pl-10 pr-4 py-2 text-sm outline-none focus:border-primary transition-all"
           />
         </div>
       </div>
@@ -221,10 +221,10 @@ export const Debts: React.FC = () => {
       {/* List */}
       <div className="grid gap-4">
         {filteredDebts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-3xl border border-dashed border-gray-200">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-surface rounded-3xl border border-dashed border-line">
             <CheckCircle2 className="h-12 w-12 text-emerald-500 mb-4" />
-            <h3 className="text-lg font-bold text-gray-900">Tudo em dia!</h3>
-            <p className="text-sm text-gray-500">Não há pendências para os filtros selecionados.</p>
+            <h3 className="text-lg font-bold text-content">Tudo em dia!</h3>
+            <p className="text-sm text-content-subtle">Não há pendências para os filtros selecionados.</p>
           </div>
         ) : (
           filteredDebts.map(debt => {
@@ -234,8 +234,8 @@ export const Debts: React.FC = () => {
                 layout
                 key={debt.id}
                 className={cn(
-                  "group relative rounded-2xl bg-white p-5 shadow-sm border transition-all hover:shadow-md",
-                  isOverdue ? "border-red-100 bg-red-50/30" : "border-gray-100"
+                  "group relative rounded-2xl bg-surface p-5 shadow-sm border transition-all hover:shadow-md",
+                  isOverdue ? "border-red-100 bg-red-50/30" : "border-line"
                 )}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -247,9 +247,9 @@ export const Debts: React.FC = () => {
                       {debt.type === 'income' ? <ArrowDownLeft className="h-6 w-6" /> : <ArrowUpRight className="h-6 w-6" />}
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900">{debt.description}</h3>
+                      <h3 className="font-bold text-content">{debt.description}</h3>
                       <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
+                        <span className="text-xs font-medium text-content-subtle flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           Vencimento: {format(parseLocalDate(debt.date), 'dd/MM/yyyy')}
                         </span>
@@ -270,7 +270,7 @@ export const Debts: React.FC = () => {
                       )}>
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(debt.amount)}
                       </p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      <p className="text-[10px] font-bold text-content-subtle uppercase tracking-widest">
                         {CATEGORIES.find(c => c.id === debt.categoryId)?.name || 'Outros'}
                       </p>
                     </div>
@@ -285,14 +285,14 @@ export const Debts: React.FC = () => {
                       </button>
                       <button
                         onClick={() => openEdit(debt)}
-                        className="rounded-xl bg-gray-50 p-2.5 text-gray-400 hover:bg-primary/10 hover:text-primary transition-all"
+                        className="rounded-xl bg-canvas p-2.5 text-content-subtle hover:bg-primary/10 hover:text-primary transition-all"
                         title="Editar / Corrigir"
                       >
                         <Pencil className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => handleDelete(debt)}
-                        className="rounded-xl bg-gray-50 p-2.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"
+                        className="rounded-xl bg-canvas p-2.5 text-content-subtle hover:bg-red-50 hover:text-red-500 transition-all"
                         title="Excluir"
                       >
                         <Trash2 className="h-5 w-5" />
@@ -314,40 +314,40 @@ export const Debts: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-2xl"
+              className="w-full max-w-md rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl"
             >
-              <h3 className="text-xl font-black text-slate-900 dark:text-gray-100">Corrigir Pendência</h3>
-              <p className="text-sm text-slate-500 mb-6">Ajuste o valor, a data ou a descrição lançada.</p>
+              <h3 className="text-xl font-black text-content dark:text-gray-100">Corrigir Pendência</h3>
+              <p className="text-sm text-content-subtle mb-6">Ajuste o valor, a data ou a descrição lançada.</p>
               <form onSubmit={handleSaveEdit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descrição</label>
+                  <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Descrição</label>
                   <input
                     type="text"
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor</label>
+                    <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Valor</label>
                     <input
                       type="number"
                       step="0.01"
                       value={editAmount}
                       onChange={(e) => setEditAmount(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vencimento</label>
+                    <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Vencimento</label>
                     <input
                       type="date"
                       value={editDate}
                       onChange={(e) => setEditDate(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                       required
                     />
                   </div>
@@ -356,7 +356,7 @@ export const Debts: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingDebt(null)}
-                    className="flex-1 rounded-2xl border border-slate-200 dark:border-gray-700 py-3 text-sm font-bold text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800"
+                    className="flex-1 rounded-2xl border border-line dark:border-gray-700 py-3 text-sm font-bold text-content-muted dark:text-gray-400 hover:bg-surface-muted dark:hover:bg-gray-800"
                   >
                     Cancelar
                   </button>

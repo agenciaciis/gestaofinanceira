@@ -88,8 +88,8 @@ export const Team: React.FC = () => {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Equipe & Acessos</h2>
-          <p className="text-sm font-medium text-slate-500">Gerencie quem pode visualizar ou editar suas entidades financeiras.</p>
+          <h2 className="text-3xl font-black text-content tracking-tight">Equipe & Acessos</h2>
+          <p className="text-sm font-medium text-content-subtle">Gerencie quem pode visualizar ou editar suas entidades financeiras.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -102,20 +102,20 @@ export const Team: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle" />
         <input
           type="text"
           placeholder="Buscar por e-mail ou entidade..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+          className="w-full rounded-2xl border border-line bg-surface py-3 pl-12 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
         />
       </div>
 
       {/* Collaborators List */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {/* Current User (Owner) Card */}
-        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100 relative overflow-hidden">
+        <div className="rounded-3xl bg-surface p-6 shadow-sm border border-line relative overflow-hidden">
           <div className="flex items-start justify-between">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <User className="h-6 w-6" />
@@ -125,12 +125,12 @@ export const Team: React.FC = () => {
             </span>
           </div>
           <div className="mt-6">
-            <h3 className="text-lg font-black text-slate-900 truncate">{user?.email}</h3>
-            <p className="text-xs font-medium text-slate-400 mt-1">Você é o dono de {entities.filter(e => e.ownerUid === user?.uid).length} entidades.</p>
+            <h3 className="text-lg font-black text-content truncate">{user?.email}</h3>
+            <p className="text-xs font-medium text-content-subtle mt-1">Você é o dono de {entities.filter(e => e.ownerUid === user?.uid).length} entidades.</p>
           </div>
           <div className="mt-6 flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-emerald-500" />
-            <span className="text-xs font-bold text-slate-600">Acesso Total</span>
+            <span className="text-xs font-bold text-content-muted">Acesso Total</span>
           </div>
           <div className="absolute -right-4 -bottom-4 h-24 w-24 rounded-full bg-primary/5" />
         </div>
@@ -144,16 +144,16 @@ export const Team: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="group rounded-3xl bg-white p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-primary/20 transition-all"
+              className="group rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-xl hover:border-primary/20 transition-all"
             >
               <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-muted text-content-subtle group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                   <User className="h-6 w-6" />
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={cn(
                     "rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider",
-                    member.role === 'admin' ? "bg-purple-100 text-purple-600" : "bg-slate-100 text-slate-600"
+                    member.role === 'admin' ? "bg-purple-100 text-purple-600" : "bg-surface-muted text-content-muted"
                   )}>
                     {member.role === 'admin' ? 'Admin' : 'Viewer'}
                   </span>
@@ -168,14 +168,14 @@ export const Team: React.FC = () => {
                 </div>
               </div>
               <div className="mt-6">
-                <h3 className="text-lg font-black text-slate-900 truncate">{member.email}</h3>
+                <h3 className="text-lg font-black text-content truncate">{member.email}</h3>
                 <div className="mt-2 flex items-center gap-2">
                   <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  <p className="text-xs font-bold text-slate-500">Acesso à: <span className="text-slate-900">{member.entityName}</span></p>
+                  <p className="text-xs font-bold text-content-subtle">Acesso à: <span className="text-content">{member.entityName}</span></p>
                 </div>
               </div>
               <div className="mt-6 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-400">
+                <div className="flex items-center gap-2 text-content-subtle">
                   <Clock className="h-3.5 w-3.5" />
                   <span className="text-[10px] font-bold uppercase tracking-widest">
                     Desde {new Date(member.addedAt).toLocaleDateString('pt-BR')}
@@ -194,18 +194,18 @@ export const Team: React.FC = () => {
         {filteredCollaborators.length === 0 && searchTerm && (
           <div className="col-span-full py-12 text-center">
             <Users className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-900">Nenhum membro encontrado</h3>
-            <p className="text-slate-500">Tente buscar por outro termo ou e-mail.</p>
+            <h3 className="text-lg font-bold text-content">Nenhum membro encontrado</h3>
+            <p className="text-content-subtle">Tente buscar por outro termo ou e-mail.</p>
           </div>
         )}
 
         {allCollaborators.length === 0 && !searchTerm && (
-          <div className="col-span-full flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 p-12 text-center bg-slate-50/50">
-            <div className="mb-4 rounded-full bg-white p-4 shadow-sm">
-              <Users className="h-8 w-8 text-slate-400" />
+          <div className="col-span-full flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-line p-12 text-center bg-slate-50/50">
+            <div className="mb-4 rounded-full bg-surface p-4 shadow-sm">
+              <Users className="h-8 w-8 text-content-subtle" />
             </div>
-            <h3 className="text-xl font-black text-slate-900">Sua equipe está vazia</h3>
-            <p className="mt-2 max-w-xs text-slate-500 font-medium">Convide colaboradores para ajudar a gerenciar suas finanças.</p>
+            <h3 className="text-xl font-black text-content">Sua equipe está vazia</h3>
+            <p className="mt-2 max-w-xs text-content-subtle font-medium">Convide colaboradores para ajudar a gerenciar suas finanças.</p>
             <button 
               onClick={() => setIsModalOpen(true)}
               className="mt-8 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
@@ -222,31 +222,31 @@ export const Team: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-2xl border border-gray-100 dark:border-gray-800"
+            className="w-full max-w-md rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl border border-line dark:border-gray-800"
           >
             <div className="flex items-center justify-between mb-8">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <UserPlus className="h-6 w-6" />
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 transition-all">
+              <button onClick={() => setIsModalOpen(false)} className="rounded-xl p-2 text-content-subtle hover:bg-surface-muted transition-all">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Convidar para Equipe</h3>
-            <p className="text-slate-500 font-medium mt-1">O convidado terá acesso aos dados da entidade selecionada.</p>
+            <h3 className="text-2xl font-black text-content tracking-tight">Convidar para Equipe</h3>
+            <p className="text-content-subtle font-medium mt-1">O convidado terá acesso aos dados da entidade selecionada.</p>
 
             <form onSubmit={handleInvite} className="mt-8 space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">E-mail do Convidado</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-content-subtle px-1">E-mail do Convidado</label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-content-subtle" />
                   <input
                     type="email"
                     value={newMemberEmail}
                     onChange={(e) => setNewMemberEmail(e.target.value)}
                     placeholder="exemplo@email.com"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-3 pl-12 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                    className="w-full rounded-2xl border border-line bg-slate-50/50 py-3 pl-12 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:bg-surface transition-all"
                     required
                   />
                 </div>
@@ -254,11 +254,11 @@ export const Team: React.FC = () => {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Entidade</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-content-subtle px-1">Entidade</label>
                   <select 
                     value={targetEntityId}
                     onChange={(e) => setTargetEntityId(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-3 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                    className="w-full rounded-2xl border border-line bg-slate-50/50 py-3 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:bg-surface transition-all"
                     required
                   >
                     <option value="">Selecione...</option>
@@ -268,11 +268,11 @@ export const Team: React.FC = () => {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Nível de Acesso</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-content-subtle px-1">Nível de Acesso</label>
                   <select 
                     value={newMemberRole}
                     onChange={(e) => setNewMemberRole(e.target.value as any)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-3 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                    className="w-full rounded-2xl border border-line bg-slate-50/50 py-3 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:bg-surface transition-all"
                   >
                     <option value="viewer">Visualizador</option>
                     <option value="admin">Administrador</option>
@@ -293,7 +293,7 @@ export const Team: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                  className="flex-1 rounded-2xl border border-line py-3 text-sm font-bold text-content-muted hover:bg-surface-muted transition-all"
                 >
                   Cancelar
                 </button>

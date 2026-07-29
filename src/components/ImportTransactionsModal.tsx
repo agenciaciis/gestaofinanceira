@@ -242,26 +242,26 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-4xl rounded-2xl bg-surface shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-bottom border-gray-100 p-6">
+        <div className="flex items-center justify-between border-bottom border-line p-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Upload className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900">Importar Extrato</h3>
-              <p className="text-sm text-gray-500">CSV, Excel, OFX ou PDF — processamos automaticamente.</p>
+              <h3 className="text-xl font-bold text-content">Importar Extrato</h3>
+              <p className="text-sm text-content-subtle">CSV, Excel, OFX ou PDF — processamos automaticamente.</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 text-gray-400">
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-surface-muted text-content-subtle">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Steps Indicator */}
-        <div className="flex border-bottom border-gray-100 bg-gray-50/50 px-6 py-3">
+        <div className="flex border-bottom border-line bg-gray-50/50 px-6 py-3">
           {[
             { id: 'upload', label: 'Upload', icon: Upload },
             { id: 'mapping', label: 'Mapeamento', icon: Table },
@@ -270,11 +270,11 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             <React.Fragment key={s.id}>
               <div className={cn(
                 "flex items-center gap-2 text-sm font-bold",
-                step === s.id ? "text-primary" : "text-gray-400"
+                step === s.id ? "text-primary" : "text-content-subtle"
               )}>
                 <div className={cn(
                   "flex h-6 w-6 items-center justify-center rounded-full text-[10px]",
-                  step === s.id ? "bg-primary text-white" : "bg-gray-200 text-gray-500"
+                  step === s.id ? "bg-primary text-white" : "bg-gray-200 text-content-subtle"
                 )}>
                   {i + 1}
                 </div>
@@ -290,8 +290,8 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
           {step === 'upload' && loading && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="mt-4 text-sm font-bold text-gray-700">Processando arquivo...</p>
-              <p className="mt-1 text-xs text-gray-400">Extraindo e categorizando as transações.</p>
+              <p className="mt-4 text-sm font-bold text-content-muted">Processando arquivo...</p>
+              <p className="mt-1 text-xs text-content-subtle">Extraindo e categorizando as transações.</p>
             </div>
           )}
 
@@ -299,14 +299,14 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             <div className="flex flex-col items-center justify-center py-12">
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="group relative flex w-full max-w-md cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-12 transition-all hover:border-primary/50 hover:bg-primary/5"
+                className="group relative flex w-full max-w-md cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-line bg-canvas p-12 transition-all hover:border-primary/50 hover:bg-primary/5"
               >
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm group-hover:scale-110 transition-transform">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface shadow-sm group-hover:scale-110 transition-transform">
                   <FileText className="h-8 w-8 text-primary" />
                 </div>
-                <p className="text-lg font-bold text-gray-900">Clique para selecionar</p>
-                <p className="mt-1 text-sm text-gray-500">ou arraste seu arquivo aqui</p>
-                <p className="mt-4 text-xs text-gray-400">Suporta .CSV, .XLSX, .XLS, .OFX e .PDF (via IA)</p>
+                <p className="text-lg font-bold text-content">Clique para selecionar</p>
+                <p className="mt-1 text-sm text-content-subtle">ou arraste seu arquivo aqui</p>
+                <p className="mt-4 text-xs text-content-subtle">Suporta .CSV, .XLSX, .XLS, .OFX e .PDF (via IA)</p>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -317,26 +317,26 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
               </div>
 
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl">
-                <div className="rounded-xl border border-gray-100 p-4 bg-white">
+                <div className="rounded-xl border border-line p-4 bg-surface">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 mb-3">
                     <Check className="h-4 w-4" />
                   </div>
-                  <h4 className="text-sm font-bold text-gray-900">Automático</h4>
-                  <p className="text-xs text-gray-500 mt-1">Reconhecemos datas e valores automaticamente.</p>
+                  <h4 className="text-sm font-bold text-content">Automático</h4>
+                  <p className="text-xs text-content-subtle mt-1">Reconhecemos datas e valores automaticamente.</p>
                 </div>
-                <div className="rounded-xl border border-gray-100 p-4 bg-white">
+                <div className="rounded-xl border border-line p-4 bg-surface">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 mb-3">
                     <Sparkles className="h-4 w-4" />
                   </div>
-                  <h4 className="text-sm font-bold text-gray-900">IA Categorização</h4>
-                  <p className="text-xs text-gray-500 mt-1">Nossa IA sugere a melhor categoria para cada item.</p>
+                  <h4 className="text-sm font-bold text-content">IA Categorização</h4>
+                  <p className="text-xs text-content-subtle mt-1">Nossa IA sugere a melhor categoria para cada item.</p>
                 </div>
-                <div className="rounded-xl border border-gray-100 p-4 bg-white">
+                <div className="rounded-xl border border-line p-4 bg-surface">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600 mb-3">
                     <Table className="h-4 w-4" />
                   </div>
-                  <h4 className="text-sm font-bold text-gray-900">Flexível</h4>
-                  <p className="text-xs text-gray-500 mt-1">Funciona com extratos de qualquer banco.</p>
+                  <h4 className="text-sm font-bold text-content">Flexível</h4>
+                  <p className="text-xs text-content-subtle mt-1">Funciona com extratos de qualquer banco.</p>
                 </div>
               </div>
             </div>
@@ -353,33 +353,33 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Coluna de Data</label>
+                  <label className="block text-sm font-bold text-content-muted mb-2">Coluna de Data</label>
                   <select 
                     value={mapping.date}
                     onChange={(e) => setMapping({ ...mapping, date: e.target.value })}
-                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-lg border border-line p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                   >
                     <option value="">Selecionar...</option>
                     {rawData.headers.map(h => <option key={h} value={h}>{h}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Coluna de Descrição</label>
+                  <label className="block text-sm font-bold text-content-muted mb-2">Coluna de Descrição</label>
                   <select 
                     value={mapping.description}
                     onChange={(e) => setMapping({ ...mapping, description: e.target.value })}
-                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-lg border border-line p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                   >
                     <option value="">Selecionar...</option>
                     {rawData.headers.map(h => <option key={h} value={h}>{h}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Coluna de Valor</label>
+                  <label className="block text-sm font-bold text-content-muted mb-2">Coluna de Valor</label>
                   <select 
                     value={mapping.amount}
                     onChange={(e) => setMapping({ ...mapping, amount: e.target.value })}
-                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-lg border border-line p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                   >
                     <option value="">Selecionar...</option>
                     {rawData.headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -388,18 +388,18 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
               </div>
 
               <div className="mt-8">
-                <h4 className="text-sm font-bold text-gray-900 mb-4">Prévia dos Dados (Primeiras 5 linhas)</h4>
-                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <h4 className="text-sm font-bold text-content mb-4">Prévia dos Dados (Primeiras 5 linhas)</h4>
+                <div className="overflow-x-auto rounded-xl border border-line">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 font-bold text-gray-500">
+                    <thead className="bg-canvas font-bold text-content-subtle">
                       <tr>
                         {rawData.headers.map(h => <th key={h} className="px-4 py-2">{h}</th>)}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-line">
                       {rawData.rows.slice(0, 5).map((row, i) => (
                         <tr key={i}>
-                          {row.map((cell, j) => <td key={j} className="px-4 py-2 text-gray-600">{String(cell)}</td>)}
+                          {row.map((cell, j) => <td key={j} className="px-4 py-2 text-content-muted">{String(cell)}</td>)}
                         </tr>
                       ))}
                     </tbody>
@@ -413,24 +413,24 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Entidade Destino</label>
+                  <label className="block text-sm font-bold text-content-muted mb-2">Entidade Destino</label>
                   <select 
                     value={targetEntityId}
                     onChange={(e) => setTargetEntityId(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-lg border border-line p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                   >
                     <option value="">Selecionar Entidade...</option>
                     {entities.map(e => <option key={e.id} value={e.id}>{e.name} ({e.type})</option>)}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Método de Pagamento</label>
+                  <label className="block text-sm font-bold text-content-muted mb-2">Método de Pagamento</label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setPaymentMethod('account')}
                       className={cn(
                         "flex-1 rounded-lg border p-2.5 text-xs font-bold transition-all",
-                        paymentMethod === 'account' ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-500"
+                        paymentMethod === 'account' ? "border-primary bg-primary/5 text-primary" : "border-line text-content-subtle"
                       )}
                     >
                       Conta Bancária
@@ -439,7 +439,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                       onClick={() => setPaymentMethod('card')}
                       className={cn(
                         "flex-1 rounded-lg border p-2.5 text-xs font-bold transition-all",
-                        paymentMethod === 'card' ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-500"
+                        paymentMethod === 'card' ? "border-primary bg-primary/5 text-primary" : "border-line text-content-subtle"
                       )}
                     >
                       Cartão de Crédito
@@ -448,11 +448,11 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 </div>
                 {paymentMethod === 'account' ? (
                   <div className="sm:col-span-4">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Conta</label>
+                    <label className="block text-sm font-bold text-content-muted mb-2">Conta</label>
                     <select 
                       value={accountId}
                       onChange={(e) => setAccountId(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full rounded-lg border border-line p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="">Selecionar Conta...</option>
                       {accounts.filter(a => a.entityId === targetEntityId).map(a => (
@@ -462,11 +462,11 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                   </div>
                 ) : (
                   <div className="sm:col-span-4">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Cartão</label>
+                    <label className="block text-sm font-bold text-content-muted mb-2">Cartão</label>
                     <select 
                       value={cardId}
                       onChange={(e) => setCardId(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full rounded-lg border border-line p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="">Selecionar Cartão...</option>
                       {cards.filter(c => c.entityId === targetEntityId).map(c => (
@@ -479,15 +479,15 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
               <div className="mt-8">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-sm font-bold text-gray-900">Revisar Lançamentos ({processedData.length})</h4>
+                  <h4 className="text-sm font-bold text-content">Revisar Lançamentos ({processedData.length})</h4>
                   <div className="flex items-center gap-2 text-xs text-purple-600 font-bold">
                     <Sparkles className="h-3 w-3" />
                     Categorizado por IA
                   </div>
                 </div>
-                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <div className="overflow-x-auto rounded-xl border border-line">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 font-bold text-gray-500">
+                    <thead className="bg-canvas font-bold text-content-subtle">
                       <tr>
                         <th className="px-4 py-2">Data</th>
                         <th className="px-4 py-2">Descrição</th>
@@ -495,11 +495,11 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                         <th className="px-4 py-2 text-right">Valor</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-line">
                       {processedData.map((t, i) => (
                         <tr key={i}>
-                          <td className="px-4 py-2 text-gray-600">{t.date}</td>
-                          <td className="px-4 py-2 font-bold text-gray-900">{t.description}</td>
+                          <td className="px-4 py-2 text-content-muted">{t.date}</td>
+                          <td className="px-4 py-2 font-bold text-content">{t.description}</td>
                           <td className="px-4 py-2">
                             <select 
                               value={t.categoryId}
@@ -508,7 +508,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                 newData[i].categoryId = e.target.value;
                                 setProcessedData(newData);
                               }}
-                              className="rounded border border-gray-100 bg-transparent p-1 text-[10px] outline-none"
+                              className="rounded border border-line bg-transparent p-1 text-[10px] outline-none"
                             >
                               {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
@@ -530,7 +530,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className="border-top border-gray-100 bg-gray-50 p-6 flex justify-between items-center">
+        <div className="border-top border-line bg-canvas p-6 flex justify-between items-center">
           <button 
             onClick={() => {
               if (step === 'mapping') setStep('upload');
@@ -538,7 +538,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             }}
             disabled={step === 'upload' || loading}
             className={cn(
-              "flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-700 disabled:opacity-0 transition-all",
+              "flex items-center gap-2 text-sm font-bold text-content-subtle hover:text-content-muted disabled:opacity-0 transition-all",
             )}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -548,7 +548,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
           <div className="flex gap-3">
             <button 
               onClick={onClose}
-              className="rounded-lg px-6 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100"
+              className="rounded-lg px-6 py-2 text-sm font-bold text-content-subtle hover:bg-surface-muted"
             >
               Cancelar
             </button>

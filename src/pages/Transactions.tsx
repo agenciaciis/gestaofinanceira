@@ -619,13 +619,13 @@ export const Transactions: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Lançamentos</h2>
-          <p className="text-sm text-gray-500">Histórico completo de receitas, despesas e transferências.</p>
+          <h2 className="text-2xl font-bold text-content">Lançamentos</h2>
+          <p className="text-sm text-content-subtle">Histórico completo de receitas, despesas e transferências.</p>
         </div>
         <div className="flex gap-3">
           <button 
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 shadow-sm hover:bg-gray-50"
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-content-muted shadow-sm hover:bg-canvas"
           >
             <Upload className="h-4 w-4" />
             Importar
@@ -633,22 +633,22 @@ export const Transactions: React.FC = () => {
           <div className="relative">
             <button 
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 shadow-sm hover:bg-gray-50"
+              className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-content-muted shadow-sm hover:bg-canvas"
             >
               <Download className="h-4 w-4" />
               Exportar
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-gray-100 bg-white p-2 shadow-lg z-20">
+              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-line bg-surface p-2 shadow-lg z-20">
                 <button 
                   onClick={exportToExcel}
-                  className="w-full rounded-lg px-4 py-2 text-left text-sm hover:bg-gray-50"
+                  className="w-full rounded-lg px-4 py-2 text-left text-sm hover:bg-canvas"
                 >
                   Excel (.xlsx)
                 </button>
                 <button 
                   onClick={exportToCSV}
-                  className="w-full rounded-lg px-4 py-2 text-left text-sm hover:bg-gray-50"
+                  className="w-full rounded-lg px-4 py-2 text-left text-sm hover:bg-canvas"
                 >
                   CSV (.csv)
                 </button>
@@ -666,24 +666,24 @@ export const Transactions: React.FC = () => {
       </div>
 
       {/* Painel: Saldo / Sobra do Mês */}
-      <div className="grid gap-4 sm:grid-cols-3 rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:to-gray-900">
-        <div className="sm:border-r sm:border-slate-200 dark:sm:border-gray-800">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sobra projetada do mês</p>
-          <p className="text-[10px] text-slate-400 mb-1">(recebido + a receber) − (pago + a pagar)</p>
+      <div className="grid gap-4 sm:grid-cols-3 rounded-2xl border border-line bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:to-gray-900">
+        <div className="sm:border-r sm:border-line dark:sm:border-gray-800">
+          <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Sobra projetada do mês</p>
+          <p className="text-[10px] text-content-subtle mb-1">(recebido + a receber) − (pago + a pagar)</p>
           <p className={cn("text-3xl font-black tracking-tight", saldoProjetado >= 0 ? "text-emerald-600" : "text-rose-600")}>
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoProjetado)}
           </p>
         </div>
-        <div className="sm:px-5 sm:border-r sm:border-slate-200 dark:sm:border-gray-800">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Saldo realizado</p>
-          <p className="text-[10px] text-slate-400 mb-1">recebido − pago (já efetivado)</p>
+        <div className="sm:px-5 sm:border-r sm:border-line dark:sm:border-gray-800">
+          <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Saldo realizado</p>
+          <p className="text-[10px] text-content-subtle mb-1">recebido − pago (já efetivado)</p>
           <p className={cn("text-2xl font-black tracking-tight", saldoRealizado >= 0 ? "text-emerald-600" : "text-rose-600")}>
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoRealizado)}
           </p>
         </div>
         <div className="sm:px-5">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">A receber − a pagar</p>
-          <p className="text-[10px] text-slate-400 mb-1">o que ainda falta entrar/sair</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">A receber − a pagar</p>
+          <p className="text-[10px] text-content-subtle mb-1">o que ainda falta entrar/sair</p>
           <p className={cn("text-2xl font-black tracking-tight", liquidoPendente >= 0 ? "text-blue-600" : "text-orange-600")}>
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(liquidoPendente)}
           </p>
@@ -692,26 +692,26 @@ export const Transactions: React.FC = () => {
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Recebido</p>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">Recebido</p>
           <p className="mt-1 text-lg font-bold text-green-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.received)}
           </p>
         </div>
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pago</p>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">Pago</p>
           <p className="mt-1 text-lg font-bold text-red-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.paid)}
           </p>
         </div>
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">A Receber</p>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">A Receber</p>
           <p className="mt-1 text-lg font-bold text-blue-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.toReceive)}
           </p>
         </div>
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">A Pagar</p>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">A Pagar</p>
           <p className="mt-1 text-lg font-bold text-orange-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.toPay)}
           </p>
@@ -727,38 +727,38 @@ export const Transactions: React.FC = () => {
       {/* Filters & Search */}
       <div className="flex flex-wrap items-center gap-4">
         {/* Month Selector */}
-        <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
+        <div className="flex items-center gap-2 rounded-xl border border-line bg-surface p-1 shadow-sm">
           <button 
             onClick={() => changeMonth(-1)}
-            className="rounded-lg p-2 hover:bg-gray-50 text-gray-400 hover:text-primary transition-all"
+            className="rounded-lg p-2 hover:bg-canvas text-content-subtle hover:text-primary transition-all"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <div className="flex items-center gap-2 px-2 min-w-[140px] justify-center">
             <Calendar className="h-4 w-4 text-primary" />
-            <span className="text-sm font-bold text-gray-700 capitalize">
+            <span className="text-sm font-bold text-content-muted capitalize">
               {MONTHS[selectedMonth]} {selectedYear}
             </span>
           </div>
           <button 
             onClick={() => changeMonth(1)}
-            className="rounded-lg p-2 hover:bg-gray-50 text-gray-400 hover:text-primary transition-all"
+            className="rounded-lg p-2 hover:bg-canvas text-content-subtle hover:text-primary transition-all"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-content-subtle" />
           <input 
             type="text" 
             placeholder="Buscar lançamentos..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-lg border border-line pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
-        <div className="flex rounded-lg border border-gray-200 bg-white p-1">
+        <div className="flex rounded-lg border border-line bg-surface p-1">
           {[
             { id: 'all', label: 'Todos' },
             { id: 'completed', label: 'Pagos' },
@@ -770,7 +770,7 @@ export const Transactions: React.FC = () => {
               onClick={() => setStatusFilter(f.id as any)}
               className={cn(
                 "rounded-md px-3 py-1 text-xs font-bold transition-all",
-                statusFilter === f.id ? "bg-primary text-white" : "text-gray-500 hover:bg-gray-50"
+                statusFilter === f.id ? "bg-primary text-white" : "text-content-subtle hover:bg-canvas"
               )}
             >
               {f.label}
@@ -780,10 +780,10 @@ export const Transactions: React.FC = () => {
       </div>
 
       {/* Transactions Table */}
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs font-bold uppercase tracking-wider text-gray-500">
+            <thead className="bg-canvas text-xs font-bold uppercase tracking-wider text-content-subtle">
               <tr>
                 <th className="px-6 py-4">Data</th>
                 <th className="px-6 py-4">Descrição</th>
@@ -794,12 +794,12 @@ export const Transactions: React.FC = () => {
                 <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {filteredTransactions.map((t) => {
                 const isOverdue = t.status === 'pending' && parseLocalDate(t.date) < todayStart;
                 return (
-                  <tr key={t.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="whitespace-nowrap px-6 py-4 text-gray-600">
+                  <tr key={t.id} className="hover:bg-canvas transition-colors group">
+                    <td className="whitespace-nowrap px-6 py-4 text-content-muted">
                       {parseLocalDate(t.date).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4">
@@ -814,15 +814,15 @@ export const Transactions: React.FC = () => {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900">{t.description}</span>
+                            <span className="font-bold text-content">{t.description}</span>
                             {t.installmentNumber && (
-                              <span className="text-[10px] text-gray-400">({t.installmentNumber}/{t.totalInstallments})</span>
+                              <span className="text-[10px] text-content-subtle">({t.installmentNumber}/{t.totalInstallments})</span>
                             )}
                             {t.isRecurring && (
                               <Repeat className="h-3 w-3 text-primary" />
                             )}
                           </div>
-                          <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                          <span className="text-[10px] text-content-subtle uppercase tracking-wider">
                             {CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros'}
                           </span>
                         </div>
@@ -836,7 +836,7 @@ export const Transactions: React.FC = () => {
                         {entities.find(e => e.id === t.entityId)?.name}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-500">
+                    <td className="px-6 py-4 text-content-subtle">
                       {t.type === 'transfer' ? (
                         <div className="flex items-center gap-2">
                           <span className="text-xs">{accounts.find(a => a.id === t.accountId)?.bankName}</span>
@@ -902,13 +902,13 @@ export const Transactions: React.FC = () => {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => handleEdit(t)}
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-primary transition-all"
+                          className="rounded-lg p-1.5 text-content-subtle hover:bg-surface-muted hover:text-primary transition-all"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button 
                           onClick={() => handleDelete(t)}
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all"
+                          className="rounded-lg p-1.5 text-content-subtle hover:bg-red-50 hover:text-red-600 transition-all"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -927,9 +927,9 @@ export const Transactions: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+            className="w-full max-w-lg rounded-2xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
           >
-            <h3 className="text-xl font-bold text-gray-900">
+            <h3 className="text-xl font-bold text-content">
               {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
             </h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -939,7 +939,7 @@ export const Transactions: React.FC = () => {
                   onClick={() => { setType('income'); setIsInstallment(false); }}
                   className={cn(
                     "flex flex-col items-center justify-center gap-1 rounded-lg border py-2 text-xs font-bold transition-all",
-                    type === 'income' ? "border-green-500 bg-green-50 text-green-600" : "border-gray-200 text-gray-500"
+                    type === 'income' ? "border-green-500 bg-green-50 text-green-600" : "border-line text-content-subtle"
                   )}
                 >
                   <ArrowUpCircle className="h-4 w-4" /> Receita
@@ -949,7 +949,7 @@ export const Transactions: React.FC = () => {
                   onClick={() => setType('expense')}
                   className={cn(
                     "flex flex-col items-center justify-center gap-1 rounded-lg border py-2 text-xs font-bold transition-all",
-                    type === 'expense' ? "border-red-500 bg-red-50 text-red-600" : "border-gray-200 text-gray-500"
+                    type === 'expense' ? "border-red-500 bg-red-50 text-red-600" : "border-line text-content-subtle"
                   )}
                 >
                   <ArrowDownCircle className="h-4 w-4" /> Despesa
@@ -959,7 +959,7 @@ export const Transactions: React.FC = () => {
                   onClick={() => { setType('transfer'); setIsInstallment(false); }}
                   className={cn(
                     "flex flex-col items-center justify-center gap-1 rounded-lg border py-2 text-xs font-bold transition-all",
-                    type === 'transfer' ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 text-gray-500"
+                    type === 'transfer' ? "border-blue-500 bg-blue-50 text-blue-600" : "border-line text-content-subtle"
                   )}
                 >
                   <ArrowRightLeft className="h-4 w-4" /> Transf.
@@ -968,11 +968,11 @@ export const Transactions: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Entidade</label>
+                  <label className="block text-sm font-medium text-content-muted">Entidade</label>
                   <select 
                     value={targetEntityId}
                     onChange={(e) => setTargetEntityId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   >
                     <option value="">Selecione...</option>
@@ -980,12 +980,12 @@ export const Transactions: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Data</label>
+                  <label className="block text-sm font-medium text-content-muted">Data</label>
                   <input
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   />
                 </div>
@@ -993,14 +993,14 @@ export const Transactions: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700">Descrição</label>
+                  <label className="block text-sm font-medium text-content-muted">Descrição</label>
                   <div className="relative">
                     <input
                       type="text"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Ex: Aluguel, Supermercado"
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="mt-1 w-full rounded-lg border border-line px-4 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20"
                       required
                     />
                     <button
@@ -1015,11 +1015,11 @@ export const Transactions: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Categoria</label>
+                  <label className="block text-sm font-medium text-content-muted">Categoria</label>
                   <select 
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   >
                     {CATEGORIES.filter(c => type === 'transfer' ? c.id === 'transferencia' : (type === 'income' ? c.type === 'income' : !c.type)).map(c => (
@@ -1030,16 +1030,16 @@ export const Transactions: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Valor Total</label>
+                <label className="block text-sm font-medium text-content-muted">Valor Total</label>
                 <div className="relative mt-1">
-                  <span className="absolute left-4 top-2 text-gray-500">R$</span>
+                  <span className="absolute left-4 top-2 text-content-subtle">R$</span>
                   <input
                     type="number"
                     step="0.01"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0,00"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                    className="w-full rounded-lg border border-line pl-10 pr-4 py-2 font-bold focus:ring-2 focus:ring-primary/20 outline-none"
                     required
                   />
                 </div>
@@ -1048,11 +1048,11 @@ export const Transactions: React.FC = () => {
               {type === 'transfer' ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Origem</label>
+                    <label className="block text-sm font-medium text-content-muted">Origem</label>
                     <select 
                       value={accountId}
                       onChange={(e) => setAccountId(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                       required
                     >
                       <option value="">Selecione...</option>
@@ -1062,11 +1062,11 @@ export const Transactions: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Destino</label>
+                    <label className="block text-sm font-medium text-content-muted">Destino</label>
                     <select 
                       value={toAccountId}
                       onChange={(e) => setToAccountId(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                       required
                     >
                       <option value="">Selecione...</option>
@@ -1079,7 +1079,7 @@ export const Transactions: React.FC = () => {
               ) : (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+                    <label className="block text-sm font-medium text-content-muted">Forma de Pagamento</label>
                     <div className="mt-2 flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input 
@@ -1106,7 +1106,7 @@ export const Transactions: React.FC = () => {
                         <select 
                           value={accountId}
                           onChange={(e) => setAccountId(e.target.value)}
-                          className="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                           required={paymentMethod === 'account'}
                         >
                           <option value="">Selecione a conta...</option>
@@ -1118,7 +1118,7 @@ export const Transactions: React.FC = () => {
                         <select 
                           value={cardId}
                           onChange={(e) => setCardId(e.target.value)}
-                          className="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                           required={paymentMethod === 'card'}
                         >
                           <option value="">Selecione o cartão...</option>
@@ -1132,11 +1132,11 @@ export const Transactions: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Tipo de Pagamento</label>
+                      <label className="block text-sm font-medium text-content-muted">Tipo de Pagamento</label>
                       <select
                         value={paymentType}
                         onChange={(e) => setPaymentType(e.target.value as typeof paymentType)}
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                        className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="">Não informado</option>
                         {PAYMENT_TYPES.map(p => (
@@ -1145,13 +1145,13 @@ export const Transactions: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-content-muted">
                         Cliente {type === 'income' ? '(quem pagou)' : '(opcional)'}
                       </label>
                       <select
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                        className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="">Nenhum</option>
                         {clients.filter(c => c.entityId === targetEntityId).map(c => (
@@ -1183,7 +1183,7 @@ export const Transactions: React.FC = () => {
 
                   {!editingTransaction && (
                     <div className="space-y-4">
-                      <div className="rounded-xl bg-gray-50 p-4">
+                      <div className="rounded-xl bg-canvas p-4">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -1194,30 +1194,30 @@ export const Transactions: React.FC = () => {
                             }}
                             className="rounded text-primary"
                           />
-                          <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                          <span className="text-sm font-bold text-content-muted flex items-center gap-2">
                             <Repeat className="h-4 w-4" /> Lançamento Parcelado?
                           </span>
                         </label>
                         
                         {isInstallment && (
                           <div className="mt-3">
-                            <label className="block text-xs font-medium text-gray-500">Número de Parcelas</label>
+                            <label className="block text-xs font-medium text-content-subtle">Número de Parcelas</label>
                             <input
                               type="number"
                               min="2"
                               max="72"
                               value={totalInstallments}
                               onChange={(e) => setTotalInstallments(e.target.value)}
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                              className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                             />
-                            <p className="mt-1 text-[10px] text-gray-400">
+                            <p className="mt-1 text-[10px] text-content-subtle">
                               Serão criados {totalInstallments} lançamentos de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(amount) / Number(totalInstallments))} cada.
                             </p>
                           </div>
                         )}
                       </div>
 
-                      <div className="rounded-xl bg-gray-50 p-4">
+                      <div className="rounded-xl bg-canvas p-4">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
                             type="checkbox" 
@@ -1228,24 +1228,24 @@ export const Transactions: React.FC = () => {
                             }}
                             className="rounded text-primary"
                           />
-                          <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                          <span className="text-sm font-bold text-content-muted flex items-center gap-2">
                             <Repeat className="h-4 w-4" /> Lançamento Recorrente?
                           </span>
                         </label>
                         
                         {isRecurring && (
                           <div className="mt-3">
-                            <label className="block text-xs font-medium text-gray-500">Frequência</label>
+                            <label className="block text-xs font-medium text-content-subtle">Frequência</label>
                             <select
                               value={recurringPeriod}
                               onChange={(e) => setRecurringPeriod(e.target.value as any)}
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                              className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                             >
                               <option value="weekly">Semanal</option>
                               <option value="monthly">Mensal</option>
                               <option value="yearly">Anual</option>
                             </select>
-                            <p className="mt-1 text-[10px] text-gray-400">
+                            <p className="mt-1 text-[10px] text-content-subtle">
                               Serão criados 12 lançamentos recorrentes como base.
                             </p>
                           </div>
@@ -1260,7 +1260,7 @@ export const Transactions: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                  className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-content-muted hover:bg-canvas"
                 >
                   Cancelar
                 </button>

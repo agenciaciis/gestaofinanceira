@@ -113,7 +113,7 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-2xl border border-gray-100 dark:border-gray-800"
+              className="relative w-full max-w-md rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl border border-line dark:border-gray-800"
             >
               <div className="flex items-center gap-4 mb-6">
                 <div className={cn(
@@ -122,19 +122,19 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
                 )}>
                   {confirmState.options.variant === 'danger' ? <AlertTriangle className="h-6 w-6" /> : <Info className="h-6 w-6" />}
                 </div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-gray-100 tracking-tight">
+                <h3 className="text-xl font-black text-content dark:text-gray-100 tracking-tight">
                   {confirmState.options.title}
                 </h3>
               </div>
               
-              <p className="text-slate-500 dark:text-gray-400 font-medium leading-relaxed mb-8">
+              <p className="text-content-subtle dark:text-gray-400 font-medium leading-relaxed mb-8">
                 {confirmState.options.message}
               </p>
               
               <div className="flex gap-3">
                 <button
                   onClick={() => handleConfirm(false)}
-                  className="flex-1 rounded-2xl border border-slate-200 dark:border-gray-700 py-3 text-sm font-bold text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800 transition-all"
+                  className="flex-1 rounded-2xl border border-line dark:border-gray-700 py-3 text-sm font-bold text-content-muted dark:text-gray-400 hover:bg-surface-muted dark:hover:bg-gray-800 transition-all"
                 >
                   {confirmState.options.cancelLabel || 'Cancelar'}
                 </button>

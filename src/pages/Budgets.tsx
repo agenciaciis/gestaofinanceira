@@ -72,8 +72,8 @@ export const Budgets: React.FC = () => {
         <div className="mb-4 rounded-full bg-blue-50 p-4">
           <Target className="h-12 w-12 text-blue-500" />
         </div>
-        <h2 className="text-xl font-bold text-gray-900">Metas Financeiras</h2>
-        <p className="mt-2 max-w-md text-gray-500">
+        <h2 className="text-xl font-bold text-content">Metas Financeiras</h2>
+        <p className="mt-2 max-w-md text-content-subtle">
           Para definir metas de gastos, selecione uma entidade específica (PF ou PJ) no seletor acima.
         </p>
       </div>
@@ -84,8 +84,8 @@ export const Budgets: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Metas Mensais</h1>
-          <p className="text-gray-500">Defina metas de receitas e limites de gastos por categoria para {filterType}</p>
+          <h1 className="text-2xl font-bold text-content">Metas Mensais</h1>
+          <p className="text-content-subtle">Defina metas de receitas e limites de gastos por categoria para {filterType}</p>
         </div>
         <button
           onClick={handleSave}
@@ -103,41 +103,41 @@ export const Budgets: React.FC = () => {
 
       <div className="space-y-8">
         <section className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+          <div className="flex items-center gap-2 border-b border-line pb-2">
             <div className="h-2 w-2 rounded-full bg-blue-500" />
-            <h2 className="text-lg font-bold text-gray-800">Meta de Saldo Mensal</h2>
+            <h2 className="text-lg font-bold text-content">Meta de Saldo Mensal</h2>
           </div>
-          <div className="max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+          <div className="max-w-md rounded-2xl border border-line bg-surface p-6 shadow-sm transition-all hover:shadow-md">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white">
                 <Target className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">Saldo Mensal</h3>
-                <p className="text-xs text-gray-500">Quanto você deseja sobrar no fim do mês</p>
+                <h3 className="font-bold text-content">Saldo Mensal</h3>
+                <p className="text-xs text-content-subtle">Quanto você deseja sobrar no fim do mês</p>
               </div>
             </div>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">R$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-content-subtle">R$</span>
               <input
                 type="number"
                 value={budgets['monthly_balance_goal'] || ''}
                 onChange={(e) => updateBudget('monthly_balance_goal', e.target.value)}
                 placeholder="0,00"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all"
+                className="w-full rounded-xl border border-line bg-canvas py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/5 transition-all"
               />
             </div>
           </div>
         </section>
 
         <section className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+          <div className="flex items-center gap-2 border-b border-line pb-2">
             <div className="h-2 w-2 rounded-full bg-red-500" />
-            <h2 className="text-lg font-bold text-gray-800">Metas de Gastos (Limites)</h2>
+            <h2 className="text-lg font-bold text-content">Metas de Gastos (Limites)</h2>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {CATEGORIES.filter(c => (!c.type || c.type === 'expense') && c.id !== 'transferencia').map((category) => (
-              <div key={category.id} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+              <div key={category.id} className="rounded-2xl border border-line bg-surface p-6 shadow-sm transition-all hover:shadow-md">
                 <div className="mb-4 flex items-center gap-3">
                   <div 
                     className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
@@ -146,19 +146,19 @@ export const Budgets: React.FC = () => {
                     <Target className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900">{category.name}</h3>
-                    <p className="text-xs text-gray-500">Limite mensal</p>
+                    <h3 className="font-bold text-content">{category.name}</h3>
+                    <p className="text-xs text-content-subtle">Limite mensal</p>
                   </div>
                 </div>
                 
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-content-subtle">R$</span>
                   <input
                     type="number"
                     value={budgets[category.id] || ''}
                     onChange={(e) => updateBudget(category.id, e.target.value)}
                     placeholder="0,00"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all"
+                    className="w-full rounded-xl border border-line bg-canvas py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/5 transition-all"
                   />
                 </div>
               </div>
@@ -167,13 +167,13 @@ export const Budgets: React.FC = () => {
         </section>
 
         <section className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+          <div className="flex items-center gap-2 border-b border-line pb-2">
             <div className="h-2 w-2 rounded-full bg-emerald-500" />
-            <h2 className="text-lg font-bold text-gray-800">Metas de Receita</h2>
+            <h2 className="text-lg font-bold text-content">Metas de Receita</h2>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {CATEGORIES.filter(c => c.type === 'income').map((category) => (
-              <div key={category.id} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+              <div key={category.id} className="rounded-2xl border border-line bg-surface p-6 shadow-sm transition-all hover:shadow-md">
                 <div className="mb-4 flex items-center gap-3">
                   <div 
                     className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
@@ -182,19 +182,19 @@ export const Budgets: React.FC = () => {
                     <Target className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900">{category.name}</h3>
-                    <p className="text-xs text-gray-500">Meta de ganho mensal</p>
+                    <h3 className="font-bold text-content">{category.name}</h3>
+                    <p className="text-xs text-content-subtle">Meta de ganho mensal</p>
                   </div>
                 </div>
                 
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-content-subtle">R$</span>
                   <input
                     type="number"
                     value={budgets[category.id] || ''}
                     onChange={(e) => updateBudget(category.id, e.target.value)}
                     placeholder="0,00"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all"
+                    className="w-full rounded-xl border border-line bg-canvas py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/5 transition-all"
                   />
                 </div>
               </div>

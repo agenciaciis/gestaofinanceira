@@ -133,8 +133,8 @@ export const BankAccounts: React.FC = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Contas & Caixas</h2>
-          <p className="text-sm font-medium text-slate-500">Gestão centralizada de toda sua liquidez.</p>
+          <h2 className="text-3xl font-black text-content tracking-tight">Contas & Caixas</h2>
+          <p className="text-sm font-medium text-content-subtle">Gestão centralizada de toda sua liquidez.</p>
         </div>
         <button
           onClick={() => { resetForm(); setIsModalOpen(true); }}
@@ -147,33 +147,33 @@ export const BankAccounts: React.FC = () => {
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Consolidado</p>
-          <p className="mt-1 text-xl font-black text-slate-900">
+        <div className="rounded-2xl bg-surface p-4 shadow-sm border border-line">
+          <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Total Consolidado</p>
+          <p className="mt-1 text-xl font-black text-content">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.total || 0)}
           </p>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+        <div className="rounded-2xl bg-surface p-4 shadow-sm border border-line">
           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Disponível (Corrente)</p>
           <p className="mt-1 text-xl font-black text-emerald-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.corrente || 0)}
           </p>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+        <div className="rounded-2xl bg-surface p-4 shadow-sm border border-line">
           <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Investimentos</p>
           <p className="mt-1 text-xl font-black text-blue-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.investimento || 0)}
           </p>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+        <div className="rounded-2xl bg-surface p-4 shadow-sm border border-line">
           <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">Reserva</p>
           <p className="mt-1 text-xl font-black text-amber-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.reserva || 0)}
           </p>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Caixa Físico</p>
-          <p className="mt-1 text-xl font-black text-slate-600">
+        <div className="rounded-2xl bg-surface p-4 shadow-sm border border-line">
+          <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Caixa Físico</p>
+          <p className="mt-1 text-xl font-black text-content-muted">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.caixa || 0)}
           </p>
         </div>
@@ -185,42 +185,42 @@ export const BankAccounts: React.FC = () => {
             key={account.id}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="group relative rounded-3xl bg-white p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-primary/20 transition-all"
+            className="group relative rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-xl hover:border-primary/20 transition-all"
           >
             <div className="flex items-center justify-between">
               <div className={cn(
                 "flex h-12 w-12 items-center justify-center rounded-2xl",
                 account.type === 'investimento' ? "bg-blue-50 text-blue-600" :
                 account.type === 'reserva' ? "bg-amber-50 text-amber-600" :
-                account.type === 'caixa' ? "bg-slate-50 text-slate-600" : "bg-emerald-50 text-emerald-600"
+                account.type === 'caixa' ? "bg-surface-muted text-content-muted" : "bg-emerald-50 text-emerald-600"
               )}>
                 <Landmark className="h-6 w-6" />
               </div>
               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => handleEdit(account)}
-                  className="p-2 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-primary transition-colors"
+                  className="p-2 rounded-lg hover:bg-surface-muted text-content-subtle hover:text-primary transition-colors"
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
                 <button 
                   onClick={() => handleDelete(account.id)}
-                  className="p-2 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                  className="p-2 rounded-lg hover:bg-rose-50 text-content-subtle hover:text-rose-600 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
             <div className="mt-6">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">
                 {getTypeLabel(account.type)}
               </p>
-              <h3 className="text-lg font-black text-slate-900 mt-1">{account.bankName}</h3>
+              <h3 className="text-lg font-black text-content mt-1">{account.bankName}</h3>
               <div className="mt-4 flex items-baseline gap-1">
-                <span className="text-sm font-bold text-slate-400">R$</span>
+                <span className="text-sm font-bold text-content-subtle">R$</span>
                 <p className={cn(
                   "text-3xl font-black tracking-tight",
-                  getBalance(account) < 0 ? "text-rose-600" : "text-slate-900"
+                  getBalance(account) < 0 ? "text-rose-600" : "text-content"
                 )}>
                   {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(getBalance(account))}
                 </p>
@@ -230,12 +230,12 @@ export const BankAccounts: React.FC = () => {
         ))}
 
         {accounts.length === 0 && !loading && (
-          <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
-            <div className="mb-4 rounded-full bg-gray-50 p-4">
-              <Wallet className="h-8 w-8 text-gray-400" />
+          <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-line p-12 text-center">
+            <div className="mb-4 rounded-full bg-canvas p-4">
+              <Wallet className="h-8 w-8 text-content-subtle" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900">Nenhuma conta cadastrada</h3>
-            <p className="mt-1 text-gray-500">Comece cadastrando sua primeira conta bancária.</p>
+            <h3 className="text-lg font-bold text-content">Nenhuma conta cadastrada</h3>
+            <p className="mt-1 text-content-subtle">Comece cadastrando sua primeira conta bancária.</p>
             <button 
               onClick={() => setIsModalOpen(true)}
               className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
@@ -251,27 +251,27 @@ export const BankAccounts: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl"
+            className="w-full max-w-md rounded-2xl bg-surface p-8 shadow-2xl"
           >
-            <h3 className="text-xl font-bold text-gray-900">{editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</h3>
+            <h3 className="text-xl font-bold text-content">{editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Nome do Banco</label>
+                <label className="block text-sm font-medium text-content-muted">Nome do Banco</label>
                 <input
                   type="text"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   placeholder="Ex: Nubank, Itaú, Bradesco"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Tipo de Conta</label>
+                <label className="block text-sm font-medium text-content-muted">Tipo de Conta</label>
                 <select 
                   value={type}
                   onChange={(e) => setType(e.target.value as any)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 >
                   <option value="corrente">Conta Corrente</option>
                   <option value="poupanca">Poupança</option>
@@ -281,16 +281,16 @@ export const BankAccounts: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Saldo Inicial</label>
+                <label className="block text-sm font-medium text-content-muted">Saldo Inicial</label>
                 <div className="relative mt-1">
-                  <span className="absolute left-4 top-2 text-gray-500">R$</span>
+                  <span className="absolute left-4 top-2 text-content-subtle">R$</span>
                   <input
                     type="number"
                     step="0.01"
                     value={initialBalance}
                     onChange={(e) => setInitialBalance(e.target.value)}
                     placeholder="0,00"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                    className="w-full rounded-lg border border-line pl-10 pr-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                     required
                   />
                 </div>
@@ -299,7 +299,7 @@ export const BankAccounts: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setIsModalOpen(false); resetForm(); }}
-                  className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                  className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-content-muted hover:bg-canvas"
                 >
                   Cancelar
                 </button>

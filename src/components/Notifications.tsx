@@ -155,7 +155,7 @@ export const Notifications: React.FC = () => {
     <div className="relative">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="relative rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all"
+        className="relative rounded-full p-2 text-content-subtle hover:bg-surface-muted hover:text-content-muted transition-all"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -173,18 +173,18 @@ export const Notifications: React.FC = () => {
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-gray-100 bg-white p-4 shadow-2xl"
+              className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-line bg-surface p-4 shadow-2xl"
             >
               <div className="mb-4 flex items-center justify-between border-b pb-2">
-                <h3 className="text-sm font-bold text-gray-900">Notificações</h3>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{unreadCount} Pendentes</span>
+                <h3 className="text-sm font-bold text-content">Notificações</h3>
+                <span className="text-[10px] font-bold text-content-subtle uppercase tracking-wider">{unreadCount} Pendentes</span>
               </div>
 
               <div className="max-h-[400px] overflow-y-auto space-y-3">
                 {allNotifications.length === 0 ? (
                   <div className="py-8 text-center">
                     <CheckCircle2 className="mx-auto h-8 w-8 text-gray-100" />
-                    <p className="mt-2 text-xs text-gray-400">Tudo em dia por aqui!</p>
+                    <p className="mt-2 text-xs text-content-subtle">Tudo em dia por aqui!</p>
                   </div>
                 ) : (
                   allNotifications.map((n) => (
@@ -208,8 +208,8 @@ export const Notifications: React.FC = () => {
                          n.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs font-bold text-gray-900">{n.title}</p>
-                        <p className="mt-0.5 text-[10px] text-gray-600 leading-relaxed">{n.message}</p>
+                        <p className="text-xs font-bold text-content">{n.title}</p>
+                        <p className="mt-0.5 text-[10px] text-content-muted leading-relaxed">{n.message}</p>
                       </div>
                     </div>
                   ))

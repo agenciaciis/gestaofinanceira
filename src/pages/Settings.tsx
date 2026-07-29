@@ -114,8 +114,8 @@ export const Settings: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-gray-500">Gerencie sua conta e preferências do sistema</p>
+        <h1 className="text-2xl font-bold text-content">Configurações</h1>
+        <p className="text-content-subtle">Gerencie sua conta e preferências do sistema</p>
       </div>
 
       <div className="flex flex-col gap-8 lg:flex-row">
@@ -129,14 +129,14 @@ export const Settings: React.FC = () => {
                 "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition-all",
                 activeTab === item.id 
                   ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                  : "text-gray-600 hover:bg-gray-100"
+                  : "text-content-muted hover:bg-surface-muted"
               )}
             >
               <item.icon className="h-5 w-5" />
               {item.label}
             </button>
           ))}
-          <hr className="my-4 border-gray-100" />
+          <hr className="my-4 border-line" />
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 transition-all"
@@ -147,7 +147,7 @@ export const Settings: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
+        <div className="flex-1 rounded-2xl border border-line bg-surface p-8 shadow-sm">
           {activeTab === 'profile' && (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -159,22 +159,22 @@ export const Settings: React.FC = () => {
                   <User className="h-12 w-12" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">{user?.email?.split('@')[0]}</h3>
-                  <p className="text-gray-500">Membro desde Abril 2026</p>
+                  <h3 className="text-xl font-bold text-content">{user?.email?.split('@')[0]}</h3>
+                  <p className="text-content-subtle">Membro desde Abril 2026</p>
                 </div>
               </div>
 
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">E-mail</label>
-                  <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-gray-600">
+                  <label className="text-xs font-bold uppercase tracking-wider text-content-subtle">E-mail</label>
+                  <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3 text-content-muted">
                     <Mail className="h-4 w-4" />
                     <span className="text-sm">{user?.email}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">ID do Usuário</label>
-                  <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-gray-600">
+                  <label className="text-xs font-bold uppercase tracking-wider text-content-subtle">ID do Usuário</label>
+                  <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3 text-content-muted">
                     <Shield className="h-4 w-4" />
                     <span className="text-sm truncate">{user?.uid}</span>
                   </div>
@@ -203,7 +203,7 @@ export const Settings: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               className="space-y-6"
             >
-              <h3 className="text-lg font-bold text-gray-900">Preferências de Notificação</h3>
+              <h3 className="text-lg font-bold text-content">Preferências de Notificação</h3>
               <div className="space-y-4">
                 {[
                   { title: 'Lembretes de Pagamento', desc: 'Receba avisos sobre contas a vencer.' },
@@ -212,11 +212,11 @@ export const Settings: React.FC = () => {
                 ].map((item, i) => (
                   <div key={i} className="flex items-center justify-between rounded-xl border border-gray-50 p-4">
                     <div>
-                      <p className="font-bold text-gray-800">{item.title}</p>
-                      <p className="text-xs text-gray-500">{item.desc}</p>
+                      <p className="font-bold text-content">{item.title}</p>
+                      <p className="text-xs text-content-subtle">{item.desc}</p>
                     </div>
                     <div className="h-6 w-11 rounded-full bg-gray-200 p-1 cursor-not-allowed">
-                      <div className="h-4 w-4 rounded-full bg-white shadow-sm"></div>
+                      <div className="h-4 w-4 rounded-full bg-surface shadow-sm"></div>
                     </div>
                   </div>
                 ))}
@@ -232,8 +232,8 @@ export const Settings: React.FC = () => {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Integração WhatsApp (Evolution API)</h3>
-                  <p className="text-sm text-gray-500">Conecte sua conta para interagir via comandos e receber alertas.</p>
+                  <h3 className="text-lg font-bold text-content">Integração WhatsApp (Evolution API)</h3>
+                  <p className="text-sm text-content-subtle">Conecte sua conta para interagir via comandos e receber alertas.</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
@@ -242,14 +242,14 @@ export const Settings: React.FC = () => {
                       waStatus === 'connected' ? "bg-emerald-500" : 
                       waStatus === 'loading' ? "bg-amber-500" : "bg-red-500"
                     )} />
-                    <span className="text-xs font-bold text-gray-500 uppercase">
+                    <span className="text-xs font-bold text-content-subtle uppercase">
                       {waStatus === 'connected' ? 'Conectado' : 
                        waStatus === 'loading' ? 'Verificando...' : 
                        waStatus === 'disabled' ? 'Desativado' : 'Desconectado'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-400 uppercase">Bot</span>
+                    <span className="text-xs font-bold text-content-subtle uppercase">Bot</span>
                     <button
                       onClick={() => setWaEnabled(!waEnabled)}
                       className={cn(
@@ -258,7 +258,7 @@ export const Settings: React.FC = () => {
                       )}
                     >
                       <span className={cn(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                        "inline-block h-4 w-4 transform rounded-full bg-surface transition-transform",
                         waEnabled ? "translate-x-6" : "translate-x-1"
                       )} />
                     </button>
@@ -268,45 +268,45 @@ export const Settings: React.FC = () => {
 
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">URL da API</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-content-subtle">URL da API</label>
                   <input
                     type="text"
                     value={waApiUrl}
                     onChange={(e) => setWaApiUrl(e.target.value)}
                     placeholder="https://api.sua-instancia.com"
-                    className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-primary transition-all"
+                    className="w-full rounded-xl border border-line bg-canvas px-4 py-3 text-sm outline-none focus:border-primary transition-all"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">API Key</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-content-subtle">API Key</label>
                   <input
                     type="password"
                     value={waApiKey}
                     onChange={(e) => setWaApiKey(e.target.value)}
                     placeholder="Sua chave de API"
-                    className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-primary transition-all"
+                    className="w-full rounded-xl border border-line bg-canvas px-4 py-3 text-sm outline-none focus:border-primary transition-all"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Nome da Instância</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-content-subtle">Nome da Instância</label>
                   <input
                     type="text"
                     value={waInstance}
                     onChange={(e) => setWaInstance(e.target.value)}
                     placeholder="Ex: Financeiro"
-                    className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-primary transition-all"
+                    className="w-full rounded-xl border border-line bg-canvas px-4 py-3 text-sm outline-none focus:border-primary transition-all"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Seu Número (WhatsApp)</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-content-subtle">Seu Número (WhatsApp)</label>
                   <input
                     type="text"
                     value={waPhone}
                     onChange={(e) => setWaPhone(e.target.value)}
                     placeholder="Ex: 5511999999999"
-                    className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-primary transition-all"
+                    className="w-full rounded-xl border border-line bg-canvas px-4 py-3 text-sm outline-none focus:border-primary transition-all"
                   />
-                  <p className="text-[10px] text-gray-400">Apenas este número poderá enviar comandos ao bot.</p>
+                  <p className="text-[10px] text-content-subtle">Apenas este número poderá enviar comandos ao bot.</p>
                 </div>
               </div>
 
@@ -319,7 +319,7 @@ export const Settings: React.FC = () => {
                   <p className="text-sm text-indigo-700 mb-4">
                     Para que o bot responda aos seus comandos, configure este Webhook na Evolution API:
                   </p>
-                  <div className="flex items-center gap-3 rounded-lg bg-white p-3 border border-indigo-200">
+                  <div className="flex items-center gap-3 rounded-lg bg-surface p-3 border border-indigo-200">
                     <code className="text-xs font-mono text-indigo-600 flex-1 break-all">
                       {window.location.origin}/api/whatsapp/webhook
                     </code>
@@ -367,7 +367,7 @@ export const Settings: React.FC = () => {
                 <button
                   onClick={handleTestWhatsApp}
                   disabled={isSaving || !waEnabled}
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl border border-line px-6 py-3 text-sm font-bold text-content-muted hover:bg-canvas transition-all disabled:opacity-50"
                 >
                   Testar Conexão
                   <ExternalLink className="h-4 w-4" />
@@ -390,7 +390,7 @@ export const Settings: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               className="space-y-6"
             >
-              <h3 className="text-lg font-bold text-gray-900">Gerenciamento de Dados</h3>
+              <h3 className="text-lg font-bold text-content">Gerenciamento de Dados</h3>
               <div className="rounded-xl border border-red-100 bg-red-50 p-6">
                 <h4 className="mb-2 font-bold text-red-900">Zona de Perigo</h4>
                 <p className="mb-4 text-sm text-red-700">

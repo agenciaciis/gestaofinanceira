@@ -410,7 +410,7 @@ export const Quotes: React.FC = () => {
       <div className="rounded-[2.5rem] bg-blue-50 dark:bg-gradient-to-br dark:from-blue-900 dark:to-indigo-950 p-8 text-blue-900 dark:text-white shadow-xl shadow-blue-100 dark:shadow-none relative overflow-hidden group border border-blue-100 dark:border-blue-900/30">
         <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white dark:bg-white/10 backdrop-blur-md border border-blue-200 dark:border-white/30 shadow-inner">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-surface dark:bg-white/10 backdrop-blur-md border border-blue-200 dark:border-white/30 shadow-inner">
               <Briefcase className="h-10 w-10 text-blue-600 dark:text-white" />
             </div>
             <div>
@@ -438,13 +438,13 @@ export const Quotes: React.FC = () => {
       {/* Search & Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:w-96">
-          <Search className="absolute left-4 top-3 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-4 top-3 h-5 w-5 text-content-subtle" />
           <input 
             type="text"
             placeholder="Buscar por cliente ou número..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-2xl border border-gray-200 bg-white pl-12 pr-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+            className="w-full rounded-2xl border border-line bg-surface pl-12 pr-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
           />
         </div>
       </div>
@@ -455,7 +455,7 @@ export const Quotes: React.FC = () => {
           <motion.div 
             layout
             key={quote.id}
-            className="group relative rounded-3xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all"
+            className="group relative rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-md transition-all"
           >
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
               <div className="flex-1">
@@ -465,7 +465,7 @@ export const Quotes: React.FC = () => {
                     "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
                     quote.status === 'approved' ? "bg-emerald-100 text-emerald-700" :
                     quote.status === 'sent' ? "bg-blue-100 text-blue-700" :
-                    quote.status === 'rejected' ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
+                    quote.status === 'rejected' ? "bg-red-100 text-red-700" : "bg-surface-muted text-content-muted"
                   )}>
                     {quote.status === 'draft' ? 'Rascunho' : 
                      quote.status === 'sent' ? 'Enviado' :
@@ -473,8 +473,8 @@ export const Quotes: React.FC = () => {
                      quote.status === 'rejected' ? 'Recusado' : 'Convertido'}
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">{quote.clientName}</h3>
-                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-gray-400">
+                <h3 className="text-lg font-bold text-content">{quote.clientName}</h3>
+                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-content-subtle">
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
                     {format(new Date(quote.date), 'dd/MM/yyyy')}
@@ -491,10 +491,10 @@ export const Quotes: React.FC = () => {
               </div>
 
               <div className="flex flex-col items-end gap-1">
-                <p className="text-2xl font-black text-gray-900">
+                <p className="text-2xl font-black text-content">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(quote.total)}
                 </p>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                <p className="text-xs font-bold text-content-subtle uppercase tracking-widest">
                   {quote.paymentMethod} {quote.installments > 1 ? `(${quote.installments}x)` : ''}
                 </p>
               </div>
@@ -502,28 +502,28 @@ export const Quotes: React.FC = () => {
               <div className="flex items-center gap-2 border-t pt-4 sm:border-t-0 sm:pt-0 sm:pl-6 sm:border-l">
                 <button 
                   onClick={() => exportPDF(quote)}
-                  className="rounded-xl p-2.5 text-gray-400 hover:bg-gray-50 hover:text-primary transition-all"
+                  className="rounded-xl p-2.5 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
                   title="Exportar PDF"
                 >
                   <Printer className="h-5 w-5" />
                 </button>
                 <button 
                   onClick={() => handleEdit(quote)}
-                  className="rounded-xl p-2.5 text-gray-400 hover:bg-gray-50 hover:text-primary transition-all"
+                  className="rounded-xl p-2.5 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
                 >
                   <Edit2 className="h-5 w-5" />
                 </button>
                 <button 
                   onClick={() => handleDelete(quote.id)}
-                  className="rounded-xl p-2.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"
+                  className="rounded-xl p-2.5 text-content-subtle hover:bg-red-50 hover:text-red-500 transition-all"
                 >
                   <Trash2 className="h-5 w-5" />
                 </button>
                 <div className="relative group/status">
-                  <button className="rounded-xl bg-gray-50 p-2.5 text-gray-400 hover:bg-gray-100 transition-all">
+                  <button className="rounded-xl bg-canvas p-2.5 text-content-subtle hover:bg-surface-muted transition-all">
                     <ChevronRight className="h-5 w-5" />
                   </button>
-                  <div className="absolute right-0 top-full z-10 mt-2 hidden w-40 rounded-xl border bg-white p-2 shadow-xl group-hover/status:block">
+                  <div className="absolute right-0 top-full z-10 mt-2 hidden w-40 rounded-xl border bg-surface p-2 shadow-xl group-hover/status:block">
                     <button onClick={() => updateStatus(quote.id, 'sent')} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-blue-600 hover:bg-blue-50">Marcar como Enviado</button>
                     <button onClick={() => updateStatus(quote.id, 'approved')} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50">Marcar como Aprovado</button>
                     <button onClick={() => updateStatus(quote.id, 'rejected')} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50">Marcar como Recusado</button>
@@ -543,27 +543,27 @@ export const Quotes: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-4xl rounded-[2rem] bg-white p-8 shadow-2xl overflow-y-auto max-h-[95vh]"
+              className="w-full max-w-4xl rounded-[2rem] bg-surface p-8 shadow-2xl overflow-y-auto max-h-[95vh]"
             >
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <Calculator className="h-6 w-6" />
                   </div>
-                  <h3 className="text-xl font-black text-gray-900 tracking-tight">
+                  <h3 className="text-xl font-black text-content tracking-tight">
                     {editingQuote ? 'Editar Orçamento' : 'Novo Orçamento'}
                   </h3>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="rounded-full p-2 hover:bg-gray-100">
-                  <X className="h-6 w-6 text-gray-400" />
+                <button onClick={() => setIsModalOpen(false)} className="rounded-full p-2 hover:bg-surface-muted">
+                  <X className="h-6 w-6 text-content-subtle" />
                 </button>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-8">
                 {/* Client Section */}
-                <div className="rounded-3xl bg-gray-50 p-6 space-y-4">
+                <div className="rounded-3xl bg-canvas p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-black uppercase tracking-widest text-gray-400">Informações do Cliente</h4>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-content-subtle">Informações do Cliente</h4>
                     <button 
                       type="button"
                       onClick={() => setIsNewClient(!isNewClient)}
@@ -580,7 +580,7 @@ export const Quotes: React.FC = () => {
                         placeholder="Nome do Cliente"
                         value={newClientName}
                         onChange={(e) => setNewClientName(e.target.value)}
-                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                        className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface"
                         required
                       />
                       <input 
@@ -588,14 +588,14 @@ export const Quotes: React.FC = () => {
                         placeholder="E-mail"
                         value={newClientEmail}
                         onChange={(e) => setNewClientEmail(e.target.value)}
-                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                        className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface"
                       />
                     </div>
                   ) : (
                     <select 
                       value={selectedClientId}
                       onChange={(e) => setSelectedClientId(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                      className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface"
                       required
                     >
                       <option value="">Selecione um cliente...</option>
@@ -607,22 +607,22 @@ export const Quotes: React.FC = () => {
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 ml-1">Data do Orçamento</label>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Data do Orçamento</label>
                       <input 
                         type="date"
                         value={quoteDate}
                         onChange={(e) => setQuoteDate(e.target.value)}
-                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                        className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 ml-1">Validade</label>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Validade</label>
                       <input 
                         type="date"
                         value={validUntil}
                         onChange={(e) => setValidUntil(e.target.value)}
-                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                        className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface"
                         required
                       />
                     </div>
@@ -632,7 +632,7 @@ export const Quotes: React.FC = () => {
                 {/* Items Section */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-black uppercase tracking-widest text-gray-400">Itens do Orçamento</h4>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-content-subtle">Itens do Orçamento</h4>
                     <div className="flex gap-2">
                       <button 
                         type="button"
@@ -658,14 +658,14 @@ export const Quotes: React.FC = () => {
                       <motion.div 
                         layout
                         key={item.id}
-                        className="grid gap-4 sm:grid-cols-12 items-end rounded-2xl border border-gray-100 p-4 bg-white shadow-sm"
+                        className="grid gap-4 sm:grid-cols-12 items-end rounded-2xl border border-line p-4 bg-surface shadow-sm"
                       >
                         <div className="sm:col-span-5">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Item / Descrição</label>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Item / Descrição</label>
                           <select 
                             value={item.referenceId || ''}
                             onChange={(e) => updateItem(item.id, { referenceId: e.target.value })}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
+                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
                           >
                             <option value="">Selecione...</option>
                             {item.type === 'service' ? (
@@ -676,26 +676,26 @@ export const Quotes: React.FC = () => {
                           </select>
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Qtd</label>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Qtd</label>
                           <input 
                             type="number"
                             value={item.quantity}
                             onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) })}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
+                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Unitário</label>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Unitário</label>
                           <input 
                             type="number"
                             value={item.unitPrice}
                             onChange={(e) => updateItem(item.id, { unitPrice: parseFloat(e.target.value) })}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
+                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Total</label>
-                          <p className="px-3 py-2 text-sm font-bold text-gray-900">
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Total</label>
+                          <p className="px-3 py-2 text-sm font-bold text-content">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
                           </p>
                         </div>
@@ -703,7 +703,7 @@ export const Quotes: React.FC = () => {
                           <button 
                             type="button"
                             onClick={() => removeItem(item.id)}
-                            className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                            className="rounded-lg p-2 text-content-subtle hover:bg-red-50 hover:text-red-500"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -715,15 +715,15 @@ export const Quotes: React.FC = () => {
 
                 {/* Payment & Recurrence */}
                 <div className="grid gap-6 sm:grid-cols-2">
-                  <div className="rounded-3xl bg-gray-50 p-6 space-y-4">
-                    <h4 className="text-sm font-black uppercase tracking-widest text-gray-400">Pagamento</h4>
+                  <div className="rounded-3xl bg-canvas p-6 space-y-4">
+                    <h4 className="text-sm font-black uppercase tracking-widest text-content-subtle">Pagamento</h4>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 ml-1">Forma</label>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Forma</label>
                         <select 
                           value={paymentMethod}
                           onChange={(e) => setPaymentMethod(e.target.value)}
-                          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary bg-white"
+                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
                         >
                           <option value="PIX">PIX</option>
                           <option value="Cartão de Crédito">Cartão de Crédito</option>
@@ -732,22 +732,22 @@ export const Quotes: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 ml-1">Parcelas</label>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Parcelas</label>
                         <input 
                           type="number"
                           min="1"
                           max="12"
                           value={installments}
                           onChange={(e) => setInstallments(parseInt(e.target.value))}
-                          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary bg-white"
+                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-3xl bg-gray-50 p-6 space-y-4">
+                  <div className="rounded-3xl bg-canvas p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-black uppercase tracking-widest text-gray-400">Recorrência</h4>
+                      <h4 className="text-sm font-black uppercase tracking-widest text-content-subtle">Recorrência</h4>
                       <button 
                         type="button"
                         onClick={() => setRecurrenceEnabled(!recurrenceEnabled)}
@@ -757,7 +757,7 @@ export const Quotes: React.FC = () => {
                         )}
                       >
                         <span className={cn(
-                          "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                          "inline-block h-4 w-4 transform rounded-full bg-surface transition-transform",
                           recurrenceEnabled ? "translate-x-6" : "translate-x-1"
                         )} />
                       </button>
@@ -765,11 +765,11 @@ export const Quotes: React.FC = () => {
                     {recurrenceEnabled && (
                       <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                         <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 ml-1">Frequência</label>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Frequência</label>
                           <select 
                             value={recurrenceFrequency}
                             onChange={(e) => setRecurrenceFrequency(e.target.value as any)}
-                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-primary bg-white"
+                            className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
                           >
                             <option value="monthly">Mensal</option>
                             <option value="weekly">Semanal</option>
@@ -783,11 +783,11 @@ export const Quotes: React.FC = () => {
 
                 {/* Notes */}
                 <div>
-                  <label className="block text-sm font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Observações</label>
+                  <label className="block text-sm font-black uppercase tracking-widest text-content-subtle mb-2 ml-1">Observações</label>
                   <textarea 
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-primary transition-all min-h-[100px]"
+                    className="w-full rounded-2xl border border-line px-4 py-3 outline-none focus:border-primary transition-all min-h-[100px]"
                     placeholder="Condições especiais, prazos de entrega..."
                   />
                 </div>
@@ -795,13 +795,13 @@ export const Quotes: React.FC = () => {
                 {/* Summary & Actions */}
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between border-t pt-8">
                   <div className="space-y-1">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Resumo do Orçamento</p>
+                    <p className="text-xs font-bold text-content-subtle uppercase tracking-widest">Resumo do Orçamento</p>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-gray-900">
+                      <span className="text-3xl font-black text-content">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
                       </span>
                       {installments > 1 && (
-                        <span className="text-sm font-bold text-gray-400">
+                        <span className="text-sm font-bold text-content-subtle">
                           ({installments}x de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total / installments)})
                         </span>
                       )}
@@ -812,7 +812,7 @@ export const Quotes: React.FC = () => {
                     <button 
                       type="button"
                       onClick={() => setIsModalOpen(false)}
-                      className="rounded-xl border border-gray-200 px-6 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all"
+                      className="rounded-xl border border-line px-6 py-3 text-sm font-bold text-content-muted hover:bg-canvas transition-all"
                     >
                       Cancelar
                     </button>

@@ -83,25 +83,25 @@ export const CrossEntityTransferModal: React.FC<Props> = ({ onClose }) => {
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-lg rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-2xl"
+        className="w-full max-w-lg rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
             <ArrowRightLeft className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-gray-100">Movimento entre PF e PJ</h3>
-            <p className="text-sm text-slate-500">Cria as duas pontas de uma vez, já vinculadas.</p>
+            <h3 className="text-xl font-black text-content dark:text-gray-100">Movimento entre PF e PJ</h3>
+            <p className="text-sm text-content-subtle">Cria as duas pontas de uma vez, já vinculadas.</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo</label>
+            <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Tipo</label>
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as CrossEntityKind)}
-              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+              className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
             >
               {Object.entries(CROSS_ENTITY_KIND_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -111,21 +111,21 @@ export const CrossEntityTransferModal: React.FC<Props> = ({ onClose }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Sai de</label>
+              <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Sai de</label>
               <select
                 value={fromEntityId}
                 onChange={(e) => setFromEntityId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
               >
                 {entities.map(en => <option key={en.id} value={en.id}>{en.name} ({en.type})</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Entra em</label>
+              <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Entra em</label>
               <select
                 value={toEntityId}
                 onChange={(e) => setToEntityId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
               >
                 {entities.map(en => <option key={en.id} value={en.id}>{en.name} ({en.type})</option>)}
               </select>
@@ -134,26 +134,26 @@ export const CrossEntityTransferModal: React.FC<Props> = ({ onClose }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor</label>
+              <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Valor</label>
               <input
                 type="number" step="0.01" min="0.01" required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Data</label>
+              <label className="block text-sm font-medium text-content-muted dark:text-gray-300">Data</label>
               <input
                 type="date" required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                className="mt-1 w-full rounded-lg border border-line dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
           </div>
 
-          <p className="rounded-xl bg-slate-50 dark:bg-gray-800/60 p-3 text-xs text-slate-500 dark:text-slate-400">
+          <p className="rounded-xl bg-surface-muted dark:bg-gray-800/60 p-3 text-xs text-content-subtle dark:text-slate-400">
             Isso não é receita nova: no consolidado do grupo as duas pontas se anulam. Cada entidade
             continua vendo o movimento na sua própria conta.
           </p>
@@ -161,7 +161,7 @@ export const CrossEntityTransferModal: React.FC<Props> = ({ onClose }) => {
           <div className="flex gap-3 pt-2">
             <button
               type="button" onClick={onClose}
-              className="flex-1 rounded-2xl border border-slate-200 dark:border-gray-700 py-3 text-sm font-bold text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800"
+              className="flex-1 rounded-2xl border border-line dark:border-gray-700 py-3 text-sm font-bold text-content-muted dark:text-gray-400 hover:bg-surface-muted dark:hover:bg-gray-800"
             >
               Cancelar
             </button>

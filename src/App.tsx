@@ -57,8 +57,8 @@ const AppContent: React.FC = () => {
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
         {showTimeout && (
           <div className="text-center">
-            <p className="text-sm text-gray-500">O carregamento está demorando mais que o esperado...</p>
-            <p className="text-xs text-gray-400 mt-1">Verifique sua conexão ou as configurações do Firebase.</p>
+            <p className="text-sm text-content-subtle">O carregamento está demorando mais que o esperado...</p>
+            <p className="text-xs text-content-subtle mt-1">Verifique sua conexão ou as configurações do Firebase.</p>
             <button 
               onClick={() => window.location.reload()}
               className="mt-4 text-xs font-bold text-primary underline"

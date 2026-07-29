@@ -46,76 +46,17 @@
 
 @layer base {
   * {
-    @apply border-gray-200 dark:border-gray-800;
+    @apply border-line;
   }
   body {
-    @apply bg-gray-50 text-gray-900 font-sans antialiased dark:bg-gray-950 dark:text-gray-100;
+    @apply bg-canvas text-content font-sans antialiased;
   }
 }
 
-/* Global Dark Mode Overrides for hardcoded light-mode classes.
-   TRANSITÓRIO: some conforme as telas migram para os tokens semânticos.
-   Enquanto existir, o !important daqui vence as classes `dark:` dos
-   componentes — por isso a migração precisa terminar. */
+/* Contraste no MODO CLARO para textos secundários que ficavam fracos.
+   Mantido: é ajuste de legibilidade, não remendo de tema. */
 @layer utilities {
-  .dark .bg-white { background-color: #111827 !important; }
-  .dark .bg-gray-50 { background-color: #030712 !important; }
-  .dark .bg-slate-50 { background-color: #1f2937 !important; }
-  .dark .bg-slate-100 { background-color: #1f2937 !important; }
-  
-  .dark .text-gray-900 { color: #f9fafb !important; }
-  .dark .text-slate-900 { color: #f9fafb !important; }
-  .dark .text-gray-800 { color: #f3f4f6 !important; }
-  .dark .text-slate-800 { color: #f3f4f6 !important; }
-  .dark .text-gray-700 { color: #e5e7eb !important; }
-  .dark .text-slate-700 { color: #e5e7eb !important; }
-  .dark .text-gray-600 { color: #d1d5db !important; }
-  .dark .text-slate-600 { color: #d1d5db !important; }
-  .dark .text-gray-500 { color: #9ca3af !important; }
-  .dark .text-slate-500 { color: #9ca3af !important; }
-  .dark .text-gray-400 { color: #6b7280 !important; }
-  .dark .text-slate-400 { color: #6b7280 !important; }
-  
-  .dark .border-gray-50 { border-color: #1f2937 !important; }
-  .dark .border-slate-50 { border-color: #1f2937 !important; }
-  .dark .border-gray-100 { border-color: #1f2937 !important; }
-  .dark .border-slate-100 { border-color: #1f2937 !important; }
-  .dark .border-gray-200 { border-color: #374151 !important; }
-  .dark .border-slate-200 { border-color: #374151 !important; }
-
-  /* Soft backgrounds for status indicators */
-  .dark .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.3) !important; }
-  .dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.4) !important; }
-  .dark .text-emerald-600 { color: #34d399 !important; }
-  
-  .dark .bg-rose-50 { background-color: rgba(159, 18, 57, 0.3) !important; }
-  .dark .bg-rose-100 { background-color: rgba(159, 18, 57, 0.4) !important; }
-  .dark .text-rose-600 { color: #fb7185 !important; }
-  
-  .dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.3) !important; }
-  .dark .bg-blue-100 { background-color: rgba(30, 58, 138, 0.4) !important; }
-  .dark .text-blue-600 { color: #60a5fa !important; }
-  
-  .dark .bg-amber-50 { background-color: rgba(120, 53, 15, 0.3) !important; }
-  .dark .bg-amber-100 { background-color: rgba(120, 53, 15, 0.4) !important; }
-  .dark .text-amber-600 { color: #fbbf24 !important; }
-
-  .dark .bg-slate-900\/60 { background-color: rgba(0, 0, 0, 0.8) !important; }
-
-  /* Specific fix for header in light mode */
-  :root:not(.dark) header {
-    background-color: #ffffff !important;
-  }
-
-  /* Contraste no MODO CLARO: cinzas muito claros ficavam quase ilegíveis.
-     Sobe um tom os textos secundários mais fracos (mantém a hierarquia). */
-  :root:not(.dark) .text-gray-400 { color: #6b7280 !important; }   /* -> gray-500 */
-  :root:not(.dark) .text-slate-400 { color: #64748b !important; }  /* -> slate-500 */
-  :root:not(.dark) .text-gray-500 { color: #4b5563 !important; }   /* -> gray-600 */
-  :root:not(.dark) .text-slate-500 { color: #475569 !important; }  /* -> slate-600 */
-
-  .bg-slate-900:not(.dark *) { @apply bg-slate-50 text-slate-900 border border-slate-200; }
-  .bg-indigo-900:not(.dark *) { @apply bg-indigo-50 text-indigo-900 border border-indigo-200; }
+  :root:not(.dark) .text-content-subtle { color: #475569; }
 }
 
 /* ===== Legibilidade e modernização dos campos de formulário ===== */

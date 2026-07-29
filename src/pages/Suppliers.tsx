@@ -187,8 +187,8 @@ export const Suppliers: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Fornecedores e Locais</h2>
-          <p className="text-sm text-gray-500">Cadastre locais e pessoas que você precisa pagar.</p>
+          <h2 className="text-2xl font-bold text-content">Fornecedores e Locais</h2>
+          <p className="text-sm text-content-subtle">Cadastre locais e pessoas que você precisa pagar.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
@@ -200,13 +200,13 @@ export const Suppliers: React.FC = () => {
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle" />
         <input
           type="text"
           placeholder="Buscar por nome, categoria ou documento..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+          className="w-full rounded-xl border border-line bg-surface py-3 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
         />
       </div>
 
@@ -221,17 +221,17 @@ export const Suppliers: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-md transition-all"
+                className="group relative overflow-hidden rounded-2xl border border-line bg-surface p-6 shadow-sm hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-50 text-gray-600 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-canvas text-content-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                     <CategoryIcon className="h-6 w-6" />
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleEdit(supplier)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-primary transition-all">
+                    <button onClick={() => handleEdit(supplier)} className="rounded-lg p-2 text-content-subtle hover:bg-canvas hover:text-primary transition-all">
                       <Edit2 className="h-4 w-4" />
                     </button>
-                    <button onClick={() => handleDelete(supplier)} className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all">
+                    <button onClick={() => handleDelete(supplier)} className="rounded-lg p-2 text-content-subtle hover:bg-red-50 hover:text-red-600 transition-all">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -241,9 +241,9 @@ export const Suppliers: React.FC = () => {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/5 px-2 py-0.5 rounded-full">
                     {SUPPLIER_CATEGORIES.find(c => c.id === supplier.category)?.name || 'Outros'}
                   </span>
-                  <h3 className="mt-2 text-lg font-bold text-gray-900">{supplier.name}</h3>
+                  <h3 className="mt-2 text-lg font-bold text-content">{supplier.name}</h3>
                   {supplier.cnpjOrCpf && (
-                    <p className="text-[10px] text-gray-400 font-medium mt-1">Doc: {supplier.cnpjOrCpf}</p>
+                    <p className="text-[10px] text-content-subtle font-medium mt-1">Doc: {supplier.cnpjOrCpf}</p>
                   )}
                 </div>
 
@@ -264,23 +264,23 @@ export const Suppliers: React.FC = () => {
                   )}
 
                   {supplier.bankInfo?.bank && (
-                    <div className="rounded-lg border border-gray-100 p-2 space-y-1">
-                      <p className="text-[8px] font-bold uppercase text-gray-400">Dados Bancários</p>
-                      <p className="text-xs font-bold text-gray-700">{supplier.bankInfo.bank}</p>
-                      <div className="flex gap-4 text-[10px] text-gray-500">
+                    <div className="rounded-lg border border-line p-2 space-y-1">
+                      <p className="text-[8px] font-bold uppercase text-content-subtle">Dados Bancários</p>
+                      <p className="text-xs font-bold text-content-muted">{supplier.bankInfo.bank}</p>
+                      <div className="flex gap-4 text-[10px] text-content-subtle">
                         <span>Ag: {supplier.bankInfo.agency}</span>
                         <span>Cc: {supplier.bankInfo.account}</span>
                       </div>
                     </div>
                   )}
 
-                  <div className="flex items-center gap-4 text-gray-400 mt-2">
+                  <div className="flex items-center gap-4 text-content-subtle mt-2">
                     {supplier.email && <Mail className="h-4 w-4" title={supplier.email} />}
                     {supplier.phone && <Phone className="h-4 w-4" title={supplier.phone} />}
                   </div>
                 </div>
 
-                <div className="absolute bottom-0 left-0 h-1 w-full bg-gray-100 group-hover:bg-primary transition-colors" />
+                <div className="absolute bottom-0 left-0 h-1 w-full bg-surface-muted group-hover:bg-primary transition-colors" />
               </motion.div>
             );
           })}
@@ -292,24 +292,24 @@ export const Suppliers: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden"
+            className="w-full max-w-lg rounded-2xl bg-surface shadow-2xl overflow-hidden"
           >
             <div className="p-6 border-b flex items-center justify-between bg-gray-50/50">
-              <h3 className="text-xl font-bold text-gray-900">
+              <h3 className="text-xl font-bold text-content">
                 {editingSupplier ? 'Editar Cadastro' : 'Novo Fornecedor/Local'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 transition-all">
+              <button onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted transition-all">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Entidade Responsável</label>
+                <label className="block text-sm font-medium text-content-muted">Entidade Responsável</label>
                 <select 
                   value={targetEntityId}
                   onChange={(e) => setTargetEntityId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                   required
                 >
                   <option value="">Selecione...</option>
@@ -319,15 +319,15 @@ export const Suppliers: React.FC = () => {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Nome / Razão Social</label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" required />
+                  <label className="block text-sm font-medium text-content-muted">Nome / Razão Social</label>
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Categoria</label>
+                  <label className="block text-sm font-medium text-content-muted">Categoria</label>
                   <select 
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   >
                     <option value="">Selecione...</option>
@@ -338,40 +338,40 @@ export const Suppliers: React.FC = () => {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">CNPJ ou CPF</label>
-                  <input type="text" value={cnpjOrCpf} onChange={(e) => setCnpjOrCpf(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-sm font-medium text-content-muted">CNPJ ou CPF</label>
+                  <input type="text" value={cnpjOrCpf} onChange={(e) => setCnpjOrCpf(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Telefone</label>
-                  <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-sm font-medium text-content-muted">Telefone</label>
+                  <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Chave PIX</label>
-                <input type="text" value={pixKey} onChange={(e) => setPixKey(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" placeholder="CPF, Email, Telefone ou Aleatória" />
+                <label className="block text-sm font-medium text-content-muted">Chave PIX</label>
+                <input type="text" value={pixKey} onChange={(e) => setPixKey(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" placeholder="CPF, Email, Telefone ou Aleatória" />
               </div>
 
-              <div className="rounded-xl bg-gray-50 p-4 space-y-4">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dados Bancários (DOC/TED)</p>
+              <div className="rounded-xl bg-canvas p-4 space-y-4">
+                <p className="text-xs font-bold text-content-subtle uppercase tracking-wider">Dados Bancários (DOC/TED)</p>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="sm:col-span-1">
-                    <label className="block text-[10px] font-bold text-gray-400">Banco</label>
-                    <input type="text" value={bank} onChange={(e) => setBank(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm" />
+                    <label className="block text-[10px] font-bold text-content-subtle">Banco</label>
+                    <input type="text" value={bank} onChange={(e) => setBank(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400">Agência</label>
-                    <input type="text" value={agency} onChange={(e) => setAgency(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm" />
+                    <label className="block text-[10px] font-bold text-content-subtle">Agência</label>
+                    <input type="text" value={agency} onChange={(e) => setAgency(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400">Conta</label>
-                    <input type="text" value={account} onChange={(e) => setAccount(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm" />
+                    <label className="block text-[10px] font-bold text-content-subtle">Conta</label>
+                    <input type="text" value={account} onChange={(e) => setAccount(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm" />
                   </div>
                 </div>
               </div>
 
               <div className="flex gap-3 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancelar</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-lg border border-line py-2.5 text-sm font-semibold text-content-muted hover:bg-canvas">Cancelar</button>
                 <button type="submit" className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90 shadow-md shadow-primary/20">
                   {editingSupplier ? 'Salvar Alterações' : 'Cadastrar'}
                 </button>

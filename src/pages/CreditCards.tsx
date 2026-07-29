@@ -205,8 +205,8 @@ export const CreditCards: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Cartões de Crédito</h2>
-          <p className="text-sm text-gray-500">Controle seus limites e faturas.</p>
+          <h2 className="text-2xl font-bold text-content">Cartões de Crédito</h2>
+          <p className="text-sm text-content-subtle">Controle seus limites e faturas.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -231,7 +231,7 @@ export const CreditCards: React.FC = () => {
               className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 dark:from-slate-900 dark:to-slate-950 p-6 text-white shadow-xl dark:shadow-none border border-white/10 dark:border-slate-800"
             >
               <div className="flex items-center justify-between">
-                <CardIcon className="h-8 w-8 text-gray-400" />
+                <CardIcon className="h-8 w-8 text-content-subtle" />
                 <div className="flex gap-2">
                   <button 
                     onClick={() => handleEdit(card)}
@@ -249,13 +249,13 @@ export const CreditCards: React.FC = () => {
               </div>
               
               <div className="mt-6">
-                <p className="text-xs font-medium uppercase tracking-widest text-gray-400">{card.brand || 'Cartão'}</p>
+                <p className="text-xs font-medium uppercase tracking-widest text-content-subtle">{card.brand || 'Cartão'}</p>
                 <h3 className="text-xl font-bold">{card.name}</h3>
               </div>
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <div className="mb-1 flex justify-between text-[10px] uppercase tracking-wider text-gray-400">
+                  <div className="mb-1 flex justify-between text-[10px] uppercase tracking-wider text-content-subtle">
                     <span>Limite Utilizado</span>
                     <span>{usagePercentage.toFixed(1)}%</span>
                   </div>
@@ -272,13 +272,13 @@ export const CreditCards: React.FC = () => {
 
                 <div className="flex justify-between">
                   <div>
-                    <p className="text-[10px] uppercase text-gray-400">Disponível</p>
+                    <p className="text-[10px] uppercase text-content-subtle">Disponível</p>
                     <p className="text-sm font-bold text-green-400">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(availableLimit)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] uppercase text-gray-400">Limite Total</p>
+                    <p className="text-[10px] uppercase text-content-subtle">Limite Total</p>
                     <p className="text-sm font-bold">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.limit)}
                     </p>
@@ -287,18 +287,18 @@ export const CreditCards: React.FC = () => {
 
                 <div className="flex justify-between border-t border-white/10 pt-4">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-3 w-3 text-gray-400" />
+                    <Calendar className="h-3 w-3 text-content-subtle" />
                     <div>
-                      <p className="text-[8px] uppercase text-gray-400">Fechamento</p>
+                      <p className="text-[8px] uppercase text-content-subtle">Fechamento</p>
                       <p className="text-xs font-bold">Dia {card.closingDay}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-right">
                     <div>
-                      <p className="text-[8px] uppercase text-gray-400">Vencimento</p>
+                      <p className="text-[8px] uppercase text-content-subtle">Vencimento</p>
                       <p className="text-xs font-bold">Dia {card.dueDay}</p>
                     </div>
-                    <Info className="h-3 w-3 text-gray-400" />
+                    <Info className="h-3 w-3 text-content-subtle" />
                   </div>
                 </div>
 
@@ -346,16 +346,16 @@ export const CreditCards: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-4xl rounded-3xl bg-white p-8 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
+              className="w-full max-w-4xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
             >
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Histórico de Faturas</h3>
-                  <p className="text-sm text-gray-500">{selectedCardForInvoices.name} - Detalhamento de Lançamentos</p>
+                  <h3 className="text-xl font-bold text-content">Histórico de Faturas</h3>
+                  <p className="text-sm text-content-subtle">{selectedCardForInvoices.name} - Detalhamento de Lançamentos</p>
                 </div>
                 <button 
                   onClick={() => setSelectedCardForInvoices(null)}
-                  className="rounded-full p-2 hover:bg-gray-100 text-gray-400 transition-all"
+                  className="rounded-full p-2 hover:bg-surface-muted text-content-subtle transition-all"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -376,7 +376,7 @@ export const CreditCards: React.FC = () => {
 
                   if (sortedMonths.length === 0) {
                     return (
-                      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                      <div className="flex flex-col items-center justify-center py-12 text-content-subtle">
                         <ReceiptText className="h-12 w-12 opacity-20 mb-4" />
                         <p>Nenhum lançamento encontrado para este cartão.</p>
                       </div>
@@ -391,29 +391,29 @@ export const CreditCards: React.FC = () => {
                     const date = new Date(parseInt(year), parseInt(month) - 1);
 
                     return (
-                      <div key={monthKey} className="rounded-2xl border border-gray-100 overflow-hidden">
+                      <div key={monthKey} className="rounded-2xl border border-line overflow-hidden">
                         <button 
                           onClick={() => setExpandedInvoice(isExpanded ? null : monthKey)}
-                          className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-all"
+                          className="w-full flex items-center justify-between p-4 bg-canvas hover:bg-surface-muted transition-all"
                         >
                           <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-xl bg-white flex flex-col items-center justify-center shadow-sm">
-                              <span className="text-[10px] font-bold uppercase text-gray-400">{format(date, 'MMM', { locale: ptBR })}</span>
-                              <span className="text-sm font-black text-gray-900">{format(date, 'yyyy')}</span>
+                            <div className="h-10 w-10 rounded-xl bg-surface flex flex-col items-center justify-center shadow-sm">
+                              <span className="text-[10px] font-bold uppercase text-content-subtle">{format(date, 'MMM', { locale: ptBR })}</span>
+                              <span className="text-sm font-black text-content">{format(date, 'yyyy')}</span>
                             </div>
                             <div className="text-left">
-                              <p className="text-sm font-bold text-gray-900">Fatura de {format(date, 'MMMM', { locale: ptBR })}</p>
-                              <p className="text-xs text-gray-500">{monthTransactions.length} lançamentos</p>
+                              <p className="text-sm font-bold text-content">Fatura de {format(date, 'MMMM', { locale: ptBR })}</p>
+                              <p className="text-xs text-content-subtle">{monthTransactions.length} lançamentos</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-6">
                             <div className="text-right">
-                              <p className="text-xs text-gray-400 uppercase font-bold">Total</p>
+                              <p className="text-xs text-content-subtle uppercase font-bold">Total</p>
                               <p className="text-lg font-black text-primary">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
                               </p>
                             </div>
-                            {isExpanded ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                            {isExpanded ? <ChevronUp className="h-5 w-5 text-content-subtle" /> : <ChevronDown className="h-5 w-5 text-content-subtle" />}
                           </div>
                         </button>
 
@@ -423,12 +423,12 @@ export const CreditCards: React.FC = () => {
                               initial={{ height: 0 }}
                               animate={{ height: 'auto' }}
                               exit={{ height: 0 }}
-                              className="overflow-hidden bg-white"
+                              className="overflow-hidden bg-surface"
                             >
                               <div className="p-4 overflow-x-auto">
                                 <table className="w-full text-left text-xs">
                                   <thead>
-                                    <tr className="border-b border-gray-50 text-gray-400 uppercase font-bold tracking-wider">
+                                    <tr className="border-b border-gray-50 text-content-subtle uppercase font-bold tracking-wider">
                                       <th className="pb-3 pl-2">Data</th>
                                       <th className="pb-3">Descrição</th>
                                       <th className="pb-3">Parcela</th>
@@ -438,16 +438,16 @@ export const CreditCards: React.FC = () => {
                                   </thead>
                                   <tbody className="divide-y divide-gray-50">
                                     {monthTransactions.map(t => (
-                                      <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="py-3 pl-2 text-gray-500">{format(new Date(t.date), 'dd/MM/yyyy')}</td>
-                                        <td className="py-3 font-bold text-gray-900">{t.description}</td>
+                                      <tr key={t.id} className="hover:bg-canvas transition-colors">
+                                        <td className="py-3 pl-2 text-content-subtle">{format(new Date(t.date), 'dd/MM/yyyy')}</td>
+                                        <td className="py-3 font-bold text-content">{t.description}</td>
                                         <td className="py-3">
                                           {t.installmentNumber ? (
                                             <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
                                               {t.installmentNumber}/{t.totalInstallments}
                                             </span>
                                           ) : (
-                                            <span className="text-gray-400">-</span>
+                                            <span className="text-content-subtle">-</span>
                                           )}
                                         </td>
                                         <td className="py-3">
@@ -458,7 +458,7 @@ export const CreditCards: React.FC = () => {
                                             {t.status === 'completed' ? 'Pago' : 'Pendente'}
                                           </span>
                                         </td>
-                                        <td className="py-3 text-right pr-2 font-black text-gray-900">
+                                        <td className="py-3 text-right pr-2 font-black text-content">
                                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                                         </td>
                                       </tr>
@@ -478,7 +478,7 @@ export const CreditCards: React.FC = () => {
               <div className="mt-8 flex justify-end">
                 <button
                   onClick={() => setSelectedCardForInvoices(null)}
-                  className="rounded-xl bg-gray-100 px-6 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 transition-all"
+                  className="rounded-xl bg-surface-muted px-6 py-2 text-sm font-bold text-content-muted hover:bg-gray-200 transition-all"
                 >
                   Fechar
                 </button>
@@ -493,16 +493,16 @@ export const CreditCards: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-3xl rounded-3xl bg-white p-8 shadow-2xl"
+              className="w-full max-w-3xl rounded-3xl bg-surface p-8 shadow-2xl"
             >
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Comparativo de Faturas</h3>
-                  <p className="text-sm text-gray-500">{comparingCard.name} - Atual vs Anterior</p>
+                  <h3 className="text-xl font-bold text-content">Comparativo de Faturas</h3>
+                  <p className="text-sm text-content-subtle">{comparingCard.name} - Atual vs Anterior</p>
                 </div>
                 <button 
                   onClick={() => setIsCompareModalOpen(false)}
-                  className="rounded-full p-2 hover:bg-gray-100 text-gray-400 transition-all"
+                  className="rounded-full p-2 hover:bg-surface-muted text-content-subtle transition-all"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -538,7 +538,7 @@ export const CreditCards: React.FC = () => {
               <div className="mt-8 flex justify-end">
                 <button
                   onClick={() => setIsCompareModalOpen(false)}
-                  className="rounded-xl bg-gray-100 px-6 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 transition-all"
+                  className="rounded-xl bg-surface-muted px-6 py-2 text-sm font-bold text-content-muted hover:bg-gray-200 transition-all"
                 >
                   Fechar
                 </button>
@@ -553,18 +553,18 @@ export const CreditCards: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl"
+            className="w-full max-w-md rounded-2xl bg-surface p-8 shadow-2xl"
           >
-            <h3 className="text-xl font-bold text-gray-900">
+            <h3 className="text-xl font-bold text-content">
               {editingCard ? 'Editar Cartão' : 'Novo Cartão de Crédito'}
             </h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Entidade Responsável</label>
+                <label className="block text-sm font-medium text-content-muted">Entidade Responsável</label>
                 <select 
                   value={targetEntityId}
                   onChange={(e) => setTargetEntityId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                   required
                 >
                   <option value="">Selecione a entidade...</option>
@@ -574,61 +574,61 @@ export const CreditCards: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Nome do Cartão</label>
+                <label className="block text-sm font-medium text-content-muted">Nome do Cartão</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: Nubank Platinum"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                   required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Bandeira</label>
+                  <label className="block text-sm font-medium text-content-muted">Bandeira</label>
                   <input
                     type="text"
                     value={brand}
                     onChange={(e) => setBrand(e.target.value)}
                     placeholder="Visa, Master..."
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Limite</label>
+                  <label className="block text-sm font-medium text-content-muted">Limite</label>
                   <input
                     type="number"
                     value={limit}
                     onChange={(e) => setLimit(e.target.value)}
                     placeholder="0.00"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Dia Vencimento</label>
+                  <label className="block text-sm font-medium text-content-muted">Dia Vencimento</label>
                   <input
                     type="number"
                     min="1"
                     max="31"
                     value={dueDay}
                     onChange={(e) => setDueDay(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Dia Fechamento</label>
+                  <label className="block text-sm font-medium text-content-muted">Dia Fechamento</label>
                   <input
                     type="number"
                     min="1"
                     max="31"
                     value={closingDay}
                     onChange={(e) => setClosingDay(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                     required
                   />
                 </div>
@@ -637,7 +637,7 @@ export const CreditCards: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                  className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-content-muted hover:bg-canvas"
                 >
                   Cancelar
                 </button>

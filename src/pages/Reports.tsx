@@ -295,32 +295,32 @@ export const Reports: React.FC = () => {
       {/* Header & Month Selector */}
       <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Relatórios e Análises</h2>
-          <p className="text-sm text-gray-500">Visualize o desempenho das suas finanças.</p>
+          <h2 className="text-2xl font-bold text-content">Relatórios e Análises</h2>
+          <p className="text-sm text-content-subtle">Visualize o desempenho das suas finanças.</p>
         </div>
         
         <div className="flex items-center gap-3">
           <button 
             onClick={exportPDF}
-            className="flex items-center gap-2 rounded-xl bg-white border border-gray-200 px-4 py-2 text-sm font-bold text-gray-600 shadow-sm hover:bg-gray-50 transition-all"
+            className="flex items-center gap-2 rounded-xl bg-surface border border-line px-4 py-2 text-sm font-bold text-content-muted shadow-sm hover:bg-canvas transition-all"
           >
             <FileText className="h-4 w-4 text-primary" />
             Exportar PDF
           </button>
-          <div className="flex items-center gap-4 rounded-2xl bg-white p-2 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4 rounded-2xl bg-surface p-2 shadow-sm border border-line">
           <button 
             onClick={() => changeMonth(-1)}
-            className="rounded-lg p-2 hover:bg-gray-50 text-gray-500"
+            className="rounded-lg p-2 hover:bg-canvas text-content-subtle"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <div className="flex flex-col items-center min-w-[120px]">
-            <span className="text-sm font-bold text-gray-900">{MONTHS[selectedMonth]}</span>
-            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">{selectedYear}</span>
+            <span className="text-sm font-bold text-content">{MONTHS[selectedMonth]}</span>
+            <span className="text-[10px] font-medium text-content-subtle uppercase tracking-widest">{selectedYear}</span>
           </div>
           <button 
             onClick={() => changeMonth(1)}
-            className="rounded-lg p-2 hover:bg-gray-50 text-gray-500"
+            className="rounded-lg p-2 hover:bg-canvas text-content-subtle"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -333,13 +333,13 @@ export const Reports: React.FC = () => {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100"
+          className="rounded-2xl bg-surface p-6 shadow-sm border border-line"
         >
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Receitas Realizadas</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-content-subtle">Receitas Realizadas</p>
           <h3 className="mt-2 text-2xl font-bold text-green-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.income)}
           </h3>
-          <p className="mt-1 text-[10px] text-gray-400">
+          <p className="mt-1 text-[10px] text-content-subtle">
             Projetado: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.projectedIncome)}
           </p>
         </motion.div>
@@ -347,13 +347,13 @@ export const Reports: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100"
+          className="rounded-2xl bg-surface p-6 shadow-sm border border-line"
         >
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Despesas Pagas</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-content-subtle">Despesas Pagas</p>
           <h3 className="mt-2 text-2xl font-bold text-red-600">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.expense)}
           </h3>
-          <p className="mt-1 text-[10px] text-gray-400">
+          <p className="mt-1 text-[10px] text-content-subtle">
             Projetado: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.projectedExpense)}
           </p>
         </motion.div>
@@ -361,16 +361,16 @@ export const Reports: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100"
+          className="rounded-2xl bg-surface p-6 shadow-sm border border-line"
         >
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Saldo Realizado</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-content-subtle">Saldo Realizado</p>
           <h3 className={cn(
             "mt-2 text-2xl font-bold",
             stats.balance >= 0 ? "text-blue-600" : "text-red-600"
           )}>
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.balance)}
           </h3>
-          <p className="mt-1 text-[10px] text-gray-400">
+          <p className="mt-1 text-[10px] text-content-subtle">
             Projetado: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.projectedBalance)}
           </p>
         </motion.div>
@@ -381,8 +381,8 @@ export const Reports: React.FC = () => {
         <div className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             {expenseBudgetProgress.length > 0 && (
-              <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-6">
+              <div className="rounded-2xl bg-surface p-8 shadow-sm border border-line">
+                <h3 className="text-lg font-bold text-content flex items-center gap-2 mb-6">
                   <Target className="h-5 w-5 text-red-500" />
                   Metas de Gastos (Gasto vs Limite)
                 </h3>
@@ -423,8 +423,8 @@ export const Reports: React.FC = () => {
             )}
 
             {incomeBudgetProgress.length > 0 && (
-              <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-6">
+              <div className="rounded-2xl bg-surface p-8 shadow-sm border border-line">
+                <h3 className="text-lg font-bold text-content flex items-center gap-2 mb-6">
                   <Target className="h-5 w-5 text-emerald-500" />
                   Metas de Receita (Ganho vs Meta)
                 </h3>
@@ -468,25 +468,25 @@ export const Reports: React.FC = () => {
           {/* Detailed Progress List */}
           <div className="grid gap-6 lg:grid-cols-2">
             {incomeBudgetProgress.length > 0 && (
-              <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
-                <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-6">Detalhamento de Metas de Receita</h3>
+              <div className="rounded-2xl bg-surface p-8 shadow-sm border border-line">
+                <h3 className="text-sm font-black uppercase tracking-widest text-content-subtle mb-6">Detalhamento de Metas de Receita</h3>
                 <div className="space-y-6">
                   {incomeBudgetProgress.map(p => {
                     const percentage = p.meta > 0 ? (p.realizado / p.meta) * 100 : 0;
                     return (
                       <div key={p.name} className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-gray-700">{p.name}</span>
+                          <span className="text-sm font-bold text-content-muted">{p.name}</span>
                           <span className="text-sm font-black text-emerald-600">{percentage.toFixed(1)}%</span>
                         </div>
-                        <div className="h-3 w-full rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-3 w-full rounded-full bg-surface-muted overflow-hidden">
                           <motion.div 
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min(percentage, 100)}%` }}
                             className="h-full bg-emerald-500 rounded-full"
                           />
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500">
+                        <div className="flex justify-between text-xs text-content-subtle">
                           <span>Realizado: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.realizado)}</span>
                           <span>Meta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.meta)}</span>
                         </div>
@@ -498,23 +498,23 @@ export const Reports: React.FC = () => {
             )}
 
             {expenseBudgetProgress.length > 0 && (
-              <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
-                <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-6">Detalhamento de Limites de Gastos</h3>
+              <div className="rounded-2xl bg-surface p-8 shadow-sm border border-line">
+                <h3 className="text-sm font-black uppercase tracking-widest text-content-subtle mb-6">Detalhamento de Limites de Gastos</h3>
                 <div className="space-y-6">
                   {expenseBudgetProgress.map(p => {
                     const percentage = p.meta > 0 ? (p.realizado / p.meta) * 100 : 0;
                     return (
                       <div key={p.name} className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-gray-700">{p.name}</span>
+                          <span className="text-sm font-bold text-content-muted">{p.name}</span>
                           <span className={cn(
                             "text-sm font-black",
-                            percentage >= 100 ? "text-red-600" : percentage >= 80 ? "text-amber-600" : "text-gray-900"
+                            percentage >= 100 ? "text-red-600" : percentage >= 80 ? "text-amber-600" : "text-content"
                           )}>
                             {percentage.toFixed(1)}%
                           </span>
                         </div>
-                        <div className="h-3 w-full rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-3 w-full rounded-full bg-surface-muted overflow-hidden">
                           <motion.div 
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min(percentage, 100)}%` }}
@@ -524,7 +524,7 @@ export const Reports: React.FC = () => {
                             )}
                           />
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500">
+                        <div className="flex justify-between text-xs text-content-subtle">
                           <span>Gasto: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.realizado)}</span>
                           <span>Limite: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.meta)}</span>
                         </div>
@@ -540,13 +540,13 @@ export const Reports: React.FC = () => {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Category Breakdown */}
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+        <div className="rounded-2xl bg-surface p-8 shadow-sm border border-line">
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-lg font-bold text-content flex items-center gap-2">
               <PieChartIcon className="h-5 w-5 text-primary" />
               Gastos por Categoria
             </h3>
-            <button className="text-gray-400 hover:text-gray-600">
+            <button className="text-content-subtle hover:text-content-muted">
               <Download className="h-4 w-4" />
             </button>
           </div>
@@ -576,7 +576,7 @@ export const Reports: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center text-gray-400">
+              <div className="flex h-full flex-col items-center justify-center text-content-subtle">
                 <PieChartIcon className="mb-2 h-12 w-12 opacity-20" />
                 <p>Sem dados para este período</p>
               </div>
@@ -585,13 +585,13 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* Income Category Breakdown */}
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+        <div className="rounded-2xl bg-surface p-8 shadow-sm border border-line">
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-lg font-bold text-content flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-500" />
               Receitas por Categoria
             </h3>
-            <button className="text-gray-400 hover:text-gray-600">
+            <button className="text-content-subtle hover:text-content-muted">
               <Download className="h-4 w-4" />
             </button>
           </div>
@@ -621,7 +621,7 @@ export const Reports: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center text-gray-400">
+              <div className="flex h-full flex-col items-center justify-center text-content-subtle">
                 <TrendingUp className="mb-2 h-12 w-12 opacity-20" />
                 <p>Sem dados para este período</p>
               </div>
@@ -630,9 +630,9 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* Income vs Expense */}
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+        <div className="rounded-2xl bg-surface p-8 shadow-sm border border-line">
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-lg font-bold text-content flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
               Receitas vs Despesas
             </h3>
@@ -666,20 +666,20 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* Monthly Trend */}
-        <div className="lg:col-span-2 rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+        <div className="lg:col-span-2 rounded-2xl bg-surface p-8 shadow-sm border border-line">
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-lg font-bold text-content flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
               Evolução do Saldo Mensal (vs Meta)
             </h3>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-blue-500" />
-                <span className="text-[10px] font-bold text-gray-500 uppercase">Saldo Real</span>
+                <span className="text-[10px] font-bold text-content-subtle uppercase">Saldo Real</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-amber-500" />
-                <span className="text-[10px] font-bold text-gray-500 uppercase">Meta de Saldo</span>
+                <span className="text-[10px] font-bold text-content-subtle uppercase">Meta de Saldo</span>
               </div>
             </div>
           </div>
@@ -721,20 +721,20 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* Cash Flow Projection */}
-        <div className="lg:col-span-2 rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+        <div className="lg:col-span-2 rounded-2xl bg-surface p-8 shadow-sm border border-line">
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-lg font-bold text-content flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
               Projeção de Fluxo de Caixa (Próximos 6 meses)
             </h3>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-blue-500" />
-                <span className="text-[10px] font-bold text-gray-500 uppercase">Histórico</span>
+                <span className="text-[10px] font-bold text-content-subtle uppercase">Histórico</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-blue-300" />
-                <span className="text-[10px] font-bold text-gray-500 uppercase">Projeção</span>
+                <span className="text-[10px] font-bold text-content-subtle uppercase">Projeção</span>
               </div>
             </div>
           </div>

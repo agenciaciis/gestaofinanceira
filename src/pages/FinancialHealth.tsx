@@ -355,8 +355,8 @@ export const FinancialHealth: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Saúde Financeira</h2>
-          <p className="text-slate-500 font-medium">Análise inteligente e plano de liberdade financeira.</p>
+          <h2 className="text-3xl font-black text-content tracking-tight">Saúde Financeira</h2>
+          <p className="text-content-subtle font-medium">Análise inteligente e plano de liberdade financeira.</p>
         </div>
         <button 
           onClick={analyzeFinancialHealth}
@@ -389,9 +389,9 @@ export const FinancialHealth: React.FC = () => {
                   const isThresholdReached = debt.alerts?.thresholdEnabled && debt.remainingAmount <= (debt.alerts?.thresholdValue || 0);
 
                   return (
-                    <div key={debt.id} className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 flex items-center justify-between gap-4">
+                    <div key={debt.id} className="bg-surface rounded-2xl p-4 shadow-sm border border-amber-200 flex items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-900 truncate">{debt.name}</p>
+                        <p className="font-bold text-content truncate">{debt.name}</p>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {isDueSoon && (
                             <span className="text-[10px] font-black text-rose-600 uppercase">Vence em {daysUntilDue}d</span>
@@ -419,9 +419,9 @@ export const FinancialHealth: React.FC = () => {
 
       {/* Health Score Card */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden relative">
+        <div className="lg:col-span-2 rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-sm border border-line dark:border-gray-800 overflow-hidden relative">
           <div className="relative z-10">
-            <h3 className="text-lg font-black text-slate-900 dark:text-gray-100 flex items-center gap-2">
+            <h3 className="text-lg font-black text-content dark:text-gray-100 flex items-center gap-2">
               <Heart className="h-5 w-5 text-rose-500 fill-rose-500" />
               Seu Score de Saúde
             </h3>
@@ -433,11 +433,11 @@ export const FinancialHealth: React.FC = () => {
                 {healthScore}
               </span>
               <div className="pb-2">
-                <p className="text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Pontos de 100</p>
-                <p className="text-lg font-black text-slate-900 dark:text-gray-100">{health.label}</p>
+                <p className="text-sm font-bold text-content-subtle dark:text-gray-500 uppercase tracking-widest">Pontos de 100</p>
+                <p className="text-lg font-black text-content dark:text-gray-100">{health.label}</p>
               </div>
             </div>
-            <div className="mt-8 h-3 w-full rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
+            <div className="mt-8 h-3 w-full rounded-full bg-surface-muted dark:bg-gray-800 overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${healthScore}%` }}
@@ -452,10 +452,10 @@ export const FinancialHealth: React.FC = () => {
               {health.parts.map(part => (
                 <div key={part.key} className="flex items-center gap-3">
                   <div className="w-40 shrink-0">
-                    <p className="text-xs font-bold text-slate-700 dark:text-gray-300">{part.label}</p>
-                    <p className="text-[10px] text-slate-400">{part.detail}</p>
+                    <p className="text-xs font-bold text-content-muted dark:text-gray-300">{part.label}</p>
+                    <p className="text-[10px] text-content-subtle">{part.detail}</p>
                   </div>
-                  <div className="h-2 flex-1 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
+                  <div className="h-2 flex-1 rounded-full bg-surface-muted dark:bg-gray-800 overflow-hidden">
                     <div
                       className={cn(
                         'h-full rounded-full',
@@ -465,7 +465,7 @@ export const FinancialHealth: React.FC = () => {
                       style={{ width: `${(part.points / part.max) * 100}%` }}
                     />
                   </div>
-                  <span className="w-14 shrink-0 text-right text-xs font-black text-slate-500 tabular-nums">
+                  <span className="w-14 shrink-0 text-right text-xs font-black text-content-subtle tabular-nums">
                     {Math.round(part.points)}/{part.max}
                   </span>
                 </div>
@@ -478,7 +478,7 @@ export const FinancialHealth: React.FC = () => {
               </p>
             )}
           </div>
-          <div className="absolute -right-12 -bottom-12 h-64 w-64 bg-slate-50 dark:bg-gray-800/20 rounded-full opacity-50" />
+          <div className="absolute -right-12 -bottom-12 h-64 w-64 bg-surface-muted dark:bg-gray-800/20 rounded-full opacity-50" />
         </div>
 
         <div className="rounded-3xl bg-indigo-50 dark:bg-indigo-950 p-8 text-indigo-900 dark:text-white shadow-xl shadow-indigo-100 dark:shadow-none relative overflow-hidden border border-indigo-100 dark:border-indigo-900/30">
@@ -499,15 +499,15 @@ export const FinancialHealth: React.FC = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <h3 className="text-2xl font-black text-content flex items-center gap-2">
               <Target className="h-6 w-6 text-rose-500" />
               Quitação de Dívidas
             </h3>
-            <p className="text-sm text-slate-500 font-medium">Acompanhamento detalhado e simulação de pagamentos.</p>
+            <p className="text-sm text-content-subtle font-medium">Acompanhamento detalhado e simulação de pagamentos.</p>
           </div>
           <button 
             onClick={() => setIsDebtModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-surface border border-line px-4 py-2 text-sm font-bold text-content-muted hover:bg-surface-muted transition-all shadow-sm"
           >
             <Plus className="h-4 w-4" />
             Adicionar Dívida
@@ -523,33 +523,33 @@ export const FinancialHealth: React.FC = () => {
                 <p className="mt-1 text-4xl font-black tracking-tighter text-rose-700 dark:text-rose-300">{fmt(totalDebt)}</p>
                 <div className="mt-6 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400 font-medium">Parcelamentos em aberto</span>
-                    <span className="font-black text-slate-900 dark:text-slate-100">{fmt(debtBySource.installments)}</span>
+                    <span className="text-content-muted dark:text-slate-400 font-medium">Parcelamentos em aberto</span>
+                    <span className="font-black text-content dark:text-slate-100">{fmt(debtBySource.installments)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400 font-medium">Dívidas com juros</span>
-                    <span className="font-black text-slate-900 dark:text-slate-100">{fmt(debtBySource.loan)}</span>
+                    <span className="text-content-muted dark:text-slate-400 font-medium">Dívidas com juros</span>
+                    <span className="font-black text-content dark:text-slate-100">{fmt(debtBySource.loan)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400 font-medium">Fatura de cartão</span>
-                    <span className="font-black text-slate-900 dark:text-slate-100">{fmt(debtBySource.card)}</span>
+                    <span className="text-content-muted dark:text-slate-400 font-medium">Fatura de cartão</span>
+                    <span className="font-black text-content dark:text-slate-100">{fmt(debtBySource.card)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Quando eu fico livre */}
-              <div className="lg:col-span-2 rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-sm border border-slate-100 dark:border-gray-800">
+              <div className="lg:col-span-2 rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-sm border border-line dark:border-gray-800">
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <h4 className="text-lg font-black text-slate-900 dark:text-gray-100 flex items-center gap-2">
+                  <h4 className="text-lg font-black text-content dark:text-gray-100 flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-emerald-500" />
                     Quando eu fico livre
                   </h4>
-                  <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-gray-800 p-1">
+                  <div className="flex items-center gap-1 rounded-xl bg-surface-muted dark:bg-gray-800 p-1">
                     <button
                       onClick={() => setStrategy('avalanche')}
                       className={cn(
                         'px-3 py-1.5 text-xs font-bold rounded-lg transition-all',
-                        strategy === 'avalanche' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-500'
+                        strategy === 'avalanche' ? 'bg-surface dark:bg-gray-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-content-subtle'
                       )}
                       title="Ataca primeiro a dívida de maior juros — economiza mais dinheiro"
                     >
@@ -559,7 +559,7 @@ export const FinancialHealth: React.FC = () => {
                       onClick={() => setStrategy('snowball')}
                       className={cn(
                         'px-3 py-1.5 text-xs font-bold rounded-lg transition-all',
-                        strategy === 'snowball' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-500'
+                        strategy === 'snowball' ? 'bg-surface dark:bg-gray-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-content-subtle'
                       )}
                       title="Ataca primeiro a menor dívida — quita mais rápido a primeira"
                     >
@@ -570,7 +570,7 @@ export const FinancialHealth: React.FC = () => {
 
                 <div className="mt-6 grid gap-6 sm:grid-cols-3">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data de libertação</p>
+                    <p className="text-[10px] font-black text-content-subtle uppercase tracking-widest">Data de libertação</p>
                     <p className="mt-1 text-2xl font-black text-emerald-600 capitalize">
                       {comparison.withExtra.months === 0
                         ? 'Você está livre'
@@ -578,25 +578,25 @@ export const FinancialHealth: React.FC = () => {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tempo restante</p>
+                    <p className="text-[10px] font-black text-content-subtle uppercase tracking-widest">Tempo restante</p>
                     <p className="mt-1 text-2xl font-black text-indigo-600">
                       {comparison.withExtra.months === 0 ? '-' : `${comparison.withExtra.months} meses`}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Juros até lá</p>
+                    <p className="text-[10px] font-black text-content-subtle uppercase tracking-widest">Juros até lá</p>
                     <p className="mt-1 text-2xl font-black text-amber-600">{fmt(comparison.withExtra.totalInterest)}</p>
                   </div>
                 </div>
 
                 {/* E se eu pagar mais por mês? */}
-                <div className="mt-8 rounded-2xl bg-slate-50 dark:bg-gray-800/60 p-5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <div className="mt-8 rounded-2xl bg-surface-muted dark:bg-gray-800/60 p-5">
+                  <label className="text-[10px] font-black text-content-subtle uppercase tracking-widest">
                     E se eu pagar mais por mês?
                   </label>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">R$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-content-subtle">R$</span>
                       <input
                         type="number"
                         min="0"
@@ -604,18 +604,18 @@ export const FinancialHealth: React.FC = () => {
                         value={extraPayment}
                         onChange={(e) => setExtraPayment(e.target.value)}
                         placeholder="0"
-                        className="w-40 rounded-xl border border-slate-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-indigo-500"
+                        className="w-40 rounded-xl border border-line dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-indigo-500"
                       />
                     </div>
                     {comparison.monthsSaved > 0 ? (
-                      <p className="text-sm font-medium text-slate-700 dark:text-gray-300">
+                      <p className="text-sm font-medium text-content-muted dark:text-gray-300">
                         Você sai <strong className="text-emerald-600">{comparison.monthsSaved} {comparison.monthsSaved === 1 ? 'mês' : 'meses'}</strong> antes
                         {comparison.interestSaved > 0 && (
                           <> e economiza <strong className="text-emerald-600">{fmt(comparison.interestSaved)}</strong> de juros</>
                         )}.
                       </p>
                     ) : (
-                      <p className="text-sm text-slate-500">Informe um valor extra para ver quanto tempo e juros você economiza.</p>
+                      <p className="text-sm text-content-subtle">Informe um valor extra para ver quanto tempo e juros você economiza.</p>
                     )}
                   </div>
                 </div>
@@ -643,12 +643,12 @@ export const FinancialHealth: React.FC = () => {
             </div>
 
             {/* Qual atacar primeiro */}
-            <div className="rounded-3xl bg-white dark:bg-gray-900 p-8 shadow-sm border border-slate-100 dark:border-gray-800">
-              <h4 className="text-lg font-black text-slate-900 dark:text-gray-100 flex items-center gap-2">
+            <div className="rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-sm border border-line dark:border-gray-800">
+              <h4 className="text-lg font-black text-content dark:text-gray-100 flex items-center gap-2">
                 <Target className="h-5 w-5 text-rose-500" />
                 Qual atacar primeiro
               </h4>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-content-subtle mt-1">
                 Ordenado pelo que cada dívida custa de juros por mês — não pelo tamanho.
               </p>
 
@@ -656,17 +656,17 @@ export const FinancialHealth: React.FC = () => {
                 {ranked.map((r, i) => (
                   <div
                     key={r.id}
-                    className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-100 dark:border-gray-800 p-4"
+                    className="flex flex-wrap items-center gap-4 rounded-2xl border border-line dark:border-gray-800 p-4"
                   >
                     <span className={cn(
                       'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black',
-                      i === 0 && !r.unknownRate ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 dark:bg-gray-800 text-slate-500'
+                      i === 0 && !r.unknownRate ? 'bg-rose-100 text-rose-600' : 'bg-surface-muted dark:bg-gray-800 text-content-subtle'
                     )}>
                       {i + 1}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900 dark:text-gray-100 truncate">{r.name}</p>
-                      <p className="text-[11px] font-medium text-slate-400">
+                      <p className="font-bold text-content dark:text-gray-100 truncate">{r.name}</p>
+                      <p className="text-[11px] font-medium text-content-subtle">
                         {r.source === 'installments'
                           ? `${r.installmentsLeft} ${r.installmentsLeft === 1 ? 'parcela restante' : 'parcelas restantes'}`
                           : r.source === 'card' ? 'Fatura em aberto' : 'Dívida com juros'}
@@ -674,11 +674,11 @@ export const FinancialHealth: React.FC = () => {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo</p>
-                      <p className="font-black text-slate-900 dark:text-gray-100">{fmt(r.balance)}</p>
+                      <p className="text-[10px] font-black text-content-subtle uppercase tracking-widest">Saldo</p>
+                      <p className="font-black text-content dark:text-gray-100">{fmt(r.balance)}</p>
                     </div>
                     <div className="text-right min-w-[9rem]">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Custo por mês</p>
+                      <p className="text-[10px] font-black text-content-subtle uppercase tracking-widest">Custo por mês</p>
                       {r.unknownRate ? (
                         editingRateId === r.id ? (
                           <div className="mt-1 flex items-center gap-1">
@@ -691,7 +691,7 @@ export const FinancialHealth: React.FC = () => {
                               value={rateInput}
                               onChange={(e) => setRateInput(e.target.value)}
                               placeholder="% a.m."
-                              className="w-20 rounded-lg border border-slate-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 px-2 py-1 text-sm outline-none focus:border-indigo-500"
+                              className="w-20 rounded-lg border border-line dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 px-2 py-1 text-sm outline-none focus:border-indigo-500"
                             />
                             <button
                               onClick={() => saveInterestRate(r, Number(rateInput))}
@@ -712,7 +712,7 @@ export const FinancialHealth: React.FC = () => {
                       ) : (
                         <p className="font-black text-amber-600">
                           {fmt(r.monthlyCost || 0)}
-                          <span className="ml-1 text-[10px] font-bold text-slate-400">{r.interestRate}% a.m.</span>
+                          <span className="ml-1 text-[10px] font-bold text-content-subtle">{r.interestRate}% a.m.</span>
                         </p>
                       )}
                     </div>
@@ -722,8 +722,8 @@ export const FinancialHealth: React.FC = () => {
             </div>
 
             {/* Debt Progress Chart */}
-            <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100">
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 mb-8">
+            <div className="rounded-3xl bg-surface p-8 shadow-sm border border-line">
+              <h3 className="text-lg font-black text-content flex items-center gap-2 mb-8">
                 <TrendingUp className="h-5 w-5 text-indigo-500" />
                 Saldo devedor por dívida
               </h3>
@@ -778,7 +778,7 @@ export const FinancialHealth: React.FC = () => {
                   <motion.div 
                     key={debt.id}
                     layout
-                    className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all flex flex-col"
+                    className="rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-md transition-all flex flex-col"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
@@ -801,7 +801,7 @@ export const FinancialHealth: React.FC = () => {
                             )}
                           </div>
                         ) : (
-                          <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-300 flex items-center justify-center">
+                          <div className="h-8 w-8 rounded-lg bg-surface-muted text-slate-300 flex items-center justify-center">
                             <BellOff className="h-4 w-4" />
                           </div>
                         )}
@@ -822,7 +822,7 @@ export const FinancialHealth: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    <h4 className="font-black text-slate-900">{debt.name}</h4>
+                    <h4 className="font-black text-content">{debt.name}</h4>
                     
                     {/* Alert Badges */}
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -848,24 +848,24 @@ export const FinancialHealth: React.FC = () => {
                     <div className="mt-4 space-y-4 flex-1">
                       <div className="flex justify-between items-end">
                         <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase">Restante</p>
-                          <p className="text-xl font-black text-slate-900">
+                          <p className="text-[10px] font-black text-content-subtle uppercase">Restante</p>
+                          <p className="text-xl font-black text-content">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(debt.remainingAmount)}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] font-black text-slate-400 uppercase">Progresso</p>
+                          <p className="text-[10px] font-black text-content-subtle uppercase">Progresso</p>
                           <p className="text-sm font-black text-emerald-600">{progress.toFixed(0)}%</p>
                         </div>
                       </div>
-                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-2 w-full rounded-full bg-surface-muted overflow-hidden">
                         <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${progress}%` }} />
                       </div>
                       
                       {/* Simulation Input */}
                       <div className="pt-4 border-t border-slate-50">
                         <div className="flex items-center justify-between mb-2">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase">Simular Nova Parcela</label>
+                          <label className="block text-[10px] font-black text-content-subtle uppercase">Simular Nova Parcela</label>
                           {simulationPayments[debt.id] && (
                             <button 
                               onClick={() => setSimulationPayments(prev => {
@@ -880,13 +880,13 @@ export const FinancialHealth: React.FC = () => {
                           )}
                         </div>
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-content-subtle text-xs font-bold">R$</span>
                           <input 
                             type="number"
                             value={simulationPayments[debt.id] || ''}
                             onChange={(e) => setSimulationPayments(prev => ({ ...prev, [debt.id]: e.target.value }))}
                             placeholder={debt.monthlyPayment.toString()}
-                            className="w-full rounded-xl border border-slate-100 bg-slate-50/50 pl-9 pr-4 py-2 text-sm font-bold text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
+                            className="w-full rounded-xl border border-line bg-slate-50/50 pl-9 pr-4 py-2 text-sm font-bold text-content-muted outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
                           />
                         </div>
                       </div>
@@ -894,16 +894,16 @@ export const FinancialHealth: React.FC = () => {
                       <div className="space-y-3 pt-4 border-t border-slate-50">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase">Quitação em</p>
+                            <p className="text-[10px] font-black text-content-subtle uppercase">Quitação em</p>
                             <p className={cn(
                               "text-sm font-bold",
-                              monthsToPay === Infinity ? "text-rose-600" : "text-slate-700"
+                              monthsToPay === Infinity ? "text-rose-600" : "text-content-muted"
                             )}>
                               {monthsToPay === Infinity ? "Nunca (Juros > Parcela)" : payoffDate ? format(payoffDate, 'MMM/yyyy', { locale: ptBR }) : '-'}
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase">Total Juros</p>
+                            <p className="text-[10px] font-black text-content-subtle uppercase">Total Juros</p>
                             <p className="text-sm font-bold text-amber-600">
                               {monthsToPay === Infinity ? '∞' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalInterest)}
                             </p>
@@ -964,12 +964,12 @@ export const FinancialHealth: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="rounded-3xl border-2 border-dashed border-slate-200 p-12 text-center">
+          <div className="rounded-3xl border-2 border-dashed border-line p-12 text-center">
             <div className="mx-auto h-16 w-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
               <ShieldCheck className="h-8 w-8" />
             </div>
-            <h4 className="text-lg font-black text-slate-900">Nenhuma dívida registrada</h4>
-            <p className="text-sm text-slate-500 mt-2">Parabéns! Você está no caminho certo para a liberdade financeira.</p>
+            <h4 className="text-lg font-black text-content">Nenhuma dívida registrada</h4>
+            <p className="text-sm text-content-subtle mt-2">Parabéns! Você está no caminho certo para a liberdade financeira.</p>
           </div>
         )}
       </div>
@@ -980,25 +980,25 @@ export const FinancialHealth: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl"
+            className="w-full max-w-md rounded-3xl bg-surface p-8 shadow-2xl"
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                 <Bell className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-xl font-black text-slate-900">Configurar Alertas</h3>
-                <p className="text-sm text-slate-500 font-medium">{editingDebt?.name}</p>
+                <h3 className="text-xl font-black text-content">Configurar Alertas</h3>
+                <p className="text-sm text-content-subtle font-medium">{editingDebt?.name}</p>
               </div>
             </div>
             
             <form onSubmit={handleUpdateAlerts} className="space-y-6">
               {/* Due Date Alert */}
-              <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-4">
+              <div className="p-4 rounded-2xl border border-line bg-slate-50/50 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm font-bold text-slate-700">Aviso de Vencimento</span>
+                    <Calendar className="h-4 w-4 text-content-subtle" />
+                    <span className="text-sm font-bold text-content-muted">Aviso de Vencimento</span>
                   </div>
                   <button
                     type="button"
@@ -1009,33 +1009,33 @@ export const FinancialHealth: React.FC = () => {
                     )}
                   >
                     <span className={cn(
-                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                      "inline-block h-4 w-4 transform rounded-full bg-surface transition-transform",
                       dueDateEnabled ? "translate-x-6" : "translate-x-1"
                     )} />
                   </button>
                 </div>
                 {dueDateEnabled && (
                   <div className="animate-in fade-in slide-in-from-top-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Avisar quantos dias antes?</label>
+                    <label className="block text-[10px] font-black text-content-subtle uppercase mb-1">Avisar quantos dias antes?</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         value={dueDateDaysBefore}
                         onChange={(e) => setDueDateDaysBefore(e.target.value)}
-                        className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        className="flex-1 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                       />
-                      <span className="text-xs font-bold text-slate-400">dias</span>
+                      <span className="text-xs font-bold text-content-subtle">dias</span>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Threshold Alert */}
-              <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-4">
+              <div className="p-4 rounded-2xl border border-line bg-slate-50/50 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm font-bold text-slate-700">Meta de Saldo</span>
+                    <Target className="h-4 w-4 text-content-subtle" />
+                    <span className="text-sm font-bold text-content-muted">Meta de Saldo</span>
                   </div>
                   <button
                     type="button"
@@ -1046,21 +1046,21 @@ export const FinancialHealth: React.FC = () => {
                     )}
                   >
                     <span className={cn(
-                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                      "inline-block h-4 w-4 transform rounded-full bg-surface transition-transform",
                       thresholdEnabled ? "translate-x-6" : "translate-x-1"
                     )} />
                   </button>
                 </div>
                 {thresholdEnabled && (
                   <div className="animate-in fade-in slide-in-from-top-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Avisar quando o saldo for menor que:</label>
+                    <label className="block text-[10px] font-black text-content-subtle uppercase mb-1">Avisar quando o saldo for menor que:</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-content-subtle text-xs font-bold">R$</span>
                       <input
                         type="number"
                         value={thresholdValue}
                         onChange={(e) => setThresholdValue(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm font-bold outline-none focus:border-emerald-500 transition-all"
+                        className="w-full rounded-xl border border-line bg-surface pl-9 pr-4 py-2 text-sm font-bold outline-none focus:border-emerald-500 transition-all"
                         placeholder="Ex: 1000"
                       />
                     </div>
@@ -1072,7 +1072,7 @@ export const FinancialHealth: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsAlertModalOpen(false)}
-                  className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                  className="flex-1 rounded-xl border border-line py-3 text-sm font-bold text-content-muted hover:bg-surface-muted transition-all"
                 >
                   Cancelar
                 </button>
@@ -1096,7 +1096,7 @@ export const FinancialHealth: React.FC = () => {
               <TrendingUp className="h-6 w-6 text-emerald-400" />
               Onde Investir Agora
             </h3>
-            <p className="text-slate-400 text-sm font-medium">Sugestões baseadas no seu perfil e saldo atual.</p>
+            <p className="text-content-subtle text-sm font-medium">Sugestões baseadas no seu perfil e saldo atual.</p>
           </div>
           <div className="hidden sm:block">
              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-xs font-bold">
@@ -1111,7 +1111,7 @@ export const FinancialHealth: React.FC = () => {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <h4 className="font-black text-lg">Reserva de Emergência</h4>
-            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+            <p className="text-sm text-content-subtle mt-2 leading-relaxed">
               O primeiro passo. Guarde o equivalente a 6 meses de seus gastos fixos em um investimento de liquidez diária (CDB 100% CDI ou Tesouro Selic).
             </p>
             <div className="mt-6 flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-widest">
@@ -1124,7 +1124,7 @@ export const FinancialHealth: React.FC = () => {
               <TrendingUp className="h-5 w-5" />
             </div>
             <h4 className="font-black text-lg">Renda Fixa (Longo Prazo)</h4>
-            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+            <p className="text-sm text-content-subtle mt-2 leading-relaxed">
               Para objetivos de 2 a 5 anos. Considere IPCA+ para proteger seu dinheiro da inflação e garantir ganho real.
             </p>
             <div className="mt-6 flex items-center gap-2 text-blue-400 text-xs font-black uppercase tracking-widest">
@@ -1137,7 +1137,7 @@ export const FinancialHealth: React.FC = () => {
               <ArrowUpRight className="h-5 w-5" />
             </div>
             <h4 className="font-black text-lg">Diversificação</h4>
-            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+            <p className="text-sm text-content-subtle mt-2 leading-relaxed">
               Se já tem reserva e renda fixa, explore Fundos Imobiliários (FIIs) para renda passiva mensal ou Ações para crescimento.
             </p>
             <div className="mt-6 flex items-center gap-2 text-indigo-400 text-xs font-black uppercase tracking-widest">
@@ -1153,89 +1153,89 @@ export const FinancialHealth: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl"
+            className="w-full max-w-md rounded-3xl bg-surface p-8 shadow-2xl"
           >
-            <h3 className="text-2xl font-black text-slate-900">Nova Dívida</h3>
-            <p className="text-sm text-slate-500 mt-1">Registre para calcular o tempo de quitação.</p>
+            <h3 className="text-2xl font-black text-content">Nova Dívida</h3>
+            <p className="text-sm text-content-subtle mt-1">Registre para calcular o tempo de quitação.</p>
             
             <form onSubmit={handleAddDebt} className="mt-8 space-y-4">
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Nome da Dívida</label>
+                <label className="block text-xs font-black uppercase tracking-widest text-content-subtle mb-1">Nome da Dívida</label>
                 <input
                   type="text"
                   value={debtName}
                   onChange={(e) => setDebtName(e.target.value)}
                   placeholder="Ex: Empréstimo, Cartão, Financiamento"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  className="w-full rounded-xl border border-line px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Valor Total</label>
+                  <label className="block text-xs font-black uppercase tracking-widest text-content-subtle mb-1">Valor Total</label>
                   <input
                     type="number"
                     value={totalAmount}
                     onChange={(e) => setTotalAmount(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full rounded-xl border border-line px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Valor Restante</label>
+                  <label className="block text-xs font-black uppercase tracking-widest text-content-subtle mb-1">Valor Restante</label>
                   <input
                     type="number"
                     value={remainingAmount}
                     onChange={(e) => setRemainingAmount(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full rounded-xl border border-line px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     required
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Juros Mensal (%)</label>
+                  <label className="block text-xs font-black uppercase tracking-widest text-content-subtle mb-1">Juros Mensal (%)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={interestRate}
                     onChange={(e) => setInterestRate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full rounded-xl border border-line px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Valor Parcela</label>
+                  <label className="block text-xs font-black uppercase tracking-widest text-content-subtle mb-1">Valor Parcela</label>
                   <input
                     type="number"
                     value={monthlyPayment}
                     onChange={(e) => setMonthlyPayment(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full rounded-xl border border-line px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     required
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Dia do Vencimento</label>
+                <label className="block text-xs font-black uppercase tracking-widest text-content-subtle mb-1">Dia do Vencimento</label>
                 <input
                   type="number"
                   min="1"
                   max="31"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  className="w-full rounded-xl border border-line px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   required
                 />
               </div>
 
               {/* Alert Config in Add Modal */}
-              <div className="space-y-4 pt-4 border-t border-slate-100">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Configurações de Alerta</h4>
+              <div className="space-y-4 pt-4 border-t border-line">
+                <h4 className="text-xs font-black uppercase tracking-widest text-content-subtle">Configurações de Alerta</h4>
                 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3">
+                  <div className="p-3 rounded-xl border border-line bg-slate-50/50 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-700">Vencimento</span>
+                      <span className="text-[10px] font-bold text-content-muted">Vencimento</span>
                       <button
                         type="button"
                         onClick={() => setDueDateEnabled(!dueDateEnabled)}
@@ -1245,7 +1245,7 @@ export const FinancialHealth: React.FC = () => {
                         )}
                       >
                         <span className={cn(
-                          "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                          "inline-block h-3 w-3 transform rounded-full bg-surface transition-transform",
                           dueDateEnabled ? "translate-x-5" : "translate-x-1"
                         )} />
                       </button>
@@ -1256,14 +1256,14 @@ export const FinancialHealth: React.FC = () => {
                         value={dueDateDaysBefore}
                         onChange={(e) => setDueDateDaysBefore(e.target.value)}
                         placeholder="Dias antes"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold outline-none focus:border-indigo-500"
+                        className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-bold outline-none focus:border-indigo-500"
                       />
                     )}
                   </div>
 
-                  <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3">
+                  <div className="p-3 rounded-xl border border-line bg-slate-50/50 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-700">Meta Saldo</span>
+                      <span className="text-[10px] font-bold text-content-muted">Meta Saldo</span>
                       <button
                         type="button"
                         onClick={() => setThresholdEnabled(!thresholdEnabled)}
@@ -1273,7 +1273,7 @@ export const FinancialHealth: React.FC = () => {
                         )}
                       >
                         <span className={cn(
-                          "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                          "inline-block h-3 w-3 transform rounded-full bg-surface transition-transform",
                           thresholdEnabled ? "translate-x-5" : "translate-x-1"
                         )} />
                       </button>
@@ -1284,7 +1284,7 @@ export const FinancialHealth: React.FC = () => {
                         value={thresholdValue}
                         onChange={(e) => setThresholdValue(e.target.value)}
                         placeholder="Valor limite"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold outline-none focus:border-emerald-500"
+                        className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-bold outline-none focus:border-emerald-500"
                       />
                     )}
                   </div>
@@ -1295,7 +1295,7 @@ export const FinancialHealth: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsDebtModalOpen(false)}
-                  className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                  className="flex-1 rounded-xl border border-line py-3 text-sm font-bold text-content-muted hover:bg-surface-muted transition-all"
                 >
                   Cancelar
                 </button>
