@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, getDocs, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Quote, Client, Service, Plan, QuoteItem } from '../types';
 import { 
@@ -25,12 +25,13 @@ import {
   Calendar,
   DollarSign,
   Briefcase
-} from 'lucide-react';
+, Share2, ImagePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
+import { compressLetterhead, validateLetterhead } from '../lib/branding';
 import autoTable from 'jspdf-autotable';
 
 export const Quotes: React.FC = () => {
@@ -44,6 +45,8 @@ export const Quotes: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [letterhead, setLetterhead] = useState<string | null>(null);
+  const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
 
   // Form states
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -299,10 +302,91 @@ export const Quotes: React.FC = () => {
     }
   };
 
-  const exportPDF = (quote: Quote) => {
+  // Papel timbrado da entidade (guardado como imagem no próprio Firestore).
+  useEffect(() => {
+    if (!selectedEntity) return;
+    return onSnapshot(doc(db, `entities/${selectedEntity.id}/config/branding`), snap => {
+      setLetterhead((snap.data()?.letterhead as string) || null);
+    }, e => handleFirestoreError(e, OperationType.GET, `entities/${selectedEntity.id}/config/branding`));
+  }, [selectedEntity]);
+
+  const handleLetterheadUpload = async (file: File) => {
+    if (!selectedEntity) return;
+    setUploadingLetterhead(true);
+    try {
+      const compressed = await compressLetterhead(file);
+      const check = validateLetterhead(compressed);
+      if (!check.ok) { showToast(check.reason || 'Imagem inválida.', 'error'); return; }
+      await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`),
+        { letterhead: compressed, updatedAt: serverTimestamp() }, { merge: true });
+      showToast('Papel timbrado salvo! Os próximos orçamentos já saem nele.', 'success');
+    } catch (error: any) {
+      console.error('Erro no papel timbrado:', error);
+      showToast(error?.message || 'Não consegui processar a imagem.', 'error');
+    } finally {
+      setUploadingLetterhead(false);
+    }
+  };
+
+  const removeLetterhead = async () => {
+    if (!selectedEntity) return;
+    await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`), { letterhead: null }, { merge: true });
+    showToast('Papel timbrado removido.', 'success');
+  };
+
+  /** Monta o PDF. Com timbrado, ele vira o fundo A4 e o conteúdo respeita a margem. */
+  const buildPDF = (quote: Quote) => {
     const doc = new jsPDF();
-    
-    // Header - Branding
+
+    if (letterhead) {
+      // A4 = 210 x 297 mm. O timbrado ocupa a página inteira, como fundo.
+      doc.addImage(letterhead, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`ORÇAMENTO ${quote.quoteNumber}`, 14, 52);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Cliente: ${quote.clientName}`, 14, 60);
+      doc.text(`Data: ${new Date(quote.date).toLocaleDateString('pt-BR')}`, 150, 60);
+      return doc;
+    }
+
+    return null; // sem timbrado, segue o cabeçalho azul de sempre
+  };
+
+  /** Abre o PDF numa aba e dispara a impressão — sai idêntico ao arquivo. */
+  const printQuote = (quote: Quote) => {
+    const withHeader = buildPDF(quote);
+    const pdf = withHeader ?? null;
+    if (!pdf) { exportPDF(quote); showToast('Sem papel timbrado: baixei o PDF para você imprimir.', 'success'); return; }
+    pdf.autoPrint();
+    const url = pdf.output('bloburl');
+    window.open(url as unknown as string, '_blank');
+  };
+
+  /** Usa o compartilhamento nativo (celular). Sem suporte, baixa o arquivo. */
+  const shareQuote = async (quote: Quote) => {
+    const withHeader = buildPDF(quote);
+    if (!withHeader) { exportPDF(quote); return; }
+    const blob = withHeader.output('blob');
+    const file = new File([blob], `Orcamento_${quote.quoteNumber}.pdf`, { type: 'application/pdf' });
+    const nav = navigator as Navigator & { canShare?: (d: any) => boolean; share?: (d: any) => Promise<void> };
+    if (nav.canShare?.({ files: [file] }) && nav.share) {
+      try { await nav.share({ files: [file], title: `Orçamento ${quote.quoteNumber}` }); return; }
+      catch { /* usuário cancelou: cai no download */ }
+    }
+    exportPDF(quote);
+    showToast('Compartilhamento não disponível aqui — baixei o PDF.', 'success');
+  };
+
+  const exportPDF = (quote: Quote) => {
+    const comTimbrado = buildPDF(quote);
+    if (comTimbrado) { comTimbrado.save(`Orcamento_${quote.quoteNumber}.pdf`); return; }
+
+    const doc = new jsPDF();
+
+    // Header - Branding (usado quando não há papel timbrado cadastrado)
     doc.setFillColor(37, 99, 235); // Primary color
     doc.rect(0, 0, 210, 40, 'F');
     
@@ -429,6 +513,41 @@ export const Quotes: React.FC = () => {
             Novo Orçamento
           </button>
         </div>
+
+      {/* Papel timbrado — sai no PDF de todos os orçamentos desta entidade */}
+      <div className="rounded-2xl bg-surface p-5 border border-line shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-muted text-content-muted">
+              <ImagePlus className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-black text-content">Papel timbrado</p>
+              <p className="text-xs text-content-subtle">
+                Envie o A4 com sua logo. Todo orçamento passa a sair nele, pronto para baixar, imprimir ou enviar.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {letterhead && (
+              <img src={letterhead} alt="Papel timbrado" className="h-16 w-auto rounded-lg border border-line" />
+            )}
+            <label className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">
+              {uploadingLetterhead ? 'Processando...' : letterhead ? 'Trocar' : 'Enviar imagem'}
+              <input
+                type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                disabled={uploadingLetterhead}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleLetterheadUpload(f); e.target.value = ''; }}
+              />
+            </label>
+            {letterhead && (
+              <button onClick={removeLetterhead}
+                className="text-xs font-bold text-content-subtle hover:text-rose-600">Remover</button>
+            )}
+          </div>
+        </div>
+      </div>
+
         
         {/* Decorative elements */}
         <div className="absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
@@ -500,12 +619,26 @@ export const Quotes: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 border-t pt-4 sm:border-t-0 sm:pt-0 sm:pl-6 sm:border-l">
-                <button 
+                <button
                   onClick={() => exportPDF(quote)}
                   className="rounded-xl p-2.5 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
-                  title="Exportar PDF"
+                  title="Baixar PDF"
+                >
+                  <Download className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => printQuote(quote)}
+                  className="rounded-xl p-2.5 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
+                  title="Imprimir"
                 >
                   <Printer className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => shareQuote(quote)}
+                  className="rounded-xl p-2.5 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
+                  title="Enviar / compartilhar"
+                >
+                  <Share2 className="h-5 w-5" />
                 </button>
                 <button 
                   onClick={() => handleEdit(quote)}
