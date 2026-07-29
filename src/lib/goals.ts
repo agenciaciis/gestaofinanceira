@@ -128,3 +128,76 @@ export function goalStatus(goal: Goal, saved: number, reference: Date = new Date
   }
   return 'em-andamento';
 }
+
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+export interface TimeProgress {
+  totalDays: number;
+  elapsedDays: number;
+  remainingDays: number;
+  /** 0 a 100 do prazo consumido. */
+  percent: number;
+}
+
+/**
+ * Quanto do PRAZO já passou — a metade que faltava.
+ *
+ * Ideia tirada da planilha antiga do usuário ("Faltam 3078 de 3652 dias"):
+ * progresso em dinheiro sozinho não diz nada. Guardar 40% é ótimo se passou
+ * 20% do tempo e é problema se passou 80%. É a comparação que revela atraso.
+ */
+export function timeProgress(goal: Goal, reference: Date = new Date()): TimeProgress | null {
+  if (!goal.deadline) return null;
+  const fim = parseLocalDate(goal.deadline);
+  if (Number.isNaN(fim.getTime())) return null;
+
+  // Sem data de criação, assume um ano de janela — melhor que não mostrar nada.
+  // A string vai por parseLocalDate: `new Date('2026-01-01')` é lido como UTC e
+  // no Brasil volta um dia, o que somava 365 num intervalo de 364.
+  const criado = !goal.createdAt
+    ? new Date(fim.getFullYear() - 1, fim.getMonth(), fim.getDate())
+    : typeof goal.createdAt === 'string'
+      ? parseLocalDate(goal.createdAt)
+      : new Date(goal.createdAt?.toDate?.() ?? goal.createdAt);
+  const inicio = Number.isNaN(criado.getTime())
+    ? new Date(fim.getFullYear() - 1, fim.getMonth(), fim.getDate())
+    : new Date(criado.getFullYear(), criado.getMonth(), criado.getDate());
+
+  const hoje = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  const totalDays = Math.max(1, Math.round((fim.getTime() - inicio.getTime()) / MS_DIA));
+  const elapsedDays = Math.min(totalDays, Math.max(0, Math.round((hoje.getTime() - inicio.getTime()) / MS_DIA)));
+
+  return {
+    totalDays,
+    elapsedDays,
+    remainingDays: Math.max(0, totalDays - elapsedDays),
+    percent: round2((elapsedDays / totalDays) * 100),
+  };
+}
+
+export type PaceVerdict = 'concluido' | 'adiantado' | 'em-dia' | 'atrasado';
+
+/** Folga aceita entre dinheiro e tempo antes de chamar de adiantado/atrasado. */
+const FOLGA_PP = 5;
+
+/**
+ * Compara progresso do dinheiro com progresso do tempo.
+ * `null` quando não há prazo — sem data não existe ritmo a julgar.
+ */
+export function paceVerdict(
+  goal: Goal,
+  saved: number,
+  reference: Date = new Date()
+): PaceVerdict | null {
+  const alvo = Number(goal.targetAmount) || 0;
+  if (alvo > 0 && saved >= alvo) return 'concluido';
+
+  const tempo = timeProgress(goal, reference);
+  if (!tempo) return null;
+
+  const dinheiroPct = alvo > 0 ? (saved / alvo) * 100 : 0;
+  const diff = dinheiroPct - tempo.percent;
+  if (diff > FOLGA_PP) return 'adiantado';
+  if (diff < -FOLGA_PP) return 'atrasado';
+  return 'em-dia';
+}

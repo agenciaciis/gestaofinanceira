@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus } from './goals';
+import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus, timeProgress, paceVerdict } from './goals';
 import { Goal, Transaction } from '../types';
 
 const goal = (over: Partial<Goal> = {}): Goal => ({
@@ -132,6 +132,59 @@ describe('goalForecast', () => {
     const txs = [tx({ id: '1', amount: 9000, goalId: 'g1', date: '2026-06-10' })];
     const f = goalForecast(goal(), txs, REF);
     expect(f.monthsToFinish).toBe(0);
+  });
+});
+
+describe('timeProgress', () => {
+  it('mede quanto do prazo já passou, contando desde a criação', () => {
+    const g = goal({ deadline: '2026-12-31', createdAt: '2026-01-01' });
+    // 01/01 a 31/12 = 364 dias; em 15/07 passaram 195
+    const t = timeProgress(g, REF)!;
+    expect(t.totalDays).toBe(364);
+    expect(t.elapsedDays).toBe(195);
+    expect(t.remainingDays).toBe(169);
+    expect(t.percent).toBeCloseTo(53.6, 0);
+  });
+
+  it('sem prazo não há progresso de tempo', () => {
+    expect(timeProgress(goal(), REF)).toBeNull();
+  });
+
+  it('prazo vencido trava em 100% e zero dias restantes', () => {
+    const t = timeProgress(goal({ deadline: '2026-01-01', createdAt: '2025-01-01' }), REF)!;
+    expect(t.percent).toBe(100);
+    expect(t.remainingDays).toBe(0);
+  });
+
+  it('sem data de criação assume o começo do mês do prazo anterior, sem quebrar', () => {
+    const t = timeProgress(goal({ deadline: '2026-12-31' }), REF);
+    expect(t).not.toBeNull();
+    expect(Number.isFinite(t!.percent)).toBe(true);
+  });
+});
+
+describe('paceVerdict', () => {
+  const g = goal({ targetAmount: 1000, deadline: '2026-12-31', createdAt: '2026-01-01' });
+
+  it('dinheiro na frente do tempo = adiantado', () => {
+    // ~54% do tempo passou; 80% guardado
+    expect(paceVerdict(g, 800, REF)).toBe('adiantado');
+  });
+
+  it('dinheiro atrás do tempo = atrasado', () => {
+    expect(paceVerdict(g, 200, REF)).toBe('atrasado');
+  });
+
+  it('empatado dentro da folga = em dia', () => {
+    expect(paceVerdict(g, 540, REF)).toBe('em-dia');
+  });
+
+  it('meta batida é sempre concluída, mesmo com o tempo curto', () => {
+    expect(paceVerdict(g, 1000, REF)).toBe('concluido');
+  });
+
+  it('sem prazo não há veredito de ritmo', () => {
+    expect(paceVerdict(goal({ targetAmount: 1000 }), 100, REF)).toBeNull();
   });
 });
 

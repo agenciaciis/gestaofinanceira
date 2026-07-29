@@ -15,7 +15,7 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus } from '../lib/goals';
+import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus, timeProgress, paceVerdict } from '../lib/goals';
 import { goalsDocPath, readGoals, upsertGoal, removeGoal } from '../lib/goalStore';
 import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
 import { formatLocalDate } from '../lib/finance';
@@ -376,6 +376,8 @@ export const Goals: React.FC = () => {
             const perMonth = monthlyNeeded(p.remaining, goal.deadline);
             const forecast = goalForecast(goal, transactions);
             const accent = normalizeHex(goal.color) || '#2563eb';
+            const tempo = timeProgress(goal);
+            const ritmo = paceVerdict(goal, p.saved);
             const entity = entities.find(e => e.id === goal.entityId);
 
             return (
@@ -428,11 +430,39 @@ export const Goals: React.FC = () => {
                     />
                   </div>
                   <div className="mt-1 flex justify-between text-[11px] font-bold">
-                    <span style={{ color: accent }}>{p.percent.toFixed(0)}%</span>
+                    <span style={{ color: accent }}>{p.percent.toFixed(0)}% do dinheiro</span>
                     <span className="text-content-subtle">
                       {p.complete ? 'Meta batida!' : `Faltam ${fmt(p.remaining)}`}
                     </span>
                   </div>
+
+                  {/* Progresso do TEMPO. Sozinho, o do dinheiro não diz nada:
+                      40% guardado é ótimo com 20% do prazo e ruim com 80%. */}
+                  {tempo && (
+                    <div className="mt-3">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+                        <div className="h-full rounded-full bg-content-subtle/60" style={{ width: `${tempo.percent}%` }} />
+                      </div>
+                      <div className="mt-1 flex justify-between text-[11px] font-bold text-content-subtle">
+                        <span>{tempo.percent.toFixed(0)}% do prazo</span>
+                        <span>
+                          {tempo.remainingDays === 0
+                            ? 'Prazo encerrado'
+                            : `Faltam ${tempo.remainingDays} de ${tempo.totalDays} dias`}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {ritmo && ritmo !== 'concluido' && (
+                    <p className={cn('mt-2 text-xs font-bold',
+                      ritmo === 'adiantado' ? 'text-emerald-600'
+                        : ritmo === 'atrasado' ? 'text-rose-600' : 'text-content-muted')}>
+                      {ritmo === 'adiantado' ? 'Você está adiantado no ritmo'
+                        : ritmo === 'atrasado' ? 'Você está atrasado para o prazo'
+                        : 'No ritmo certo'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-5 flex gap-2">
