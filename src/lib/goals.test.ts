@@ -36,6 +36,30 @@ describe('computeGoalProgress', () => {
     expect(computeGoalProgress(goal(), txs).saved).toBe(600);
   });
 
+  it('resgate marcado como saída DIMINUI, mesmo sendo transferência', () => {
+    // Guardar e resgatar são os dois 'transfer'. Sem a direção explícita, o
+    // resgate somaria no progresso — o oposto do que aconteceu de verdade.
+    const txs = [
+      tx({ id: '1', amount: 1000, goalId: 'g1', type: 'transfer', goalDirection: 'in' }),
+      tx({ id: '2', amount: 400, goalId: 'g1', type: 'transfer', goalDirection: 'out' }),
+    ];
+    expect(computeGoalProgress(goal(), txs).saved).toBe(600);
+  });
+
+  it('direção explícita vence a inferência pelo tipo', () => {
+    // Receita marcada como entrada (dinheiro que chegou e foi direto guardado)
+    const txs = [tx({ id: '1', amount: 500, goalId: 'g1', type: 'income', goalDirection: 'in' })];
+    expect(computeGoalProgress(goal(), txs).saved).toBe(500);
+  });
+
+  it('sem direção, mantém a inferência antiga pelo tipo', () => {
+    const txs = [
+      tx({ id: '1', amount: 800, goalId: 'g1', type: 'expense' }),
+      tx({ id: '2', amount: 300, goalId: 'g1', type: 'income' }),
+    ];
+    expect(computeGoalProgress(goal(), txs).saved).toBe(500);
+  });
+
   it('ignora pendentes e cancelados: só conta o que saiu do bolso', () => {
     const txs = [
       tx({ id: '1', amount: 1000, goalId: 'g1' }),

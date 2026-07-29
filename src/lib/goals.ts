@@ -6,8 +6,11 @@
  * desatualiza e não existe a chance de o saldo da caixinha discordar do
  * extrato.
  *
- * Convenção de sinal: dinheiro ENTRANDO na caixinha sai da sua conta, então é
- * despesa/transferência (+). Resgatar de volta é receita (−).
+ * Sinal do movimento: quando o lançamento traz `goalDirection`, ela manda.
+ * Isso é necessário porque guardar e resgatar são os DOIS 'transfer' — o tipo
+ * do lançamento não distingue, e sem a direção o resgate somaria no progresso.
+ * Sem `goalDirection`, cai na inferência antiga: despesa/transferência entra
+ * (+), receita sai (−).
  */
 import { Goal, Transaction } from '../types';
 import { parseLocalDate, round2 } from './finance';
@@ -26,7 +29,10 @@ export function computeGoalProgress(goal: Goal, transactions: Transaction[]): Go
     if (t.goalId !== goal.id) continue;
     if (t.status !== 'completed') continue;
     const amount = Number(t.amount) || 0;
-    saved = round2(saved + (t.type === 'income' ? -amount : amount));
+    const entra = t.goalDirection
+      ? t.goalDirection === 'in'
+      : t.type !== 'income';
+    saved = round2(saved + (entra ? amount : -amount));
   }
 
   const target = Number(goal.targetAmount) || 0;
@@ -89,7 +95,9 @@ export function goalForecast(
     if (t.goalId !== goal.id || t.status !== 'completed') continue;
     const d = parseLocalDate(t.date);
     if (Number.isNaN(d.getTime()) || d < start || d >= firstOfCurrent) continue;
-    total += t.type === 'income' ? -(Number(t.amount) || 0) : (Number(t.amount) || 0);
+    const valor = Number(t.amount) || 0;
+    const entra = t.goalDirection ? t.goalDirection === 'in' : t.type !== 'income';
+    total += entra ? valor : -valor;
     monthsWithData.add(`${d.getFullYear()}-${d.getMonth()}`);
   }
 

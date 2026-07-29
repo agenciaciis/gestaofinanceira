@@ -108,8 +108,14 @@ export interface Transaction {
   counterpartEntityId?: string;
   /** Despesa pessoal paga pela empresa — o que o contador precisa enxergar. */
   personalExpense?: boolean;
-  /** Vínculo com uma meta/caixinha. Despesa/transferência = depósito; receita = resgate. */
+  /** Vínculo com uma meta/caixinha. */
   goalId?: string;
+  /**
+   * Direção EXPLÍCITA do movimento na caixinha. Necessário porque guardar e
+   * resgatar são os dois 'transfer': o tipo do lançamento não distingue.
+   * Ausente = infere pelo tipo (compatível com lançamentos antigos).
+   */
+  goalDirection?: 'in' | 'out';
 }
 
 /** Meta de poupança — praia, carro, reserva. O guardado é derivado dos lançamentos. */
@@ -137,13 +143,14 @@ export interface CreditScoreEntry {
   createdAt: any;
 }
 
-export type CrossEntityKind = 'prolabore' | 'distribuicao' | 'aporte' | 'reembolso';
+export type CrossEntityKind = 'prolabore' | 'distribuicao' | 'aporte' | 'reembolso' | 'transferencia';
 
 export const CROSS_ENTITY_KIND_LABELS: Record<CrossEntityKind, string> = {
   prolabore: 'Pró-labore',
   distribuicao: 'Distribuição de lucros',
   aporte: 'Aporte na empresa',
   reembolso: 'Reembolso',
+  transferencia: 'Transferência entre contas',
 };
 
 export interface Client {
