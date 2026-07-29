@@ -19,6 +19,21 @@ import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus } from '..
 import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
 import { formatLocalDate } from '../lib/finance';
 
+/**
+ * Objetivos comuns, para não começar de uma tela em branco.
+ * O valor é só um ponto de partida sugerido — cada um ajusta ao seu caso.
+ */
+const OBJETIVOS_PRONTOS: { nome: string; valor: number; cor: string; dica: string }[] = [
+  { nome: 'Férias', valor: 6000, cor: '#00aeef', dica: 'passagem, hospedagem, alimentação e um extra para imprevisto' },
+  { nome: 'Casa própria (entrada)', valor: 60000, cor: '#3fa110', dica: 'entrada costuma ser 20% do valor do imóvel' },
+  { nome: 'Reforma', valor: 25000, cor: '#ff7a00', dica: 'peça orçamento e acrescente 20% de folga — reforma sempre passa' },
+  { nome: 'Carro', valor: 40000, cor: '#e11d48', dica: 'lembre de documentação, seguro e emplacamento' },
+  { nome: 'Reserva de emergência', valor: 0, cor: '#10b981', dica: 'de 3 a 6 meses da sua despesa mensal' },
+  { nome: 'Casamento', valor: 30000, cor: '#820ad1', dica: '' },
+  { nome: 'Faculdade / curso', valor: 15000, cor: '#6366f1', dica: '' },
+  { nome: 'Troca de equipamento', valor: 8000, cor: '#242424', dica: 'notebook, celular, câmera' },
+];
+
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
 
@@ -29,6 +44,7 @@ export const Goals: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Goal | null>(null);
 
@@ -57,13 +73,24 @@ export const Goals: React.FC = () => {
         allGoals = [...allGoals.filter(g => g.entityId !== entity.id), ...list];
         setGoals([...allGoals]);
         setLoading(false);
-      }, e => handleFirestoreError(e, OperationType.LIST, `entities/${entity.id}/goals`)));
+      }, e => {
+        // Sem isto o loading ficava true para sempre e a página travava no
+        // círculo girando — falha silenciosa, o pior tipo.
+        setLoading(false);
+        setLoadError(
+          (e as { code?: string })?.code === 'permission-denied'
+            ? 'permission-denied'
+            : 'unknown'
+        );
+        handleFirestoreError(e, OperationType.LIST, `entities/${entity.id}/goals`);
+      }));
 
       unsubs.push(onSnapshot(query(collection(db, `entities/${entity.id}/transactions`)), snap => {
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
         allTx = [...allTx.filter(t => t.entityId !== entity.id), ...list];
         setTransactions([...allTx]);
       }, e => handleFirestoreError(e, OperationType.LIST, `entities/${entity.id}/transactions`)));
+
     });
 
     return () => unsubs.forEach(u => u());
@@ -144,6 +171,45 @@ export const Goals: React.FC = () => {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/40 p-8">
+        <h2 className="text-xl font-black text-amber-900 dark:text-amber-200">
+          As caixinhas ainda não estão liberadas no banco
+        </h2>
+        {loadError === 'permission-denied' ? (
+          <>
+            <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+              A regra de acesso desta coleção existe no arquivo do projeto, mas ainda não foi
+              publicada no Firebase. Enquanto isso, o banco recusa a leitura e a gravação.
+            </p>
+            <p className="mt-4 text-sm font-bold text-amber-900 dark:text-amber-200">
+              Jeito mais rápido, sem instalar nada:
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-amber-800 dark:text-amber-300">
+              <li>Abra o Console do Firebase → Firestore Database → aba <strong>Regras</strong></li>
+              <li>Cole o conteúdo do arquivo <code className="rounded bg-amber-900/20 px-1">firestore.rules</code> do projeto</li>
+              <li>Clique em <strong>Publicar</strong></li>
+            </ol>
+            <p className="mt-4 text-sm font-bold text-amber-900 dark:text-amber-200">Ou, pelo terminal:</p>
+            <pre className="mt-2 overflow-x-auto rounded-xl bg-amber-900 p-4 text-xs text-amber-50">
+npm i -g firebase-tools
+firebase login
+firebase deploy --only firestore:rules</pre>
+            <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
+              Isso também libera o score do Serasa e a taxa de juros dos parcelamentos, que
+              dependem das mesmas regras novas.
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+            Não consegui carregar as caixinhas. Veja o console do navegador para o erro completo.
+          </p>
+        )}
       </div>
     );
   }
@@ -308,6 +374,32 @@ export const Goals: React.FC = () => {
             <h3 className="text-xl font-black text-content">{editing ? 'Editar caixinha' : 'Nova caixinha'}</h3>
             <p className="text-sm text-content-subtle">Um objetivo por caixinha. O progresso vem dos lançamentos.</p>
 
+            {!editing && (
+              <div className="mt-5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">
+                  Comece por um destes
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {OBJETIVOS_PRONTOS.map(o => (
+                    <button
+                      key={o.nome}
+                      type="button"
+                      onClick={() => {
+                        setName(o.nome);
+                        if (o.valor > 0) setTargetAmount(String(o.valor));
+                        setColor(o.cor);
+                        if (o.dica) setDescription(o.dica);
+                      }}
+                      className="rounded-full border border-line px-3 py-1.5 text-xs font-bold text-content-muted hover:border-primary hover:text-primary transition-all"
+                    >
+                      <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: o.cor }} />
+                      {o.nome}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-content-muted">Nome do objetivo</label>
@@ -336,6 +428,33 @@ export const Goals: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Planejamento ao vivo: responde antes de salvar */}
+              {Number(targetAmount) > 0 && (
+                <div className="rounded-2xl bg-surface-muted p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Planejamento</p>
+                  {deadline ? (
+                    (() => {
+                      const porMes = monthlyNeeded(Number(targetAmount), deadline);
+                      const meses = porMes && porMes > 0 ? Math.ceil(Number(targetAmount) / porMes) : 0;
+                      return (
+                        <>
+                          <p className="mt-1 text-sm text-content-muted">
+                            Para juntar <strong className="text-content">{fmt(Number(targetAmount))}</strong> até{' '}
+                            {format(new Date(deadline + 'T00:00:00'), "MMMM 'de' yyyy", { locale: ptBR })}, você precisa guardar
+                          </p>
+                          <p className="text-2xl font-black text-primary">{fmt(porMes || 0)}<span className="text-sm font-bold text-content-subtle"> por mês</span></p>
+                          <p className="mt-1 text-xs text-content-subtle">São {meses} {meses === 1 ? 'depósito' : 'depósitos'} mensais.</p>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <p className="mt-1 text-sm text-content-subtle">
+                      Coloque uma data em "até quando" e eu calculo aqui quanto você precisa guardar por mês.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* PF ou PJ — separação é o ponto central do sistema */}
               <div>

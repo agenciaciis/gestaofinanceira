@@ -31,12 +31,18 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
   const [score, setScore] = useState('');
   const [date, setDate] = useState(formatLocalDate(new Date()));
   const [notes, setNotes] = useState('');
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, `entities/${entity.id}/credit_scores`), orderBy('date', 'desc'));
     return onSnapshot(q, snap => {
       setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() })) as CreditScoreEntry[]);
-    }, e => handleFirestoreError(e, OperationType.LIST, `entities/${entity.id}/credit_scores`));
+    }, e => {
+      // Sem isto a tela diria "nenhum score anotado" quando na verdade o banco
+      // recusou o acesso — engana mais que mostrar o erro.
+      if ((e as { code?: string })?.code === 'permission-denied') setBlocked(true);
+      handleFirestoreError(e, OperationType.LIST, `entities/${entity.id}/credit_scores`);
+    });
   }, [entity.id]);
 
   const trend = useMemo(() => scoreTrend(entries.map(e => ({ score: e.score, date: e.date }))), [entries]);
@@ -93,7 +99,16 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
         </button>
       </div>
 
-      {!latest ? (
+      {blocked ? (
+        <div className="mt-6 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/40 p-6">
+          <p className="font-bold text-amber-900 dark:text-amber-200">Score bloqueado pelo banco de dados</p>
+          <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+            A regra de acesso desta coleção ainda não foi publicada no Firebase. Publique o arquivo
+            <code className="mx-1 rounded bg-amber-900/20 px-1">firestore.rules</code>
+            (Console do Firebase → Firestore → Regras → Publicar) e isso volta a funcionar.
+          </p>
+        </div>
+      ) : !latest ? (
         <div className="mt-6 rounded-2xl border border-dashed border-line p-8 text-center">
           <p className="font-bold text-content">Nenhum score anotado ainda</p>
           <p className="mt-1 text-sm text-content-subtle">
