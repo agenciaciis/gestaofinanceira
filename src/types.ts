@@ -195,6 +195,18 @@ export interface Supplier {
   createdAt: any;
 }
 
+export type ServiceUnit = 'projeto' | 'hora' | 'mes' | 'diaria' | 'unidade' | 'palavra' | 'post';
+
+export const SERVICE_UNIT_LABELS: Record<ServiceUnit, string> = {
+  projeto: 'por projeto',
+  hora: 'por hora',
+  mes: 'por mês',
+  diaria: 'por diária',
+  unidade: 'por unidade',
+  palavra: 'por palavra',
+  post: 'por post',
+};
+
 export interface Service {
   id: string;
   name: string;
@@ -203,6 +215,23 @@ export interface Service {
   category: string;
   entityId: string;
   createdAt: any;
+  /** Código interno para referência em orçamento e contrato. */
+  code?: string;
+  /** Unidade de cobrança — muda como o preço é lido no orçamento. */
+  unit?: ServiceUnit;
+  /** Custo de execução (mão de obra, ferramentas, terceiros). Base da margem. */
+  costPrice?: number;
+  /** Horas estimadas de execução. */
+  estimatedHours?: number;
+  /** Prazo de entrega em dias úteis. */
+  deliveryDays?: number;
+  /** O que está incluso — vira o detalhamento do orçamento. */
+  scope?: string;
+  /** O que NÃO está incluso — evita discussão depois. */
+  notIncluded?: string;
+  /** Condições, observações, pré-requisitos do cliente. */
+  observations?: string;
+  active?: boolean;
 }
 
 export interface Plan {

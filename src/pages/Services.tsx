@@ -3,7 +3,7 @@ import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Service, Plan } from '../types';
+import { Service, Plan, ServiceUnit, SERVICE_UNIT_LABELS } from '../types';
 import { 
   Package, 
   Plus, 
@@ -37,6 +37,16 @@ export const Services: React.FC = () => {
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
+  // Campos profissionais do serviço
+  const [code, setCode] = useState('');
+  const [unit, setUnit] = useState<ServiceUnit>('projeto');
+  const [costPrice, setCostPrice] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [deliveryDays, setDeliveryDays] = useState('');
+  const [scope, setScope] = useState('');
+  const [notIncluded, setNotIncluded] = useState('');
+  const [observations, setObservations] = useState('');
+  const [active, setActive] = useState(true);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   useEffect(() => {
@@ -77,6 +87,15 @@ export const Services: React.FC = () => {
           description,
           basePrice: Number(price) || 0,
           category,
+          code: code.trim() || null,
+          unit,
+          costPrice: costPrice === '' ? null : Number(costPrice) || 0,
+          estimatedHours: estimatedHours === '' ? null : Number(estimatedHours) || 0,
+          deliveryDays: deliveryDays === '' ? null : Number(deliveryDays) || 0,
+          scope: scope.trim() || null,
+          notIncluded: notIncluded.trim() || null,
+          observations: observations.trim() || null,
+          active,
           entityId: selectedEntity.id,
           ownerUid: selectedEntity.ownerUid,
           collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
@@ -124,6 +143,8 @@ export const Services: React.FC = () => {
     setCategory('');
     setBillingCycle('monthly');
     setSelectedServices([]);
+    setCode(''); setUnit('projeto'); setCostPrice(''); setEstimatedHours('');
+    setDeliveryDays(''); setScope(''); setNotIncluded(''); setObservations(''); setActive(true);
     setEditingItem(null);
   };
 
@@ -134,7 +155,17 @@ export const Services: React.FC = () => {
     setPrice(activeTab === 'services' ? (item as Service).basePrice.toString() : (item as Plan).price.toString());
     
     if (activeTab === 'services') {
-      setCategory((item as Service).category);
+      const sv = item as Service;
+      setCategory(sv.category);
+      setCode(sv.code || '');
+      setUnit(sv.unit || 'projeto');
+      setCostPrice(sv.costPrice != null ? String(sv.costPrice) : '');
+      setEstimatedHours(sv.estimatedHours != null ? String(sv.estimatedHours) : '');
+      setDeliveryDays(sv.deliveryDays != null ? String(sv.deliveryDays) : '');
+      setScope(sv.scope || '');
+      setNotIncluded(sv.notIncluded || '');
+      setObservations(sv.observations || '');
+      setActive(sv.active !== false);
     } else {
       setBillingCycle((item as Plan).billingCycle);
       setSelectedServices((item as Plan).services);
@@ -431,6 +462,95 @@ export const Services: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Campos profissionais do serviço — o que faz o orçamento sair completo */}
+                {activeTab === 'services' && (
+                  <div className="space-y-4 rounded-2xl border border-line p-4">
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-sm font-bold text-content-muted mb-2">Código</label>
+                        <input type="text" value={code} onChange={e => setCode(e.target.value)}
+                          placeholder="Ex: SM-01"
+                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-content-muted mb-2">Cobrança</label>
+                        <select value={unit} onChange={e => setUnit(e.target.value as ServiceUnit)}
+                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary">
+                          {Object.entries(SERVICE_UNIT_LABELS).map(([v, l]) => (
+                            <option key={v} value={v}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-content-muted mb-2">Prazo (dias úteis)</label>
+                        <input type="number" min="0" value={deliveryDays} onChange={e => setDeliveryDays(e.target.value)}
+                          placeholder="Ex: 15"
+                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary" />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-sm font-bold text-content-muted mb-2">Custo de execução</label>
+                        <input type="number" step="0.01" min="0" value={costPrice} onChange={e => setCostPrice(e.target.value)}
+                          placeholder="0,00"
+                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-content-muted mb-2">Horas estimadas</label>
+                        <input type="number" step="0.5" min="0" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)}
+                          placeholder="Ex: 20"
+                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary" />
+                      </div>
+                      <div className="flex flex-col justify-end">
+                        {/* Margem: o número que diz se vale a pena vender esse serviço */}
+                        {Number(price) > 0 && costPrice !== '' && (
+                          <div className="rounded-xl bg-surface-muted px-4 py-2.5">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Margem</p>
+                            <p className={cn('text-lg font-black',
+                              (Number(price) - Number(costPrice)) / Number(price) >= 0.4 ? 'text-emerald-600'
+                                : (Number(price) - Number(costPrice)) / Number(price) >= 0.2 ? 'text-amber-600' : 'text-rose-600')}>
+                              {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(0)}%
+                              <span className="ml-2 text-xs font-bold text-content-subtle">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(price) - Number(costPrice))}
+                              </span>
+                            </p>
+                            {Number(estimatedHours) > 0 && (
+                              <p className="text-[10px] text-content-subtle">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(price) / Number(estimatedHours))}/hora
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-content-muted mb-2">O que está incluso</label>
+                      <textarea value={scope} onChange={e => setScope(e.target.value)} rows={2}
+                        placeholder="Ex: 12 posts por mês, 2 rodadas de ajuste, relatório mensal"
+                        className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-content-muted mb-2">O que NÃO está incluso</label>
+                      <textarea value={notIncluded} onChange={e => setNotIncluded(e.target.value)} rows={2}
+                        placeholder="Ex: verba de anúncio, produção de vídeo, banco de imagens"
+                        className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary" />
+                      <p className="mt-1 text-xs text-content-subtle">Deixar isso escrito evita discussão depois da venda.</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-content-muted mb-2">Observações e condições</label>
+                      <textarea value={observations} onChange={e => setObservations(e.target.value)} rows={2}
+                        placeholder="Ex: cliente fornece acesso às contas; início após aprovação do briefing"
+                        className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary" />
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="rounded text-primary" />
+                      <span className="text-sm font-bold text-content-muted">Serviço ativo (aparece no orçamento)</span>
+                    </label>
+                  </div>
+                )}
 
                 {activeTab === 'plans' && (
                   <div>
