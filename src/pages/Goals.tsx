@@ -19,6 +19,7 @@ import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus, timeProgr
 import { goalsDocPath, readGoals, upsertGoal, removeGoal } from '../lib/goalStore';
 import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
 import { formatLocalDate } from '../lib/finance';
+import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 
 /**
  * Objetivos comuns, para não começar de uma tela em branco.
@@ -48,6 +49,7 @@ export const Goals: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useViewMode('caixinhas', 'grid');
   // Movimentação: guardar na caixinha ou resgatar dela
   const [moving, setMoving] = useState<{ goal: Goal; mode: 'guardar' | 'resgatar' } | null>(null);
   const [moveAmount, setMoveAmount] = useState('');
@@ -304,6 +306,56 @@ export const Goals: React.FC = () => {
     return { saved, target, concluidas };
   }, [goals, transactions]);
 
+  const colunasCaixinhas: Column<Goal>[] = [
+    {
+      chave: 'nome', titulo: 'Objetivo',
+      render: (g) => (
+        <span className="flex items-center gap-2">
+          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: normalizeHex(g.color) || '#2563eb' }} />
+          <span className="font-bold text-content">{g.name}</span>
+          <span className="rounded bg-surface-muted px-1.5 text-[10px] font-black text-content-subtle">
+            {entities.find(e => e.id === g.entityId)?.type}
+          </span>
+        </span>
+      ),
+    },
+    { chave: 'meta', titulo: 'Meta', numerico: true, render: (g) => fmt(g.targetAmount) },
+    {
+      chave: 'guardado', titulo: 'Guardado', numerico: true,
+      render: (g) => {
+        const p = computeGoalProgress(g, transactions);
+        return <span className="font-black text-emerald-600">{fmt(p.saved)}</span>;
+      },
+    },
+    {
+      chave: 'progresso', titulo: 'Dinheiro', numerico: true,
+      render: (g) => `${computeGoalProgress(g, transactions).percent.toFixed(0)}%`,
+    },
+    {
+      chave: 'tempo', titulo: 'Prazo', numerico: true, escondeNoMobile: true,
+      render: (g) => {
+        const t = timeProgress(g);
+        return t ? `${t.percent.toFixed(0)}% · ${t.remainingDays}d` : 'sem prazo';
+      },
+    },
+    {
+      chave: 'ritmo', titulo: 'Ritmo',
+      render: (g) => {
+        const p = computeGoalProgress(g, transactions);
+        const r = paceVerdict(g, p.saved);
+        if (!r) return <span className="text-content-subtle">—</span>;
+        const rotulo = { concluido: 'Conquistada', adiantado: 'Adiantado', 'em-dia': 'No ritmo', atrasado: 'Atrasado' }[r];
+        return (
+          <span className={cn('text-xs font-bold',
+            r === 'concluido' || r === 'adiantado' ? 'text-emerald-600'
+              : r === 'atrasado' ? 'text-rose-600' : 'text-content-muted')}>
+            {rotulo}
+          </span>
+        );
+      },
+    },
+  ];
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -334,12 +386,15 @@ export const Goals: React.FC = () => {
             Junte dinheiro para o que você quer. O guardado vem dos seus lançamentos — nada é digitado à mão.
           </p>
         </div>
-        <button
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
-        >
-          <Plus className="h-4 w-4" /> Nova Caixinha
-        </button>
+        <div className="flex items-center gap-3">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+          >
+            <Plus className="h-4 w-4" /> Nova Caixinha
+          </button>
+        </div>
       </div>
 
       {goals.length > 0 && (
@@ -369,6 +424,28 @@ export const Goals: React.FC = () => {
           </p>
         </div>
       ) : (
+        viewMode === 'list' ? (
+          <DataTable
+            itens={goals}
+            colunas={colunasCaixinhas}
+            acoes={(g) => (
+              <>
+                <button onClick={() => openMove(g, 'guardar')} title="Guardar"
+                  className="rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-primary/90">
+                  Guardar
+                </button>
+                <button onClick={() => openEdit(g)} title="Editar"
+                  className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button onClick={() => handleDelete(g)} title="Excluir"
+                  className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          />
+        ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {goals.map(goal => {
             const p = computeGoalProgress(goal, transactions);
@@ -520,6 +597,7 @@ export const Goals: React.FC = () => {
             );
           })}
         </div>
+        )
       )}
 
       {moving && (
