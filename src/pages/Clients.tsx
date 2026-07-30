@@ -64,6 +64,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { partyTotals } from '../lib/quotes';
+import { parseLocalDate } from '../lib/finance';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const Clients: React.FC = () => {
@@ -72,6 +73,7 @@ export const Clients: React.FC = () => {
   const { theme } = useTheme();
   const [clients, setClients] = useState<Client[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [historyClient, setHistoryClient] = useState<Client | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -390,6 +392,10 @@ export const Clients: React.FC = () => {
           colunas={colunasClientes}
           acoes={(c) => (
             <>
+              <button onClick={() => setHistoryClient(c)} title="Histórico"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Activity className="h-4 w-4" />
+              </button>
               <button onClick={() => handleEdit(c)} title="Editar"
                 className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
                 <Edit2 className="h-4 w-4" />
@@ -420,7 +426,14 @@ export const Clients: React.FC = () => {
                   <User className="h-6 w-6" />
                 </div>
                 <div className="flex gap-2">
-                  <button 
+                  <button
+                    onClick={() => setHistoryClient(client)}
+                    title="Histórico"
+                    className="rounded-lg p-2 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
+                  >
+                    <Activity className="h-4 w-4" />
+                  </button>
+                  <button
                     onClick={() => handleEdit(client)}
                     className="rounded-lg p-2 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
                   >
@@ -621,6 +634,81 @@ export const Clients: React.FC = () => {
           ))}
         </AnimatePresence>
       </div>}
+
+      {/* Histórico do cliente: totais + lançamentos vinculados */}
+      <AnimatePresence>
+        {historyClient && (() => {
+          const pt = partyTotals(transactions, historyClient.id);
+          const doCliente = transactions
+            .filter(t => t.clientId === historyClient.id)
+            .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl"
+              >
+                <div className="flex items-center justify-between border-b border-line p-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-content">Histórico — {historyClient.name}</h3>
+                    <p className="text-sm text-content-subtle">Recebimentos e movimentos vinculados a este cliente.</p>
+                  </div>
+                  <button onClick={() => setHistoryClient(null)} className="rounded-full p-2 text-content-subtle hover:bg-surface-muted">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3 p-6 sm:grid-cols-4">
+                  <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Recebido</p>
+                    <p className="text-lg font-black text-emerald-700 dark:text-emerald-300">{brl(pt.recebido)}</p>
+                  </div>
+                  <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">A receber</p>
+                    <p className="text-lg font-black text-blue-700 dark:text-blue-300">{brl(pt.aReceber)}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-muted p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">Pago a ele</p>
+                    <p className="text-lg font-black text-content">{brl(pt.pago)}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-muted p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">Lançamentos</p>
+                    <p className="text-lg font-black text-content">{doCliente.length}</p>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto px-6 pb-6">
+                  {doCliente.length === 0 ? (
+                    <p className="rounded-2xl border border-dashed border-line p-8 text-center text-sm text-content-subtle">
+                      Nenhum lançamento vinculado ainda. Converta um orçamento deste cliente em OS/receita para começar o histórico.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-line">
+                      {doCliente.map(t => (
+                        <div key={t.id} className="flex items-center justify-between py-3 text-sm">
+                          <div className="min-w-0">
+                            <p className="truncate font-bold text-content">{t.description}</p>
+                            <p className="text-xs text-content-subtle">
+                              {format(parseLocalDate(t.date), 'dd/MM/yyyy')}
+                              {' · '}
+                              <span className={cn('font-bold', t.status === 'completed' ? 'text-emerald-600' : t.status === 'pending' ? 'text-amber-600' : 'text-content-subtle')}>
+                                {t.status === 'completed' ? 'Recebido' : t.status === 'pending' ? 'A receber' : 'Cancelado'}
+                              </span>
+                            </p>
+                          </div>
+                          <p className={cn('shrink-0 font-black', t.type === 'income' ? 'text-emerald-600' : 'text-rose-600')}>
+                            {t.type === 'income' ? '+' : '-'} {brl(Number(t.amount) || 0)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
