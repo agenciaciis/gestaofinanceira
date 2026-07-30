@@ -124,6 +124,8 @@ export interface Transaction {
   tags?: string[];
   /** Vínculo com uma meta/caixinha. */
   goalId?: string;
+  /** Orçamento que originou este lançamento (OS convertida). Idempotência + histórico. */
+  sourceQuoteId?: string;
   /**
    * Direção EXPLÍCITA do movimento na caixinha. Necessário porque guardar e
    * resgatar são os dois 'transfer': o tipo do lançamento não distingue.

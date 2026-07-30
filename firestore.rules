@@ -255,6 +255,12 @@ service cloud.firestore {
         allow create, update, delete: if isEntityWriter(entityId);
       }
 
+      // Produtos (catálogo) — mesmo formato/regra de serviços.
+      match /products/{productId} {
+        allow read: if hasDocAccess() || hasEntityAccess(entityId);
+        allow create, update, delete: if isEntityWriter(entityId);
+      }
+
       match /plans/{planId} {
         allow read: if hasDocAccess() || hasEntityAccess(entityId);
         allow create, update, delete: if isEntityWriter(entityId);
