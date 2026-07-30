@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
 import { computeCardUsage } from '../lib/finance';
+import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -45,6 +46,7 @@ export const CreditCards: React.FC = () => {
   const [closingDay, setClosingDay] = useState('');
   const [targetEntityId, setTargetEntityId] = useState('');
   const [color, setColor] = useState('');
+  const [viewMode, setViewMode] = useViewMode('cartoes', 'grid');
 
   useEffect(() => {
     if (entities.length === 0) return;
@@ -210,6 +212,42 @@ export const CreditCards: React.FC = () => {
     return data;
   };
 
+  const brl = (n: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
+
+  const colunasCartoes: Column<CreditCard>[] = [
+    {
+      chave: 'nome', titulo: 'Cartão',
+      render: (c) => (
+        <span className="flex items-center gap-2">
+          <span className="h-3 w-3 shrink-0 rounded-full border border-line"
+            style={{ backgroundColor: normalizeHex(c.color) || '#111827' }} />
+          <span className="font-bold text-content">{c.name}</span>
+          <span className="text-[10px] font-black uppercase text-content-subtle">{c.brand}</span>
+        </span>
+      ),
+    },
+    { chave: 'limite', titulo: 'Limite', numerico: true, render: (c) => brl(c.limit) },
+    {
+      chave: 'usado', titulo: 'Utilizado', numerico: true,
+      render: (c) => {
+        const usado = calculateUsage(c.id);
+        const pct = c.limit > 0 ? (usado / c.limit) * 100 : 0;
+        return (
+          <span className={cn('font-bold', pct > 90 ? 'text-rose-600' : pct > 70 ? 'text-amber-600' : 'text-content-muted')}>
+            {brl(usado)} <span className="text-[10px] font-normal">({pct.toFixed(0)}%)</span>
+          </span>
+        );
+      },
+    },
+    {
+      chave: 'disponivel', titulo: 'Disponível', numerico: true,
+      render: (c) => <span className="font-bold text-emerald-600">{brl(c.limit - calculateUsage(c.id))}</span>,
+    },
+    { chave: 'fecha', titulo: 'Fecha', numerico: true, escondeNoMobile: true, render: (c) => `dia ${c.closingDay}` },
+    { chave: 'vence', titulo: 'Vence', numerico: true, escondeNoMobile: true, render: (c) => `dia ${c.dueDay}` },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -217,16 +255,39 @@ export const CreditCards: React.FC = () => {
           <h2 className="text-2xl font-bold text-content">Cartões de Crédito</h2>
           <p className="text-sm text-content-subtle">Controle seus limites e faturas.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Cartão
-        </button>
+        <div className="flex items-center gap-3">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Cartão
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {viewMode === 'list' && (
+        <DataTable
+          itens={cards}
+          colunas={colunasCartoes}
+          acoes={(card) => (
+            <>
+              <button onClick={() => handleEdit(card)} title="Editar"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(card.entityId, card.id)} title="Excluir"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum cartão cadastrado.</p>}
+        />
+      )}
+
+      {viewMode === 'grid' && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => {
           const usedLimit = calculateUsage(card.id);
           const availableLimit = card.limit - usedLimit;
@@ -361,7 +422,7 @@ export const CreditCards: React.FC = () => {
             </motion.div>
           );
         })}
-      </div>
+      </div>}
 
       <AnimatePresence>
         {selectedCardForInvoices && (

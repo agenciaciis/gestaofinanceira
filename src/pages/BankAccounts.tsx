@@ -9,6 +9,7 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
 import { computeBalances } from '../lib/finance';
+import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 
 export const BankAccounts: React.FC = () => {
   const { selectedEntity } = useEntity();
@@ -22,6 +23,7 @@ export const BankAccounts: React.FC = () => {
   // Form state
   const [bankName, setBankName] = useState('');
   const [color, setColor] = useState('');
+  const [viewMode, setViewMode] = useViewMode('contas', 'grid');
   const [type, setType] = useState<'corrente' | 'poupanca' | 'investimento' | 'caixa' | 'reserva'>('corrente');
   const [initialBalance, setInitialBalance] = useState('');
 
@@ -135,6 +137,32 @@ export const BankAccounts: React.FC = () => {
     }
   };
 
+  const brl = (n: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
+
+  const colunasContas: Column<BankAccount>[] = [
+    {
+      chave: 'banco', titulo: 'Conta',
+      render: (a) => (
+        <span className="flex items-center gap-2">
+          <span className="h-3 w-3 shrink-0 rounded-full border border-line"
+            style={{ backgroundColor: normalizeHex(a.color) || '#94a3b8' }} />
+          <span className="font-bold text-content">{a.bankName}</span>
+        </span>
+      ),
+    },
+    { chave: 'tipo', titulo: 'Tipo', escondeNoMobile: true, render: (a) => getTypeLabel(a.type) },
+    { chave: 'inicial', titulo: 'Saldo inicial', numerico: true, escondeNoMobile: true, render: (a) => brl(a.initialBalance) },
+    {
+      chave: 'saldo', titulo: 'Saldo atual', numerico: true,
+      render: (a) => (
+        <span className={cn('font-black', getBalance(a) < 0 ? 'text-rose-600' : 'text-content')}>
+          {brl(getBalance(a))}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -142,13 +170,16 @@ export const BankAccounts: React.FC = () => {
           <h2 className="text-3xl font-black text-content tracking-tight">Contas & Caixas</h2>
           <p className="text-sm font-medium text-content-subtle">Gestão centralizada de toda sua liquidez.</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Nova Conta
-        </button>
+        <div className="flex items-center gap-3">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            Nova Conta
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -185,7 +216,27 @@ export const BankAccounts: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {viewMode === 'list' && (
+        <DataTable
+          itens={accounts}
+          colunas={colunasContas}
+          acoes={(a) => (
+            <>
+              <button onClick={() => handleEdit(a)} title="Editar"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(a.id)} title="Excluir"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhuma conta cadastrada.</p>}
+        />
+      )}
+
+      {viewMode === 'grid' && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {accounts.map((account) => (
           <motion.div 
             key={account.id}
@@ -267,7 +318,7 @@ export const BankAccounts: React.FC = () => {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
