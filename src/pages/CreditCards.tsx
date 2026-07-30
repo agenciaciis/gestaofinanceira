@@ -8,7 +8,7 @@ import { Plus, CreditCard as CardIcon, Trash2, Edit2, AlertCircle, Calendar, Inf
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
-import { computeCardUsage } from '../lib/finance';
+import { computeCardUsage, currentInvoiceWindow, parseLocalDate } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -62,36 +62,45 @@ export const CreditCards: React.FC = () => {
     }
 
     const unsubscribes: (() => void)[] = [];
-    let allCards: CreditCard[] = [];
+    const cardsByEntity: Record<string, CreditCard[]> = {};
+    const txByEntity: Record<string, Transaction[]> = {};
 
+    const publishCards = () => setCards(Object.values(cardsByEntity).flat());
+    const publishTx = () => {
+      const byCard: Record<string, Transaction[]> = {};
+      for (const list of Object.values(txByEntity)) {
+        for (const t of list) {
+          if (!t.cardId) continue;
+          (byCard[t.cardId] ||= []).push(t);
+        }
+      }
+      setCardTransactions(byCard);
+    };
+
+    // Uma assinatura por entidade para cartões e OUTRA para transações — antes,
+    // um listener de transações era criado DENTRO do callback de cartões, para
+    // cada cartão, e se acumulava a cada mudança (vazamento + leituras repetidas).
     filteredEntities.forEach(entity => {
-      const q = query(collection(db, `entities/${entity.id}/credit_cards`));
-      const unsub = onSnapshot(q, (snapshot) => {
-        const entityCards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CreditCard[];
-        allCards = [...allCards.filter(c => c.entityId !== entity.id), ...entityCards];
-        setCards([...allCards]);
-
-        // Fetch transactions for each card to calculate usage
-        entityCards.forEach(card => {
-          const tQ = query(collection(db, `entities/${entity.id}/transactions`));
-          const unsubT = onSnapshot(tQ, (tSnapshot) => {
-            const transactions = tSnapshot.docs.map(doc => doc.data() as Transaction);
-            const cardT = transactions.filter(t => t.cardId === card.id);
-            setCardTransactions(prev => ({ ...prev, [card.id]: cardT }));
-          }, (error) => {
-            console.error(`Error fetching transactions for card ${card.id}:`, error);
-            handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/transactions`);
-          });
-          unsubscribes.push(unsubT);
-        });
+      const cardsQ = query(collection(db, `entities/${entity.id}/credit_cards`));
+      unsubscribes.push(onSnapshot(cardsQ, (snapshot) => {
+        cardsByEntity[entity.id] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CreditCard[];
+        publishCards();
+        setLoading(false);
       }, (error) => {
         console.error(`Error fetching credit cards for entity ${entity.id}:`, error);
         handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/credit_cards`);
-      });
-      unsubscribes.push(unsub);
+      }));
+
+      const txQ = query(collection(db, `entities/${entity.id}/transactions`));
+      unsubscribes.push(onSnapshot(txQ, (snapshot) => {
+        txByEntity[entity.id] = snapshot.docs.map(doc => doc.data() as Transaction);
+        publishTx();
+      }, (error) => {
+        console.error(`Error fetching transactions for entity ${entity.id}:`, error);
+        handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/transactions`);
+      }));
     });
 
-    setLoading(false);
     return () => unsubscribes.forEach(unsub => unsub());
   }, [entities, filterType]);
 
@@ -182,34 +191,27 @@ export const CreditCards: React.FC = () => {
 
   const getComparisonData = (card: CreditCard) => {
     const transactions = cardTransactions[card.id] || [];
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
-    const currentInvoice = transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear && t.type === 'expense' && t.status !== 'cancelled';
-    });
+    // Ciclos de fatura REAIS (respeitam o dia de fechamento), não mês-calendário,
+    // e usando parseLocalDate (sem o off-by-one de fuso).
+    const cur = currentInvoiceWindow(card.closingDay);
+    const dayBeforeCur = new Date(cur.start.getFullYear(), cur.start.getMonth(), cur.start.getDate() - 1);
+    const prev = currentInvoiceWindow(card.closingDay, dayBeforeCur);
 
-    const prevInvoice = transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getMonth() === prevMonth && d.getFullYear() === prevYear && t.type === 'expense' && t.status !== 'cancelled';
-    });
+    const inWindow = (t: Transaction, w: { start: Date; end: Date }) => {
+      if (t.type !== 'expense' || t.status === 'cancelled') return false;
+      const d = parseLocalDate(t.date);
+      return !Number.isNaN(d.getTime()) && d >= w.start && d < w.end;
+    };
 
-    const data = CATEGORIES.filter(c => c.type !== 'income').map(cat => {
-      const currentAmount = currentInvoice.filter(t => t.categoryId === cat.id).reduce((acc, t) => acc + t.amount, 0);
-      const prevAmount = prevInvoice.filter(t => t.categoryId === cat.id).reduce((acc, t) => acc + t.amount, 0);
-      return {
-        name: cat.name,
-        atual: currentAmount,
-        anterior: prevAmount,
-      };
-    }).filter(d => d.atual > 0 || d.anterior > 0);
+    const currentInvoice = transactions.filter(t => inWindow(t, cur));
+    const prevInvoice = transactions.filter(t => inWindow(t, prev));
 
-    return data;
+    return CATEGORIES.filter(c => c.type !== 'income').map(cat => ({
+      name: cat.name,
+      atual: currentInvoice.filter(t => t.categoryId === cat.id).reduce((acc, t) => acc + (Number(t.amount) || 0), 0),
+      anterior: prevInvoice.filter(t => t.categoryId === cat.id).reduce((acc, t) => acc + (Number(t.amount) || 0), 0),
+    })).filter(d => d.atual > 0 || d.anterior > 0);
   };
 
   const brl = (n: number) =>
@@ -291,7 +293,7 @@ export const CreditCards: React.FC = () => {
         {cards.map((card) => {
           const usedLimit = calculateUsage(card.id);
           const availableLimit = card.limit - usedLimit;
-          const usagePercentage = Math.min((usedLimit / card.limit) * 100, 100);
+          const usagePercentage = card.limit > 0 ? Math.min((usedLimit / card.limit) * 100, 100) : 0;
 
           const gradient = cardGradient(card.color);
           const fg = readableForeground(gradient.from);
@@ -448,12 +450,24 @@ export const CreditCards: React.FC = () => {
 
               <div className="flex-1 overflow-y-auto pr-2 space-y-4">
                 {(() => {
-                  const transactions = cardTransactions[selectedCardForInvoices.id] || [];
+                  const closingDay = selectedCardForInvoices.closingDay;
+                  // Agrupa pela FATURA (ciclo de fechamento), não pelo mês-calendário:
+                  // compra após o dia de fechamento entra na fatura do mês seguinte.
+                  const invoiceKey = (dateStr: string) => {
+                    const d = parseLocalDate(dateStr);
+                    if (Number.isNaN(d.getTime())) return 'sem-data';
+                    const day = Math.min(Math.max(1, Math.floor(closingDay) || 1), 28);
+                    let y = d.getFullYear(); let m = d.getMonth();
+                    if (d.getDate() > day) { m += 1; if (m > 11) { m = 0; y += 1; } }
+                    return `${y}-${String(m + 1).padStart(2, '0')}`;
+                  };
+                  // Só despesas não-canceladas entram na fatura (antes somava
+                  // canceladas e até receitas lançadas no cartão).
+                  const transactions = (cardTransactions[selectedCardForInvoices.id] || [])
+                    .filter(t => t.type === 'expense' && t.status !== 'cancelled');
                   const groupedByMonth = transactions.reduce((acc, t) => {
-                    const date = new Date(t.date);
-                    const key = format(date, 'yyyy-MM');
-                    if (!acc[key]) acc[key] = [];
-                    acc[key].push(t);
+                    const key = invoiceKey(t.date);
+                    (acc[key] ||= []).push(t);
                     return acc;
                   }, {} as Record<string, Transaction[]>);
 
@@ -469,7 +483,7 @@ export const CreditCards: React.FC = () => {
                   }
 
                   return sortedMonths.map(monthKey => {
-                    const monthTransactions = groupedByMonth[monthKey].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    const monthTransactions = groupedByMonth[monthKey].sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
                     const totalAmount = monthTransactions.reduce((acc, t) => acc + t.amount, 0);
                     const isExpanded = expandedInvoice === monthKey;
                     const [year, month] = monthKey.split('-');
@@ -513,7 +527,7 @@ export const CreditCards: React.FC = () => {
                               <div className="p-4 overflow-x-auto">
                                 <table className="w-full text-left text-xs">
                                   <thead>
-                                    <tr className="border-b border-gray-50 text-content-subtle uppercase font-bold tracking-wider">
+                                    <tr className="border-b border-line text-content-subtle uppercase font-bold tracking-wider">
                                       <th className="pb-3 pl-2">Data</th>
                                       <th className="pb-3">Descrição</th>
                                       <th className="pb-3">Parcela</th>
@@ -521,10 +535,10 @@ export const CreditCards: React.FC = () => {
                                       <th className="pb-3 text-right pr-2">Valor</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-gray-50">
+                                  <tbody className="divide-y divide-line">
                                     {monthTransactions.map(t => (
                                       <tr key={t.id} className="hover:bg-canvas transition-colors">
-                                        <td className="py-3 pl-2 text-content-subtle">{format(new Date(t.date), 'dd/MM/yyyy')}</td>
+                                        <td className="py-3 pl-2 text-content-subtle">{format(parseLocalDate(t.date), 'dd/MM/yyyy')}</td>
                                         <td className="py-3 font-bold text-content">{t.description}</td>
                                         <td className="py-3">
                                           {t.installmentNumber ? (
