@@ -18,6 +18,7 @@ import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { splitInstallments, parseLocalDate } from '../lib/finance';
 import { planRecurringRenewals } from '../lib/recurring';
 import { tagsDocPath, readTags, parseTags, mergeTags, matchesAllTags } from '../lib/tags';
+import { readGoals, goalsDocPath } from '../lib/goalStore';
 
 const PAYMENT_TYPES: { id: NonNullable<Transaction['paymentType']>; label: string }[] = [
   { id: 'pix', label: 'PIX' },
@@ -351,13 +352,14 @@ export const Transactions: React.FC = () => {
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/clients`));
       unsubscribes.push(unsubCl);
 
-      // Caixinhas (para marcar um lançamento como depósito num objetivo)
-      const gQ = query(collection(db, `entities/${entity.id}/goals`));
-      const unsubG = onSnapshot(gQ, (snapshot) => {
-        const entityG = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Goal[];
+      // Caixinhas: doc único `config/goals` (mesma fonte da tela de Caixinhas).
+      // Antes lia a coleção `entities/{id}/goals`, que não existe — a marcação
+      // de depósito ficava vazia e gerava erro de permissão.
+      const unsubG = onSnapshot(doc(db, goalsDocPath(entity.id)), (snap) => {
+        const entityG = readGoals(snap.data(), entity.id);
         allGoals = [...allGoals.filter(g => g.entityId !== entity.id), ...entityG];
         setGoals([...allGoals]);
-      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/goals`));
+      }, (error) => handleFirestoreError(error, OperationType.GET, goalsDocPath(entity.id)));
       unsubscribes.push(unsubG);
 
       // Etiquetas já usadas nesta entidade, para sugerir em vez de digitar de novo.

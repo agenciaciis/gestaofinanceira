@@ -235,16 +235,10 @@ service cloud.firestore {
         allow delete: if isEntityWriter(entityId);
       }
 
-      // Caixinhas / objetivos de poupança.
-      match /goals/{goalId} {
-        allow read: if hasDocAccess() || hasEntityAccess(entityId);
-        allow create, update: if isEntityWriter(entityId)
-          && request.resource.data.name is string
-          && request.resource.data.name.size() < 120
-          && request.resource.data.targetAmount is number
-          && request.resource.data.targetAmount > 0;
-        allow delete: if isEntityWriter(entityId);
-      }
+      // Caixinhas / objetivos de poupança: NÃO ficam numa coleção /goals; moram
+      // no documento `config/goals` (lista `items`), coberto pela regra de
+      // /config abaixo. (A antiga regra /goals/{goalId} era código morto e a
+      // condição de create não batia com o formato real do documento.)
 
       // Score de crédito informado pelo usuário (Serasa/SPC/Boa Vista).
       match /credit_scores/{scoreId} {
