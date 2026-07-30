@@ -485,7 +485,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
           </h2>
           <p className="text-content-subtle font-medium">Visão estratégica e projeções do seu ecossistema financeiro.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 rounded-xl bg-surface-muted dark:bg-gray-800 p-1">
             <button 
               onClick={() => setTimeFilter('today')}

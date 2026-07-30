@@ -286,8 +286,9 @@ export const Layout: React.FC<{
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 bg-canvas dark:bg-gray-950">
+      {/* Main Content — min-w-0 deixa o conteúdo encolher no mobile (senão uma
+          tabela larga estoura a página inteira, causando scroll horizontal). */}
+      <main className="flex-1 min-w-0 bg-canvas dark:bg-gray-950">
         {/* Header */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line dark:border-gray-800 bg-surface dark:bg-gray-900 px-4 lg:px-8">
           <button className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
@@ -335,7 +336,7 @@ export const Layout: React.FC<{
           </div>
         </header>
 
-        <div className="p-4 lg:p-8">
+        <div className="p-4 lg:p-8 min-w-0">
           {children}
         </div>
       </main>
