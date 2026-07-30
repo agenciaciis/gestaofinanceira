@@ -28,6 +28,8 @@ import {
 , Share2, ImagePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { parseLocalDate } from '../lib/finance';
+import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
@@ -46,6 +48,7 @@ export const Quotes: React.FC = () => {
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useViewMode('orcamentos', 'grid');
   const [letterhead, setLetterhead] = useState<string | null>(null);
   const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
 
@@ -481,6 +484,43 @@ export const Quotes: React.FC = () => {
     q.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const STATUS_ROTULO: Record<string, { texto: string; cor: string }> = {
+    draft: { texto: 'Rascunho', cor: 'text-content-subtle' },
+    sent: { texto: 'Enviado', cor: 'text-blue-600' },
+    approved: { texto: 'Aprovado', cor: 'text-emerald-600' },
+    converted: { texto: 'Convertido', cor: 'text-emerald-700' },
+    rejected: { texto: 'Recusado', cor: 'text-rose-600' },
+  };
+
+  const colunasOrcamentos: Column<Quote>[] = [
+    { chave: 'numero', titulo: 'Nº', render: (q) => <span className="font-black text-content">{q.quoteNumber}</span> },
+    { chave: 'cliente', titulo: 'Cliente', render: (q) => q.clientName || '—' },
+    {
+      chave: 'data', titulo: 'Data', escondeNoMobile: true,
+      render: (q) => q.date ? format(parseLocalDate(q.date), 'dd/MM/yyyy') : '—',
+    },
+    {
+      chave: 'validade', titulo: 'Vence', escondeNoMobile: true,
+      render: (q) => q.validUntil ? format(parseLocalDate(q.validUntil), 'dd/MM/yyyy') : '—',
+    },
+    { chave: 'itens', titulo: 'Itens', numerico: true, escondeNoMobile: true, render: (q) => String(q.items?.length || 0) },
+    {
+      chave: 'total', titulo: 'Total', numerico: true,
+      render: (q) => (
+        <span className="font-black text-content">
+          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(q.total) || 0)}
+        </span>
+      ),
+    },
+    {
+      chave: 'status', titulo: 'Situação',
+      render: (q) => {
+        const st = STATUS_ROTULO[q.status] || { texto: q.status, cor: 'text-content-muted' };
+        return <span className={cn('text-xs font-bold', st.cor)}>{st.texto}</span>;
+      },
+    },
+  ];
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -506,13 +546,16 @@ export const Quotes: React.FC = () => {
               <p className="text-sm font-medium text-blue-700 dark:text-white/80 mt-1">Gere propostas profissionais e gerencie recorrências com facilidade.</p>
             </div>
           </div>
-          <button 
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-blue-700 transition-all transform hover:scale-105 active:scale-95"
-          >
-            <Plus className="h-5 w-5" />
-            Novo Orçamento
-          </button>
+          <div className="flex items-center gap-3">
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+            <button
+              onClick={() => { resetForm(); setIsModalOpen(true); }}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-blue-700 transition-all transform hover:scale-105 active:scale-95"
+            >
+              <Plus className="h-5 w-5" />
+              Novo Orçamento
+            </button>
+          </div>
         </div>
 
       {/* Papel timbrado — sai no PDF de todos os orçamentos desta entidade */}
@@ -569,8 +612,36 @@ export const Quotes: React.FC = () => {
         </div>
       </div>
 
+      {viewMode === 'list' && (
+        <DataTable
+          itens={filteredQuotes}
+          colunas={colunasOrcamentos}
+          acoes={(q) => (
+            <>
+              <button onClick={() => exportPDF(q)} title="Baixar PDF"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Download className="h-4 w-4" />
+              </button>
+              <button onClick={() => printQuote(q)} title="Imprimir"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Printer className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleEdit(q)} title="Editar"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(q.id)} title="Excluir"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum orçamento encontrado.</p>}
+        />
+      )}
+
       {/* Quotes List */}
-      <div className="grid gap-6">
+      {viewMode === 'grid' && <div className="grid gap-6">
         {filteredQuotes.map(quote => (
           <motion.div 
             layout
@@ -681,7 +752,7 @@ export const Quotes: React.FC = () => {
             </div>
           </motion.div>
         ))}
-      </div>
+      </div>}
 
       {/* Modal */}
       <AnimatePresence>

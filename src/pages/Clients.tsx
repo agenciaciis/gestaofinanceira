@@ -46,6 +46,8 @@ import {
 import { format, parseISO, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
+import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
+import { partyTotals } from '../lib/quotes';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const Clients: React.FC = () => {
@@ -57,6 +59,7 @@ export const Clients: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useViewMode('clientes', 'grid');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'info' | 'credentials' | 'contracts'>('info');
 
@@ -306,6 +309,30 @@ export const Clients: React.FC = () => {
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
+  const brl = (n: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
+
+  const colunasClientes: Column<Client>[] = [
+    { chave: 'nome', titulo: 'Cliente', render: (c) => <span className="font-bold text-content">{c.name}</span> },
+    { chave: 'doc', titulo: 'CNPJ / CPF', escondeNoMobile: true, render: (c) => c.cnpj || c.cpf || '—' },
+    { chave: 'contato', titulo: 'Contato', escondeNoMobile: true, render: (c) => c.email || c.responsibleName || '—' },
+    {
+      chave: 'recebido', titulo: 'Já recebido', numerico: true,
+      render: (c) => <span className="font-bold text-emerald-600">{brl(partyTotals(transactions, c.id).recebido)}</span>,
+    },
+    {
+      chave: 'areceber', titulo: 'A receber', numerico: true,
+      render: (c) => {
+        const v = partyTotals(transactions, c.id).aReceber;
+        return <span className={cn('font-bold', v > 0 ? 'text-blue-600' : 'text-content-subtle')}>{brl(v)}</span>;
+      },
+    },
+    {
+      chave: 'contratos', titulo: 'Contratos', numerico: true, escondeNoMobile: true,
+      render: (c) => String(c.contracts?.filter(ct => ct.status !== 'inactive').length || 0),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -313,13 +340,16 @@ export const Clients: React.FC = () => {
           <h2 className="text-2xl font-bold text-content">Gestão de Clientes</h2>
           <p className="text-sm text-content-subtle">Gerencie informações, acessos e contratos dos seus clientes.</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Cliente
-        </button>
+        <div className="flex items-center gap-3">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Cliente
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -333,7 +363,27 @@ export const Clients: React.FC = () => {
         />
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {viewMode === 'list' && (
+        <DataTable
+          itens={filteredClients}
+          colunas={colunasClientes}
+          acoes={(c) => (
+            <>
+              <button onClick={() => handleEdit(c)} title="Editar"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(c)} title="Excluir"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum cliente encontrado.</p>}
+        />
+      )}
+
+      {viewMode === 'grid' && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
           {filteredClients.map((client) => (
             <motion.div
@@ -549,7 +599,7 @@ export const Clients: React.FC = () => {
             </motion.div>
           ))}
         </AnimatePresence>
-      </div>
+      </div>}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
