@@ -250,16 +250,22 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       .filter(t => t.type === 'expense' && t.status === 'completed' && filterFn(parseLocalDate(t.date), prevDate))
       .reduce((acc, t) => acc + t.amount, 0);
 
+    // Pendentes DO PERÍODO analisado. Antes somavam qualquer data, então
+    // trocar de mês não mexia em "a receber", "a pagar" nem no previsto —
+    // metade do painel ficava parada.
     const pendingIncome = transactions
-      .filter(t => t.type === 'income' && t.status === 'pending')
+      .filter(t => t.type === 'income' && t.status === 'pending' && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const pendingExpense = transactions
-      .filter(t => t.type === 'expense' && t.status === 'pending')
+      .filter(t => t.type === 'expense' && t.status === 'pending' && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
+    // Vencidas é "até hoje", não do período: uma conta vencida continua vencida
+    // independente do mês que você está olhando.
+    const inicioDeHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     const overdue = transactions
-      .filter(t => t.status === 'pending' && t.type === 'expense' && isBefore(parseLocalDate(t.date), new Date().setHours(0,0,0,0)))
+      .filter(t => t.status === 'pending' && t.type === 'expense' && isBefore(parseLocalDate(t.date), inicioDeHoje))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
@@ -314,7 +320,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       expenseTrend: calculateTrend(expenseThisPeriod, expenseLastPeriod),
       budgetProgress
     };
-  }, [transactions, accounts, cards, debts, budgets, now, timeFilter]);
+  }, [transactions, accounts, cards, debts, budgets, now, hoje, timeFilter]);
 
   /**
    * "Posso gastar?" — quanto sobra hoje já descontando tudo que está
@@ -561,7 +567,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
             { rotulo: 'Valores a receber', valor: stats.pendingIncome, cor: 'text-blue-600', nota: 'ainda não entrou' },
             { rotulo: 'Valores a pagar', valor: -stats.pendingExpense, cor: 'text-amber-600', nota: 'ainda não saiu' },
             { rotulo: 'Resultado previsto', valor: stats.resultadoPrevisto, cor: stats.resultadoPrevisto >= 0 ? 'text-emerald-600' : 'text-rose-600', nota: 'se tudo se confirmar' },
-            { rotulo: 'Vencidas', valor: -stats.overdue, cor: 'text-rose-600', nota: 'passou do vencimento' },
+            { rotulo: 'Vencidas', valor: -stats.overdue, cor: 'text-rose-600', nota: 'até hoje, todo o histórico' },
           ].map(item => (
             <div key={item.rotulo} className="rounded-2xl border border-line p-4">
               <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">{item.rotulo}</p>

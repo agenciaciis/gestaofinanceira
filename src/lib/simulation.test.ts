@@ -16,8 +16,10 @@ import { computeSpendable, averageMonthlyExpense, averageMonthlyIncome, detectDu
 import { computeHealthScore } from './health';
 import { consolidate } from './crossEntity';
 import { computeDRE, breakEven, CategoryKindMap } from './dre';
-import { computeGoalProgress, monthlyNeeded, timeProgress, paceVerdict } from './goals';
+import { computeGoalProgress, monthlyNeeded, timeProgress, paceVerdict, goalStatus } from './goals';
 import { periodTotals, computeVariance } from './variance';
+import { quoteTotals, quotePipeline, partyTotals, serviceMargin } from './quotes';
+import { budgetProgress, exceededBudgets, balanceGoalGap } from './budgets';
 
 // ---------------------------------------------------------------- cenário
 const PF = { id: 'pf', name: 'Lucas', type: 'PF' as const, ownerUid: 'u1' };
@@ -355,5 +357,190 @@ describe('simulação de 4 meses — previsto x real', () => {
     const v = computeVariance(parcelas);
     expect(v.diff).toBe(0);
     expect(v.percent).toBe(0);
+  });
+});
+
+
+// ================================================================
+// Parte 2 da simulação: o resto do sistema preenchido
+// ================================================================
+
+/** Metas de gasto por categoria, como a aba "Metas" guarda. */
+const METAS = {
+  alimentacao: 800,          // vai estourar: a simulação gasta 900/mês
+  moradia: 4000,             // dentro do limite
+  transporte: 500,
+  monthly_balance_goal: 3000,
+};
+
+/** Clientes e fornecedores cadastrados. */
+const CLIENTES = [
+  { id: 'cli-1', nome: 'Lu Perfumes' },
+  { id: 'cli-2', nome: 'Armazém Ferreira' },
+];
+const FORNECEDORES = [{ id: 'for-1', nome: 'Gráfica Paulista' }];
+
+/** Serviços do catálogo, com custo para medir margem. */
+const SERVICOS = [
+  { nome: 'Social Media', preco: 1500, custo: 500, horas: 20 },
+  { nome: 'Identidade Visual', preco: 3000, custo: 1200, horas: 30 },
+  { nome: 'Serviço no prejuízo', preco: 800, custo: 1000, horas: 10 },
+];
+
+/** Orçamentos em todas as situações do funil. */
+const ORCAMENTOS = [
+  { status: 'draft' as const, total: quoteTotals([{ quantity: 1, unitPrice: 1500, discount: 0 }]).total },
+  { status: 'sent' as const, total: quoteTotals([{ quantity: 2, unitPrice: 1500, discount: 300 }]).total },
+  { status: 'approved' as const, total: quoteTotals([{ quantity: 1, unitPrice: 3000, discount: 0 }]).total },
+  { status: 'converted' as const, total: quoteTotals([{ quantity: 1, unitPrice: 1500, discount: 100 }]).total },
+  { status: 'rejected' as const, total: quoteTotals([{ quantity: 1, unitPrice: 5000, discount: 0 }]).total },
+];
+
+/** Lançamentos vinculados a cliente, para medir faturamento por cliente. */
+const TXS_COM_CLIENTE: Transaction[] = [
+  t({ type: 'income', amount: 1500, date: '2026-07-05', entityId: 'pj', accountId: 'pj-cc', categoryId: 'venda', clientId: 'cli-1', status: 'completed' }),
+  t({ type: 'income', amount: 1500, date: '2026-07-28', entityId: 'pj', accountId: 'pj-cc', categoryId: 'venda', clientId: 'cli-1', status: 'pending' }),
+  t({ type: 'income', amount: 2900, date: '2026-07-06', entityId: 'pj', accountId: 'pj-cc', categoryId: 'venda', clientId: 'cli-2', status: 'completed' }),
+  t({ amount: 450, date: '2026-07-07', entityId: 'pj', accountId: 'pj-cc', categoryId: 'servicos', clientId: 'for-1', status: 'completed' }),
+];
+
+const TUDO = [...TXS, ...TXS_COM_CLIENTE];
+
+/** Três caixinhas: uma em dia, uma concluída e uma atrasada. */
+const CAIXINHAS: Goal[] = [
+  caixinha,
+  { id: 'notebook', name: 'Notebook novo', targetAmount: 1000, deadline: '2026-12-31', entityId: 'pf', createdAt: '2026-04-01' },
+  { id: 'curso', name: 'Curso', targetAmount: 3000, deadline: '2026-05-31', entityId: 'pf', createdAt: '2026-01-01' },
+];
+const TXS_CAIXINHAS: Transaction[] = [
+  ...TUDO,
+  t({ type: 'transfer', amount: 1200, date: '2026-05-10', entityId: 'pf', accountId: 'pf-cc', toAccountId: 'pf-res', goalId: 'notebook', goalDirection: 'in' }),
+  t({ type: 'transfer', amount: 200, date: '2026-04-10', entityId: 'pf', accountId: 'pf-cc', toAccountId: 'pf-res', goalId: 'curso', goalDirection: 'in' }),
+];
+
+describe('simulação — metas de gasto por categoria', () => {
+  const linhas = budgetProgress(METAS, TUDO, HOJE);
+
+  it('só as categorias com limite entram, e a meta de sobra fica fora', () => {
+    expect(linhas.map(l => l.categoryId).sort()).toEqual(['alimentacao', 'moradia', 'transporte']);
+  });
+
+  it('acusa o estouro de alimentação e mostra o tamanho dele', () => {
+    const estouradas = exceededBudgets(linhas);
+    expect(estouradas.map(l => l.categoryId)).toEqual(['alimentacao']);
+    expect(estouradas[0].percent).toBeGreaterThan(100);
+  });
+
+  it('o gasto da meta bate com o do comparador de períodos', () => {
+    const p = periodTotals(TUDO, new Date(2026, 6, 1), new Date(2026, 6, 31));
+    const ali = linhas.find(l => l.categoryId === 'alimentacao')!;
+    expect(ali.spent).toBe(p.porCategoria.alimentacao);
+  });
+
+  it('a meta de sobra é comparada com o resultado do mês', () => {
+    const p = periodTotals(TUDO, new Date(2026, 6, 1), new Date(2026, 6, 31));
+    const gap = balanceGoalGap(METAS, p.resultado)!;
+    expect(Number.isFinite(gap)).toBe(true);
+    expect(gap).toBe(round2(3000 - p.resultado));
+  });
+});
+
+describe('simulação — orçamentos', () => {
+  const funil = quotePipeline(ORCAMENTOS);
+
+  it('cada orçamento cai numa situação do funil', () => {
+    expect(Object.keys(funil.porStatus).sort())
+      .toEqual(['approved', 'converted', 'draft', 'rejected', 'sent']);
+  });
+
+  it('separa em jogo, ganho e perdido sem sobrepor', () => {
+    const soma = funil.emAberto + funil.ganho + funil.perdido;
+    const totalGeral = round2(ORCAMENTOS.reduce((a, q) => a + q.total, 0));
+    expect(round2(soma)).toBe(totalGeral);
+  });
+
+  it('o desconto entrou uma vez só em cada orçamento', () => {
+    // 2 × 1500 com 300 de desconto = 2700, não 2400 nem 3000
+    expect(ORCAMENTOS[1].total).toBe(2700);
+  });
+
+  it('a taxa de aprovação considera só os decididos', () => {
+    expect(funil.taxaAprovacao).toBe(round2((2 / 3) * 100));
+  });
+});
+
+describe('simulação — clientes e fornecedores', () => {
+  it('faturamento por cliente separa recebido de a receber', () => {
+    const c1 = partyTotals(TUDO, 'cli-1');
+    expect(c1.recebido).toBe(1500);
+    expect(c1.aReceber).toBe(1500);
+  });
+
+  it('o que foi pago a fornecedor não vira receita de cliente', () => {
+    const f = partyTotals(TUDO, 'for-1');
+    expect(f.pago).toBe(450);
+    expect(f.recebido).toBe(0);
+  });
+
+  it('a soma dos clientes não passa da receita total do período', () => {
+    const p = periodTotals(TUDO, new Date(2026, 6, 1), new Date(2026, 6, 31));
+    const porCliente = CLIENTES.reduce((a, c) => a + partyTotals(TUDO, c.id).recebido, 0);
+    expect(porCliente).toBeLessThanOrEqual(p.receita);
+  });
+});
+
+describe('simulação — serviços e margem', () => {
+  it('margem saudável, apertada e negativa são distinguidas', () => {
+    const m = SERVICOS.map(sv => serviceMargin(sv.preco, sv.custo, sv.horas));
+    expect(m[0].margemPercent).toBeGreaterThan(60);
+    expect(m[1].margemPercent).toBe(60);
+    expect(m[2].margem).toBeLessThan(0);   // prejuízo tem que aparecer
+  });
+
+  it('o valor por hora sai de preço ÷ horas', () => {
+    expect(serviceMargin(1500, 500, 20).valorHora).toBe(75);
+  });
+});
+
+describe('simulação — várias caixinhas ao mesmo tempo', () => {
+  it('distingue em dia, concluída e atrasada', () => {
+    const estados = CAIXINHAS.map(g => {
+      const p = computeGoalProgress(g, TXS_CAIXINHAS);
+      return { id: g.id, status: goalStatus(g, p.saved, HOJE), saved: p.saved };
+    });
+    expect(estados.find(e => e.id === 'notebook')!.status).toBe('concluida');
+    expect(estados.find(e => e.id === 'curso')!.status).toBe('atrasada');
+    expect(estados.find(e => e.id === 'ferias')!.status).toBe('em-andamento');
+  });
+
+  it('cada caixinha conta só os seus depósitos', () => {
+    expect(computeGoalProgress(CAIXINHAS[1], TXS_CAIXINHAS).saved).toBe(1200);
+    expect(computeGoalProgress(CAIXINHAS[2], TXS_CAIXINHAS).saved).toBe(200);
+  });
+
+  it('a soma das caixinhas bate com o saldo da conta reserva', () => {
+    const saldos = computeBalances(contas, TXS_CAIXINHAS);
+    const somaCaixinhas = CAIXINHAS.reduce((a, g) => a + computeGoalProgress(g, TXS_CAIXINHAS).saved, 0);
+    expect(round2(somaCaixinhas)).toBe(saldos['pf-res']);
+  });
+});
+
+describe('simulação — nada quebra com o sistema todo preenchido', () => {
+  it('nenhum motor devolve NaN com os dados completos', () => {
+    const views = collectDebts(TXS_CAIXINHAS, emprestimos, cartoes, {}, HOJE);
+    const numeros = [
+      ...Object.values(computeBalances(contas, TXS_CAIXINHAS)),
+      ...views.map(v => v.balance),
+      payoffSchedule(views, 300, 'avalanche', HOJE).totalInterest,
+      computeSpendable({ accounts: contas, transactions: TXS_CAIXINHAS, cards: cartoes,
+        loans: emprestimos.map(d => ({ id: d.id, name: d.name, monthlyPayment: d.monthlyPayment })),
+        reserve: 3000, reference: HOJE }).spendable,
+      computeDRE(TXS_CAIXINHAS, KINDS, HOJE).resultado,
+      periodTotals(TXS_CAIXINHAS, new Date(2026, 6, 1), new Date(2026, 6, 31)).resultado,
+      quotePipeline(ORCAMENTOS).ganho,
+      ...CAIXINHAS.map(g => computeGoalProgress(g, TXS_CAIXINHAS).saved),
+      ...budgetProgress(METAS, TXS_CAIXINHAS, HOJE).map(l => l.percent),
+    ];
+    for (const n of numeros) expect(Number.isFinite(n)).toBe(true);
   });
 });
