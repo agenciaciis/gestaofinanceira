@@ -30,8 +30,24 @@ import {
   BarChart2,
   DollarSign,
   Clock,
-  Activity
+  Activity,
+  Eye,
+  EyeOff
 } from 'lucide-react';
+
+// Campos fixos de credenciais — a aba sempre mostra todos, mesmo em cliente
+// antigo que só tinha algumas chaves salvas.
+const EMPTY_CREDENTIALS = { instagram: '', facebook: '', googleAds: '', linkedin: '', meta: '', wordpress: '', site: '', others: '' };
+const CREDENTIAL_FIELDS: { key: keyof typeof EMPTY_CREDENTIALS; label: string }[] = [
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'googleAds', label: 'Google Ads' },
+  { key: 'linkedin', label: 'LinkedIn' },
+  { key: 'meta', label: 'Meta Business' },
+  { key: 'wordpress', label: 'WordPress' },
+  { key: 'site', label: 'Site' },
+  { key: 'others', label: 'Outros' },
+];
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart, 
@@ -82,6 +98,8 @@ export const Clients: React.FC = () => {
     site: '',
     others: ''
   });
+  // Credenciais ficam mascaradas por padrão; revela uma a uma sob demanda.
+  const [showCred, setShowCred] = useState<Record<string, boolean>>({});
   const [contracts, setContracts] = useState<{ 
     id: string; 
     name: string; 
@@ -147,14 +165,14 @@ export const Clients: React.FC = () => {
     return () => unsubscribes.forEach(unsub => unsub());
   }, [entities, filterType]);
 
-  // Totais por cliente: recebido (concluído) e a receber (pendente).
+  // Totais por cliente derivados de partyTotals (a MESMA fonte usada na visão
+  // em lista) — antes o grid tinha uma conta inline divergente.
   const clientTotals = useMemo(() => {
     const map: Record<string, { received: number; pending: number }> = {};
-    for (const t of transactions) {
-      if (!t.clientId || t.type !== 'income') continue;
-      if (!map[t.clientId]) map[t.clientId] = { received: 0, pending: 0 };
-      if (t.status === 'completed') map[t.clientId].received += Number(t.amount) || 0;
-      else if (t.status === 'pending') map[t.clientId].pending += Number(t.amount) || 0;
+    const ids = new Set(transactions.map(t => t.clientId).filter(Boolean) as string[]);
+    for (const id of ids) {
+      const pt = partyTotals(transactions, id);
+      map[id] = { received: pt.recebido, pending: pt.aReceber };
     }
     return map;
   }, [transactions]);
@@ -209,7 +227,10 @@ export const Clients: React.FC = () => {
     setAddress(client.address || '');
     setDrivePath(client.drivePath || '');
     setTargetEntityId(client.entityId);
-    setCredentials(client.credentials || {});
+    // Mescla no formato completo — cliente antigo com só algumas chaves não
+    // "some" os demais campos da aba Acessos.
+    setCredentials({ ...EMPTY_CREDENTIALS, ...(client.credentials || {}) });
+    setShowCred({});
     setContracts(client.contracts || []);
     setActiveTab('info');
     setIsModalOpen(true);
@@ -456,7 +477,7 @@ export const Clients: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-6 pt-6 border-t border-gray-50 space-y-4">
+              <div className="mt-6 pt-6 border-t border-line space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">Acessos</p>
                   <div className="flex flex-wrap gap-2">
@@ -722,20 +743,33 @@ export const Clients: React.FC = () => {
               )}
 
               {activeTab === 'credentials' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300">
+                    <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>Dados sensíveis. Ficam mascarados e o acesso é restrito aos responsáveis pela entidade. Evite reutilizar senhas.</span>
+                  </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {Object.keys(credentials).map((key) => (
+                    {CREDENTIAL_FIELDS.map(({ key, label }) => (
                       <div key={key}>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-content-subtle">
-                          {key === 'googleAds' ? 'Google Ads' : key.charAt(0).toUpperCase() + key.slice(1)}
-                        </label>
-                        <input
-                          type="text"
-                          value={(credentials as any)[key]}
-                          onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
-                          placeholder="Login / Senha"
-                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                        />
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-content-subtle">{label}</label>
+                        <div className="relative mt-1">
+                          <input
+                            type={showCred[key] ? 'text' : 'password'}
+                            value={(credentials as any)[key] || ''}
+                            onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
+                            placeholder="Login / senha"
+                            autoComplete="off"
+                            className="w-full rounded-lg border border-line bg-surface px-3 py-2 pr-10 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCred(s => ({ ...s, [key]: !s[key] }))}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content"
+                            aria-label={showCred[key] ? 'Ocultar' : 'Mostrar'}
+                          >
+                            {showCred[key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
