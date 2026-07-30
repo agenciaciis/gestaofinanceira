@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, getDocs, setDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Quote, Client, Service, Plan, QuoteItem } from '../types';
 import { 
@@ -29,6 +29,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { parseLocalDate } from '../lib/finance';
+import { quoteTotals, itemGross } from '../lib/quotes';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -111,9 +112,8 @@ export const Quotes: React.FC = () => {
     };
   }, [selectedEntity]);
 
-  const subtotal = useMemo(() => quoteItems.reduce((acc, item) => acc + item.total, 0), [quoteItems]);
-  const discountTotal = useMemo(() => quoteItems.reduce((acc, item) => acc + (item.discount || 0), 0), [quoteItems]);
-  const total = useMemo(() => subtotal - discountTotal, [subtotal, discountTotal]);
+  // Fonte única testada (lib/quotes): round2, desconto abatido uma vez, total nunca negativo.
+  const { subtotal, discountTotal, total } = useMemo(() => quoteTotals(quoteItems), [quoteItems]);
 
   const handleAddItem = (type: 'service' | 'plan') => {
     const newItem: QuoteItem = {
@@ -150,12 +150,12 @@ export const Quotes: React.FC = () => {
         }
         // Guarda contra NaN vindo de inputs vazios. O desconto é abatido uma única
         // vez no total geral (subtotal - discountTotal), então item.total é bruto.
-        const qty = Number(updated.quantity) || 0;
-        const price = Number(updated.unitPrice) || 0;
+        const qty = Math.max(0, Number(updated.quantity) || 0);
+        const price = Math.max(0, Number(updated.unitPrice) || 0);
         updated.quantity = qty;
         updated.unitPrice = price;
-        updated.discount = Number(updated.discount) || 0;
-        updated.total = qty * price;
+        updated.discount = Math.max(0, Number(updated.discount) || 0);
+        updated.total = itemGross(updated); // bruto, com round2 (desconto entra no total geral)
         return updated;
       }
       return item;
@@ -197,12 +197,18 @@ export const Quotes: React.FC = () => {
         clientName = newClientName;
       }
 
-      // Número único: data + epoch base36 + sufixo aleatório (sem colisão prática).
+      // Número sequential por mês (ORC-AAAAMM-0001), derivado dos orçamentos já
+      // carregados — legível e sem número aleatório.
       const uniqueQuoteNumber = () => {
         const d = new Date();
-        const ym = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-        return `ORC-${ym}-${Date.now().toString(36).slice(-4).toUpperCase()}${rand}`;
+        const prefix = `ORC-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}-`;
+        const usados = quotes
+          .map(q => q.quoteNumber)
+          .filter((n): n is string => !!n && n.startsWith(prefix))
+          .map(n => parseInt(n.slice(prefix.length), 10))
+          .filter(n => Number.isFinite(n));
+        const proximo = (usados.length ? Math.max(...usados) : 0) + 1;
+        return `${prefix}${String(proximo).padStart(4, '0')}`;
       };
 
       const quoteData: any = {
@@ -268,7 +274,7 @@ export const Quotes: React.FC = () => {
     setSelectedClientId(quote.clientId);
     setQuoteDate(quote.date);
     setValidUntil(quote.validUntil);
-    setQuoteItems(quote.items);
+    setQuoteItems(quote.items || []);
     setPaymentMethod(quote.paymentMethod);
     setInstallments(quote.installments);
     setNotes(quote.notes || '');
@@ -338,9 +344,18 @@ export const Quotes: React.FC = () => {
     showToast('Papel timbrado removido.', 'success');
   };
 
-  /** Monta o PDF. Com timbrado, ele vira o fundo A4 e o conteúdo respeita a margem. */
-  const buildPDF = (quote: Quote) => {
+  const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
+
+  /**
+   * Monta o PDF COMPLETO (itens, totais, pagamento) — com ou sem papel timbrado.
+   * Antes, o caminho com timbrado saía só com o cabeçalho, sem valores.
+   * Os totais são recalculados por `quoteTotals` para não depender do que ficou gravado.
+   */
+  const buildPDF = (quote: Quote): jsPDF => {
     const doc = new jsPDF();
+    const itens = quote.items || [];
+    const totais = quoteTotals(itens);
+    let bodyStartY: number;
 
     if (letterhead) {
       // A4 = 210 x 297 mm. O timbrado ocupa a página inteira, como fundo.
@@ -352,18 +367,106 @@ export const Quotes: React.FC = () => {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Cliente: ${quote.clientName}`, 14, 60);
-      doc.text(`Data: ${new Date(quote.date).toLocaleDateString('pt-BR')}`, 150, 60);
-      return doc;
+      doc.text(`Data: ${format(parseLocalDate(quote.date), 'dd/MM/yyyy')}`, 150, 60);
+      doc.text(`Validade: ${format(parseLocalDate(quote.validUntil), 'dd/MM/yyyy')}`, 150, 66);
+      bodyStartY = 78;
+    } else {
+      // Cabeçalho azul padrão (sem papel timbrado cadastrado).
+      doc.setFillColor(37, 99, 235);
+      doc.rect(0, 0, 210, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text('AGÊNCIA CIIS', 14, 25);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Soluções Digitais & Gestão Financeira', 14, 32);
+      doc.setFontSize(12);
+      doc.text(`ORÇAMENTO: ${quote.quoteNumber}`, 150, 25);
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CLIENTE:', 14, 55);
+      doc.setFont('helvetica', 'normal');
+      doc.text(quote.clientName, 14, 62);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DATA:', 150, 55);
+      doc.setFont('helvetica', 'normal');
+      doc.text(format(parseLocalDate(quote.date), 'dd/MM/yyyy'), 150, 62);
+      doc.setFont('helvetica', 'bold');
+      doc.text('VALIDADE:', 150, 72);
+      doc.setFont('helvetica', 'normal');
+      doc.text(format(parseLocalDate(quote.validUntil), 'dd/MM/yyyy'), 150, 79);
+      bodyStartY = 90;
     }
 
-    return null; // sem timbrado, segue o cabeçalho azul de sempre
+    // Tabela de itens (comum aos dois caminhos).
+    const tableData = itens.map(item => [
+      item.description,
+      String(item.quantity),
+      brl(item.unitPrice),
+      brl(itemGross(item)),
+    ]);
+
+    autoTable(doc, {
+      startY: bodyStartY,
+      head: [['Descrição', 'Qtd', 'Unitário', 'Total']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [37, 99, 235] },
+      styles: { fontSize: 10 },
+      margin: { left: 14, right: 14 },
+    });
+
+    // Totais.
+    let y = (doc as any).lastAutoTable.finalY + 10;
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Subtotal:', 140, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(brl(totais.subtotal), 170, y);
+
+    if (totais.discountTotal > 0) {
+      y += 7;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Desconto:', 140, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`- ${brl(totais.discountTotal)}`, 170, y);
+    }
+
+    y += 10;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(37, 99, 235);
+    doc.text('TOTAL:', 140, y);
+    doc.text(brl(totais.total), 170, y);
+
+    // Pagamento e observações.
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FORMA DE PAGAMENTO:', 14, y + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${quote.paymentMethod || '-'} ${(quote.installments || 1) > 1 ? `(${quote.installments}x)` : ''}`, 14, y + 20);
+
+    if (quote.notes) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('OBSERVAÇÕES:', 14, y + 33);
+      doc.setFont('helvetica', 'normal');
+      doc.text(quote.notes, 14, y + 40, { maxWidth: 180 });
+    }
+
+    return doc;
+  };
+
+  const exportPDF = (quote: Quote) => {
+    buildPDF(quote).save(`Orcamento_${quote.quoteNumber}.pdf`);
   };
 
   /** Abre o PDF numa aba e dispara a impressão — sai idêntico ao arquivo. */
   const printQuote = (quote: Quote) => {
-    const withHeader = buildPDF(quote);
-    const pdf = withHeader ?? null;
-    if (!pdf) { exportPDF(quote); showToast('Sem papel timbrado: baixei o PDF para você imprimir.', 'success'); return; }
+    const pdf = buildPDF(quote);
     pdf.autoPrint();
     const url = pdf.output('bloburl');
     window.open(url as unknown as string, '_blank');
@@ -371,112 +474,16 @@ export const Quotes: React.FC = () => {
 
   /** Usa o compartilhamento nativo (celular). Sem suporte, baixa o arquivo. */
   const shareQuote = async (quote: Quote) => {
-    const withHeader = buildPDF(quote);
-    if (!withHeader) { exportPDF(quote); return; }
-    const blob = withHeader.output('blob');
+    const pdf = buildPDF(quote);
+    const blob = pdf.output('blob');
     const file = new File([blob], `Orcamento_${quote.quoteNumber}.pdf`, { type: 'application/pdf' });
     const nav = navigator as Navigator & { canShare?: (d: any) => boolean; share?: (d: any) => Promise<void> };
     if (nav.canShare?.({ files: [file] }) && nav.share) {
       try { await nav.share({ files: [file], title: `Orçamento ${quote.quoteNumber}` }); return; }
       catch { /* usuário cancelou: cai no download */ }
     }
-    exportPDF(quote);
+    pdf.save(`Orcamento_${quote.quoteNumber}.pdf`);
     showToast('Compartilhamento não disponível aqui — baixei o PDF.', 'success');
-  };
-
-  const exportPDF = (quote: Quote) => {
-    const comTimbrado = buildPDF(quote);
-    if (comTimbrado) { comTimbrado.save(`Orcamento_${quote.quoteNumber}.pdf`); return; }
-
-    const doc = new jsPDF();
-
-    // Header - Branding (usado quando não há papel timbrado cadastrado)
-    doc.setFillColor(37, 99, 235); // Primary color
-    doc.rect(0, 0, 210, 40, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text('AGÊNCIA CIIS', 14, 25);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Soluções Digitais & Gestão Financeira', 14, 32);
-    
-    doc.setFontSize(12);
-    doc.text(`ORÇAMENTO: ${quote.quoteNumber}`, 150, 25);
-    
-    // Client Info
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CLIENTE:', 14, 55);
-    doc.setFont('helvetica', 'normal');
-    doc.text(quote.clientName, 14, 62);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('DATA:', 150, 55);
-    doc.setFont('helvetica', 'normal');
-    doc.text(format(new Date(quote.date), 'dd/MM/yyyy'), 150, 62);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('VALIDADE:', 150, 72);
-    doc.setFont('helvetica', 'normal');
-    doc.text(format(new Date(quote.validUntil), 'dd/MM/yyyy'), 150, 79);
-
-    // Items Table
-    const tableData = quote.items.map(item => [
-      item.description,
-      item.quantity,
-      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice),
-      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)
-    ]);
-
-    autoTable(doc, {
-      startY: 90,
-      head: [['Descrição', 'Qtd', 'Unitário', 'Total']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [37, 99, 235] },
-      styles: { fontSize: 10 }
-    });
-
-    // Totals
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Subtotal:', 140, finalY);
-    doc.setFont('helvetica', 'normal');
-    doc.text(new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(quote.subtotal), 170, finalY);
-
-    if (quote.discountTotal > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Desconto:', 140, finalY + 7);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`- ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(quote.discountTotal)}`, 170, finalY + 7);
-    }
-
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(37, 99, 235);
-    doc.text('TOTAL:', 140, finalY + 17);
-    doc.text(new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(quote.total), 170, finalY + 17);
-
-    // Payment Info
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('FORMA DE PAGAMENTO:', 14, finalY + 30);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${quote.paymentMethod} ${quote.installments > 1 ? `(${quote.installments}x)` : ''}`, 14, finalY + 37);
-
-    if (quote.notes) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('OBSERVAÇÕES:', 14, finalY + 50);
-      doc.setFont('helvetica', 'normal');
-      doc.text(quote.notes, 14, finalY + 57, { maxWidth: 180 });
-    }
-
-    doc.save(`orcamento_${quote.quoteNumber}.pdf`);
   };
 
   const filteredQuotes = quotes.filter(q => 
@@ -668,15 +675,15 @@ export const Quotes: React.FC = () => {
                 <div className="mt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-content-subtle">
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
-                    {format(new Date(quote.date), 'dd/MM/yyyy')}
+                    {format(parseLocalDate(quote.date), 'dd/MM/yyyy')}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5" />
-                    Válido até {format(new Date(quote.validUntil), 'dd/MM/yyyy')}
+                    Válido até {format(parseLocalDate(quote.validUntil), 'dd/MM/yyyy')}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Package className="h-3.5 w-3.5" />
-                    {quote.items.length} itens
+                    {quote.items?.length || 0} itens
                   </div>
                 </div>
               </div>
@@ -879,12 +886,12 @@ export const Quotes: React.FC = () => {
                         key={item.id}
                         className="grid gap-4 sm:grid-cols-12 items-end rounded-2xl border border-line p-4 bg-surface shadow-sm"
                       >
-                        <div className="sm:col-span-5">
+                        <div className="sm:col-span-3">
                           <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Item / Descrição</label>
-                          <select 
+                          <select
                             value={item.referenceId || ''}
                             onChange={(e) => updateItem(item.id, { referenceId: e.target.value })}
-                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
+                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary bg-surface"
                           >
                             <option value="">Selecione...</option>
                             {item.type === 'service' ? (
@@ -896,8 +903,9 @@ export const Quotes: React.FC = () => {
                         </div>
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Qtd</label>
-                          <input 
+                          <input
                             type="number"
+                            min="0"
                             value={item.quantity}
                             onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) })}
                             className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
@@ -905,10 +913,23 @@ export const Quotes: React.FC = () => {
                         </div>
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Unitário</label>
-                          <input 
+                          <input
                             type="number"
+                            min="0"
+                            step="0.01"
                             value={item.unitPrice}
                             onChange={(e) => updateItem(item.id, { unitPrice: parseFloat(e.target.value) })}
+                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Desconto (R$)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.discount || 0}
+                            onChange={(e) => updateItem(item.id, { discount: parseFloat(e.target.value) })}
                             className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
                           />
                         </div>
@@ -918,11 +939,12 @@ export const Quotes: React.FC = () => {
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
                           </p>
                         </div>
-                        <div className="sm:col-span-1 flex justify-end">
-                          <button 
+                        <div className="sm:col-span-1 flex justify-end sm:items-center">
+                          <button
                             type="button"
                             onClick={() => removeItem(item.id)}
                             className="rounded-lg p-2 text-content-subtle hover:bg-red-50 hover:text-red-500"
+                            title="Remover item"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -1015,9 +1037,14 @@ export const Quotes: React.FC = () => {
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between border-t pt-8">
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-content-subtle uppercase tracking-widest">Resumo do Orçamento</p>
+                    {discountTotal > 0 && (
+                      <p className="text-xs font-medium text-content-subtle">
+                        Subtotal {brl(subtotal)} − desconto {brl(discountTotal)}
+                      </p>
+                    )}
                     <div className="flex items-baseline gap-2">
                       <span className="text-3xl font-black text-content">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                        {brl(total)}
                       </span>
                       {installments > 1 && (
                         <span className="text-sm font-bold text-content-subtle">
