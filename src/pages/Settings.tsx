@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, MessageSquare, Save, ExternalLink, Settings2, Users, Plus, Trash2 } from 'lucide-react';
+import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, MessageSquare, Save, ExternalLink, Settings2, Users, Plus, Trash2, Send } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -10,7 +10,7 @@ export const Settings: React.FC = () => {
   const { user, logout } = useAuth();
   const { entities, selectedEntity, updateEntity } = useEntity();
   const { showToast, confirm } = useUI();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'data' | 'whatsapp'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'data' | 'whatsapp' | 'telegram'>('profile');
 
   const [isSaving, setIsSaving] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
@@ -48,6 +48,7 @@ export const Settings: React.FC = () => {
     { id: 'profile', label: 'Meu Perfil', icon: User },
     { id: 'notifications', label: 'Notificações', icon: Bell },
     { id: 'whatsapp', label: 'WhatsApp Bot', icon: MessageSquare },
+    { id: 'telegram', label: 'Telegram Bot', icon: Send },
     { id: 'data', label: 'Dados e Privacidade', icon: Database },
   ];
 
@@ -111,6 +112,28 @@ export const Settings: React.FC = () => {
       try { localStorage.setItem('finanflow:notif-prefs', JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+  };
+
+  // Vínculo do Telegram: pede um código/deep link ao servidor (autenticado).
+  const [tgLink, setTgLink] = useState<string | null>(null);
+  const [tgCode, setTgCode] = useState<string | null>(null);
+  const [tgLoading, setTgLoading] = useState(false);
+  const connectTelegram = async () => {
+    if (!user) return;
+    setTgLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/telegram/link-code', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || 'Não foi possível gerar o link.', 'error'); return; }
+      setTgCode(data.code || null);
+      setTgLink(data.deepLink || null);
+      if (!data.deepLink) showToast(`Abra o seu bot no Telegram e envie: /start ${data.code}`, 'info');
+    } catch {
+      showToast('Erro ao conectar com o Telegram. O servidor precisa do TELEGRAM_BOT_TOKEN.', 'error');
+    } finally {
+      setTgLoading(false);
+    }
   };
 
   const handleDeleteAllData = async () => {
@@ -400,6 +423,70 @@ export const Settings: React.FC = () => {
                   <Save className="h-4 w-4" />
                 </button>
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'telegram' && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-600 dark:bg-sky-950/40">
+                  <Send className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-content">Telegram Bot</h3>
+                  <p className="text-sm text-content-subtle">Receba alertas no celular e lance por mensagem/foto.</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-line bg-canvas p-5 text-sm text-content-muted">
+                <p className="font-bold text-content mb-2">O que o bot faz</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Avisa <b>contas a vencer</b>, <b>saldo no vermelho</b> e <b>orçamento estourado</b>.</li>
+                  <li>Manda um <b>resumo semanal</b> (segunda de manhã).</li>
+                  <li>Aceita comandos: <i>“saldo”, “quanto tenho a pagar”, “gastei 50 no posto”</i> e foto de nota.</li>
+                  <li>Tudo num chat só, marcado <b>[PF]</b> / <b>[PJ]</b>. Ajuste as preferências na aba <b>Notificações</b>.</li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm space-y-4">
+                <p className="font-bold text-content">Conectar seu chat</p>
+                <p className="text-sm text-content-subtle">
+                  Toque em conectar, abra o bot no Telegram e confirme com <code>/start</code>. É preciso fazer isso uma vez.
+                </p>
+                <button
+                  onClick={connectTelegram}
+                  disabled={tgLoading}
+                  className="flex items-center gap-2 rounded-xl bg-sky-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-600/20 hover:bg-sky-700 transition-all disabled:opacity-50"
+                >
+                  {tgLoading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Send className="h-4 w-4" />}
+                  Conectar Telegram
+                </button>
+
+                {(tgLink || tgCode) && (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 dark:bg-sky-950/30 p-4 text-sm">
+                    {tgLink ? (
+                      <a href={tgLink} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-2 font-bold text-sky-700 dark:text-sky-300 hover:underline">
+                        <ExternalLink className="h-4 w-4" /> Abrir o bot e confirmar
+                      </a>
+                    ) : (
+                      <p className="text-content-muted">Abra o seu bot no Telegram e envie:</p>
+                    )}
+                    {tgCode && (
+                      <p className="mt-2 font-mono text-content">/start {tgCode}</p>
+                    )}
+                    <p className="mt-2 text-xs text-content-subtle">O código expira em pouco tempo — se falhar, gere outro.</p>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-content-subtle">
+                Requer o <code>TELEGRAM_BOT_TOKEN</code> configurado no servidor (feito no deploy).
+              </p>
             </motion.div>
           )}
 
