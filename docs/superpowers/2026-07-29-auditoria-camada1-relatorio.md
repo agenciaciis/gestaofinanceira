@@ -142,6 +142,30 @@
 - `goals.ts`, `finance.ts`, `debts.ts`, `creditScore.ts` — sólidos, sem divisão por zero nos caminhos testados.
 - z-index/sobreposição do `Layout` (header/sidebar/backdrops) coerentes.
 
+## Camada 2 — auditoria visual ao vivo (executada 2026-07-29, seed + login)
+
+Ambiente: dev server na 4322, seed de ~4 meses (206 docs, PF+PJ), login OK.
+
+**Positivo (desktop):** UI polida e coerente; sem sobreposição/"cavalado"; sidebar/header/z-index
+corretos. Cálculos batem com o esperado: "Posso Gastar" R$167.213,42 = saldo − contas − fatura −
+parcela − variável − reserva (conferido); "A Receber − A Pagar" = 15.300 − 15.004,06 = 295,94.
+
+### C2.1 — [P1] Mobile quebrado: overflow horizontal sistêmico
+- **Medido:** viewport 375px. Dashboard → conteúdo 568px (overflow ~193px): a **barra de
+  ferramentas** (período + "Movimento PF x PJ" + "+") é flex-row que não quebra. Lançamentos →
+  conteúdo **1085px (overflow 756px)**: a **tabela de transações não tem `overflow-x-auto`** e
+  arrasta a página inteira; cards de resumo também não empilham.
+- **Impacto:** o app é **praticamente inutilizável no celular** — e o objetivo declarado é usar no
+  celular. Elevado a P1 (era o eixo "diagramação" que o usuário mais pediu). Precisa de um **passe
+  de responsividade** repo-wide: toolbars com `flex-wrap`, tabelas em `overflow-x-auto`, grids de
+  card com breakpoints (`grid-cols-1 sm:grid-cols-2 …`).
+
+### C2.2 — [P3] Menu hambúrguer não abriu ao primeiro clique (a confirmar no passe mobile)
+- Observado no mobile; pode ser timing do drawer. Reverificar durante o fix de responsividade.
+
+> Botões e fluxos serão exercitados 1-a-1 na **simulação de 6 meses** (etapa final de verificação,
+> após as correções) — a pedido do usuário.
+
 ## Sugestão de ordem de correção
 
 1. **P0.1** (senha) — imediato, isolado.
