@@ -252,3 +252,38 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 
 Depois, logado no navegador: criar uma caixinha, registrar um depósito de R$ 10
 e confirmar que o progresso mexeu.
+
+---
+
+## Telegram (subprojeto B) — ativação
+
+Variáveis no `.env` do servidor:
+
+```
+TELEGRAM_BOT_TOKEN=...        # token do @BotFather (obrigatório)
+TELEGRAM_WEBHOOK_SECRET=...   # string aleatória; valida o webhook
+ALERTS_CRON_TOKEN=...         # protege /api/telegram/run-alerts
+```
+
+Passos:
+
+1. Criar o bot no **@BotFather**, pegar o token, pôr em `TELEGRAM_BOT_TOKEN`.
+2. Registrar o webhook (uma vez), passando o mesmo secret:
+
+```bash
+curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  -d "url=https://SEUDOMINIO.com.br/api/telegram/webhook" \
+  -d "secret_token=$TELEGRAM_WEBHOOK_SECRET"
+```
+
+3. No app: **Configurações → Telegram Bot → Conectar**, abrir o link e enviar `/start`.
+4. Alertas: o agendador in-process dispara às **08:00 (America/Sao_Paulo)** e o resumo na
+   segunda. Para forçar/testar (ou usar cron externo):
+
+```bash
+curl -s -X POST "https://SEUDOMINIO.com.br/api/telegram/run-alerts?weekly=1" \
+  -H "x-alerts-token: $ALERTS_CRON_TOKEN"
+```
+
+5. Regras do Firestore: publicar as novas coleções `telegram_links` e `telegram_codes`
+   (restritas ao dono) junto do `firebase deploy --only firestore:rules`.
