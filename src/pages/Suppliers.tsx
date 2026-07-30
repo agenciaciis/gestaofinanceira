@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 
 const SUPPLIER_CATEGORIES = [
   { id: 'imobiliaria', name: 'Imobiliária', icon: Building2 },
@@ -41,6 +42,7 @@ export const Suppliers: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useViewMode('fornecedores', 'grid');
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -183,6 +185,17 @@ export const Suppliers: React.FC = () => {
     s.cnpjOrCpf?.includes(searchTerm)
   );
 
+  const colunasFornecedores: Column<Supplier>[] = [
+    { chave: 'nome', titulo: 'Nome', render: (f) => <span className="font-bold text-content">{f.name}</span> },
+    {
+      chave: 'categoria', titulo: 'Categoria',
+      render: (f) => SUPPLIER_CATEGORIES.find(c => c.id === f.category)?.name || f.category || '—',
+    },
+    { chave: 'doc', titulo: 'CNPJ / CPF', escondeNoMobile: true, render: (f) => f.cnpjOrCpf || '—' },
+    { chave: 'contato', titulo: 'Contato', escondeNoMobile: true, render: (f) => f.phone || f.email || '—' },
+    { chave: 'pix', titulo: 'Chave PIX', escondeNoMobile: true, render: (f) => f.pixKey || '—' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -190,13 +203,16 @@ export const Suppliers: React.FC = () => {
           <h2 className="text-2xl font-bold text-content">Fornecedores e Locais</h2>
           <p className="text-sm text-content-subtle">Cadastre locais e pessoas que você precisa pagar.</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Cadastro
-        </button>
+        <div className="flex items-center gap-3">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Cadastro
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -210,7 +226,27 @@ export const Suppliers: React.FC = () => {
         />
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {viewMode === 'list' && (
+        <DataTable
+          itens={filteredSuppliers}
+          colunas={colunasFornecedores}
+          acoes={(f) => (
+            <>
+              <button onClick={() => handleEdit(f)} title="Editar"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(f)} title="Excluir"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum cadastro encontrado.</p>}
+        />
+      )}
+
+      {viewMode === 'grid' && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
           {filteredSuppliers.map((supplier) => {
             const CategoryIcon = SUPPLIER_CATEGORIES.find(c => c.id === supplier.category)?.icon || Banknote;
@@ -285,7 +321,7 @@ export const Suppliers: React.FC = () => {
             );
           })}
         </AnimatePresence>
-      </div>
+      </div>}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">

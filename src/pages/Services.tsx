@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
+import { serviceMargin } from '../lib/quotes';
 
 export const Services: React.FC = () => {
   const { selectedEntity } = useEntity();
@@ -30,6 +32,7 @@ export const Services: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Service | Plan | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useViewMode('servicos', 'grid');
 
   // Form states
   const [name, setName] = useState('');
@@ -209,6 +212,55 @@ export const Services: React.FC = () => {
     );
   }
 
+  const brl = (n: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
+
+  const colunasServicos: Column<Service>[] = [
+    {
+      chave: 'nome', titulo: 'Serviço',
+      render: (sv) => (
+        <span>
+          <span className="font-bold text-content">{sv.name}</span>
+          {sv.code && <span className="ml-2 text-[10px] font-black text-content-subtle">{sv.code}</span>}
+          {sv.active === false && <span className="ml-2 rounded bg-surface-muted px-1.5 text-[10px] font-black text-content-subtle">inativo</span>}
+        </span>
+      ),
+    },
+    { chave: 'categoria', titulo: 'Categoria', escondeNoMobile: true, render: (sv) => sv.category || '—' },
+    { chave: 'preco', titulo: 'Preço', numerico: true, render: (sv) => brl(sv.basePrice) },
+    { chave: 'custo', titulo: 'Custo', numerico: true, escondeNoMobile: true, render: (sv) => sv.costPrice != null ? brl(sv.costPrice) : '—' },
+    {
+      chave: 'margem', titulo: 'Margem', numerico: true,
+      render: (sv) => {
+        const m = serviceMargin(sv.basePrice, sv.costPrice, sv.estimatedHours);
+        return (
+          <span className={cn('font-bold',
+            m.margemPercent >= 40 ? 'text-emerald-600' : m.margemPercent >= 20 ? 'text-amber-600' : 'text-rose-600')}>
+            {m.margemPercent.toFixed(0)}%
+          </span>
+        );
+      },
+    },
+    {
+      chave: 'hora', titulo: 'Por hora', numerico: true, escondeNoMobile: true,
+      render: (sv) => {
+        const m = serviceMargin(sv.basePrice, sv.costPrice, sv.estimatedHours);
+        return m.valorHora !== null ? brl(m.valorHora) : '—';
+      },
+    },
+    { chave: 'prazo', titulo: 'Prazo', numerico: true, escondeNoMobile: true, render: (sv) => sv.deliveryDays ? `${sv.deliveryDays}d` : '—' },
+  ];
+
+  const colunasPlanos: Column<Plan>[] = [
+    { chave: 'nome', titulo: 'Plano', render: (pl) => <span className="font-bold text-content">{pl.name}</span> },
+    { chave: 'preco', titulo: 'Preço', numerico: true, render: (pl) => brl(pl.price) },
+    {
+      chave: 'ciclo', titulo: 'Cobrança',
+      render: (pl) => ({ monthly: 'Mensal', quarterly: 'Trimestral', yearly: 'Anual' }[pl.billingCycle] || pl.billingCycle),
+    },
+    { chave: 'servicos', titulo: 'Serviços inclusos', numerico: true, escondeNoMobile: true, render: (pl) => String(pl.services?.length || 0) },
+  ];
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -226,13 +278,16 @@ export const Services: React.FC = () => {
               <p className="text-sm font-medium text-purple-700 dark:text-white/80 mt-1">Gerencie seu catálogo de serviços e pacotes recorrentes.</p>
             </div>
           </div>
-          <button 
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-purple-700 transition-all transform hover:scale-105 active:scale-95"
-          >
-            <Plus className="h-5 w-5" />
-            {activeTab === 'services' ? 'Novo Serviço' : 'Novo Plano'}
-          </button>
+          <div className="flex items-center gap-3">
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+            <button
+              onClick={() => { resetForm(); setIsModalOpen(true); }}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-purple-700 transition-all transform hover:scale-105 active:scale-95"
+            >
+              <Plus className="h-5 w-5" />
+              {activeTab === 'services' ? 'Novo Serviço' : 'Novo Plano'}
+            </button>
+          </div>
         </div>
         
         {/* Decorative elements */}
@@ -277,8 +332,48 @@ export const Services: React.FC = () => {
         </div>
       </div>
 
+      {viewMode === 'list' && (
+        activeTab === 'services' ? (
+          <DataTable
+            itens={filteredServices}
+            colunas={colunasServicos}
+            acoes={(sv) => (
+              <>
+                <button onClick={() => handleEdit(sv)} title="Editar"
+                  className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button onClick={() => handleDelete(sv.id)} title="Excluir"
+                  className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
+            )}
+            vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum serviço encontrado.</p>}
+          />
+        ) : (
+          <DataTable
+            itens={filteredPlans}
+            colunas={colunasPlanos}
+            acoes={(pl) => (
+              <>
+                <button onClick={() => handleEdit(pl)} title="Editar"
+                  className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button onClick={() => handleDelete(pl.id)} title="Excluir"
+                  className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
+            )}
+            vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum plano encontrado.</p>}
+          />
+        )
+      )}
+
       {/* Content Grid */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {viewMode === 'grid' && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {activeTab === 'services' ? (
           filteredServices.map(service => (
             <motion.div 
@@ -378,7 +473,7 @@ export const Services: React.FC = () => {
             </motion.div>
           ))
         )}
-      </div>
+      </div>}
 
       {/* Modal */}
       <AnimatePresence>
