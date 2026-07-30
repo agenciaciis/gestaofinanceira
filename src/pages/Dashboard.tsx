@@ -3,7 +3,7 @@ import { useEntity } from '../contexts/EntityContext';
 import { collection, query, where, onSnapshot, limit, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Transaction, BankAccount, CreditCard, Debt } from '../types';
-import { CATEGORIES } from '../constants';
+import { CATEGORIES, MONTHS } from '../constants';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -118,6 +118,8 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
   const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [timeFilter, setTimeFilter] = useState<'today' | 'month' | 'year'>('month');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   // Vazio = usar a reserva sugerida pelo sistema.
   const [reserveOverride, setReserveOverride] = useState<string>(
     () => (typeof localStorage !== 'undefined' && localStorage.getItem(RESERVE_STORAGE_KEY)) || ''
@@ -198,7 +200,16 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
   }, [entities, filterType]);
 
   // Derived Data
-  const now = useMemo(() => new Date(), []);
+  /** Hoje de verdade — para "posso gastar", reserva e duplicidade, que são do agora. */
+  const hoje = useMemo(() => new Date(), []);
+  /**
+   * Referência do PERÍODO analisado. "Hoje" sempre aponta para hoje; Mês e Ano
+   * respeitam o seletor, para dar para olhar março de 2026.
+   */
+  const now = useMemo(
+    () => (timeFilter === 'today' ? hoje : new Date(selectedYear, selectedMonth, 15)),
+    [timeFilter, hoje, selectedYear, selectedMonth]
+  );
   const currentMonthStart = startOfMonth(now);
   const lastMonthStart = subMonths(currentMonthStart, 1);
 
@@ -295,6 +306,9 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       totalEstimatedInterest,
       // A fatura de cartão já está dentro de totalOpenDebts — subtrair de novo
       // contaria a mesma dívida duas vezes.
+      // Os dois que faltavam do painel da planilha antiga.
+      resultadoPeriodo: round2(incomeThisPeriod - expenseThisPeriod),
+      resultadoPrevisto: round2((incomeThisPeriod + pendingIncome) - (expenseThisPeriod + pendingExpense)),
       netWorth: round2(totalBankBalance - totalOpenDebts),
       incomeTrend: calculateTrend(incomeThisPeriod, incomeLastPeriod),
       expenseTrend: calculateTrend(expenseThisPeriod, expenseLastPeriod),
@@ -307,8 +321,8 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
    * comprometido até o fim do mês, o gasto variável esperado e a reserva.
    */
   const reserveSuggestion = useMemo(
-    () => suggestReserve(transactions, now, stats.totalOpenDebts > 0),
-    [transactions, now, stats.totalOpenDebts]
+    () => suggestReserve(transactions, hoje, stats.totalOpenDebts > 0),
+    [transactions, hoje, stats.totalOpenDebts]
   );
 
   const activeReserve = reserveOverride.trim() === ''
@@ -322,18 +336,18 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       cards,
       loans: debts.map(d => ({ id: d.id, name: d.name, monthlyPayment: d.monthlyPayment })),
       reserve: activeReserve,
-      reference: now,
+      reference: hoje,
     }),
-    [accounts, transactions, cards, debts, activeReserve, now]
+    [accounts, transactions, cards, debts, activeReserve, hoje]
   );
 
   const duplicateLoans = useMemo(
     () => detectDuplicateLoanCommitments(
       debts.map(d => ({ id: d.id, name: d.name, monthlyPayment: d.monthlyPayment })),
       transactions,
-      now
+      hoje
     ),
-    [debts, transactions, now]
+    [debts, transactions, hoje]
   );
 
   /** Consolidação PF × PJ do mês, com o movimento interno anulado. */
@@ -484,6 +498,30 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
               Ano
             </button>
           </div>
+          {timeFilter !== 'today' && (
+            <div className="flex items-center gap-1 rounded-xl border border-line px-2 py-1">
+              {timeFilter === 'month' && (
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  aria-label="Mês analisado"
+                  className="rounded-lg bg-transparent px-2 py-1 text-xs font-bold text-content outline-none"
+                >
+                  {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+                </select>
+              )}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                aria-label="Ano analisado"
+                className="rounded-lg bg-transparent px-2 py-1 text-xs font-bold text-content outline-none"
+              >
+                {Array.from({ length: 7 }, (_, i) => hoje.getFullYear() - 4 + i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          )}
           {entities.length > 1 && (
             <button
               onClick={() => setIsCrossEntityOpen(true)}
@@ -502,6 +540,43 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
             <Plus className="h-5 w-5" />
           </button>
         </div>
+      </div>
+
+      {/* Painel do período — os 8 indicadores juntos, como na planilha antiga.
+          Antes estavam espalhados entre Dashboard, Lançamentos e Relatórios. */}
+      <div className="rounded-3xl bg-surface p-6 shadow-sm border border-line">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-sm font-black uppercase tracking-widest text-content-subtle">
+            Painel de {timeFilter === 'today' ? 'hoje' : timeFilter === 'year' ? selectedYear : `${MONTHS[selectedMonth]} de ${selectedYear}`}
+          </h3>
+          <span className="text-xs text-content-subtle">Tudo abaixo responde ao período escolhido acima.</span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { rotulo: 'Saldo geral', valor: stats.totalBankBalance, cor: 'text-content', nota: 'todas as contas, hoje' },
+            { rotulo: 'Receita', valor: stats.incomeThisPeriod, cor: 'text-emerald-600', nota: 'recebido no período' },
+            { rotulo: 'Despesa', valor: -stats.expenseThisPeriod, cor: 'text-rose-600', nota: 'pago no período' },
+            { rotulo: 'Resultado do período', valor: stats.resultadoPeriodo, cor: stats.resultadoPeriodo >= 0 ? 'text-emerald-600' : 'text-rose-600', nota: 'receita − despesa' },
+            { rotulo: 'Valores a receber', valor: stats.pendingIncome, cor: 'text-blue-600', nota: 'ainda não entrou' },
+            { rotulo: 'Valores a pagar', valor: -stats.pendingExpense, cor: 'text-amber-600', nota: 'ainda não saiu' },
+            { rotulo: 'Resultado previsto', valor: stats.resultadoPrevisto, cor: stats.resultadoPrevisto >= 0 ? 'text-emerald-600' : 'text-rose-600', nota: 'se tudo se confirmar' },
+            { rotulo: 'Vencidas', valor: -stats.overdue, cor: 'text-rose-600', nota: 'passou do vencimento' },
+          ].map(item => (
+            <div key={item.rotulo} className="rounded-2xl border border-line p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">{item.rotulo}</p>
+              <p className={cn('mt-1 text-xl font-black tracking-tight tabular-nums', item.cor)}>
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor)}
+              </p>
+              <p className="mt-0.5 text-[10px] text-content-subtle">{item.nota}</p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-4 text-xs text-content-subtle">
+          O ponto de equilíbrio fica em <strong>Relatórios</strong>, porque depende de você classificar
+          cada categoria como custo variável ou despesa fixa — sem isso o número seria um chute.
+        </p>
       </div>
 
       {/* Posso gastar? */}
