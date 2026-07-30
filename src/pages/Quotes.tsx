@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, setDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, setDoc, getDocs, writeBatch, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Quote, Client, Service, Plan, QuoteItem } from '../types';
 import { 
@@ -30,6 +30,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { parseLocalDate } from '../lib/finance';
 import { quoteTotals, itemGross } from '../lib/quotes';
+import { quoteToRevenueTransactions } from '../lib/orders';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -43,6 +44,7 @@ export const Quotes: React.FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [products, setProducts] = useState<Service[]>([]); // produto = mesmo formato de serviço
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,6 +75,7 @@ export const Quotes: React.FC = () => {
     const quotesQ = query(collection(db, `entities/${selectedEntity.id}/quotes`), orderBy('createdAt', 'desc'));
     const clientsQ = query(collection(db, `entities/${selectedEntity.id}/clients`), orderBy('name', 'asc'));
     const servicesQ = query(collection(db, `entities/${selectedEntity.id}/services`), orderBy('name', 'asc'));
+    const productsQ = query(collection(db, `entities/${selectedEntity.id}/products`), orderBy('name', 'asc'));
     const plansQ = query(collection(db, `entities/${selectedEntity.id}/plans`), orderBy('name', 'asc'));
 
     const unsubQuotes = onSnapshot(quotesQ, (snapshot) => {
@@ -96,6 +99,13 @@ export const Quotes: React.FC = () => {
       handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/services`);
     });
 
+    const unsubProducts = onSnapshot(productsQ, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[]);
+    }, (error) => {
+      console.error("Error fetching products for quotes:", error);
+      handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/products`);
+    });
+
     const unsubPlans = onSnapshot(plansQ, (snapshot) => {
       setPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Plan[]);
       setLoading(false);
@@ -108,6 +118,7 @@ export const Quotes: React.FC = () => {
       unsubQuotes();
       unsubClients();
       unsubServices();
+      unsubProducts();
       unsubPlans();
     };
   }, [selectedEntity]);
@@ -115,7 +126,7 @@ export const Quotes: React.FC = () => {
   // Fonte única testada (lib/quotes): round2, desconto abatido uma vez, total nunca negativo.
   const { subtotal, discountTotal, total } = useMemo(() => quoteTotals(quoteItems), [quoteItems]);
 
-  const handleAddItem = (type: 'service' | 'plan') => {
+  const handleAddItem = (type: 'service' | 'plan' | 'product') => {
     const newItem: QuoteItem = {
       id: Math.random().toString(36).substr(2, 9),
       description: '',
@@ -134,8 +145,9 @@ export const Quotes: React.FC = () => {
         const updated = { ...item, ...updates };
         // If referenceId changed, update description and price
         if (updates.referenceId) {
-          if (item.type === 'service') {
-            const s = services.find(serv => serv.id === updates.referenceId);
+          if (item.type === 'service' || item.type === 'product') {
+            const lista = item.type === 'product' ? products : services;
+            const s = lista.find(serv => serv.id === updates.referenceId);
             if (s) {
               updated.description = s.name;
               updated.unitPrice = s.basePrice;
@@ -309,6 +321,47 @@ export const Quotes: React.FC = () => {
     } catch (error) {
       console.error("Error updating status:", error);
       showToast('Erro ao atualizar status.', 'error');
+    }
+  };
+
+  /**
+   * Converte o orçamento em Ordem de Serviço: gera as receitas A RECEBER
+   * (única/parcelada/recorrente) vinculadas ao cliente e marca como convertido.
+   * Idempotente: se já houver lançamentos com este sourceQuoteId, não duplica.
+   */
+  const convertQuote = async (quote: Quote) => {
+    if (!selectedEntity) return;
+    const confirmed = await confirm({
+      title: 'Converter em Receita (OS)',
+      message: `Gerar os lançamentos a receber de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(quote.total) || 0)} para ${quote.clientName} e marcar como convertido?`,
+      variant: 'default',
+    });
+    if (!confirmed) return;
+    setStatusMenuFor(null);
+    try {
+      const txCol = collection(db, `entities/${selectedEntity.id}/transactions`);
+      const existing = await getDocs(query(txCol, where('sourceQuoteId', '==', quote.id)));
+      if (!existing.empty) {
+        await updateDoc(doc(db, `entities/${selectedEntity.id}/quotes/${quote.id}`), { status: 'converted' });
+        showToast('Este orçamento já tinha receitas geradas — marquei como convertido (nada duplicado).', 'info');
+        return;
+      }
+      const drafts = quoteToRevenueTransactions(quote, {
+        id: selectedEntity.id,
+        ownerUid: selectedEntity.ownerUid,
+        collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
+      });
+      if (drafts.length === 0) { showToast('Orçamento sem valor para converter.', 'error'); return; }
+      const batch = writeBatch(db);
+      for (const d of drafts) {
+        batch.set(doc(txCol), { ...d, createdAt: serverTimestamp() });
+      }
+      batch.update(doc(db, `entities/${selectedEntity.id}/quotes/${quote.id}`), { status: 'converted' });
+      await batch.commit();
+      showToast(`Convertido! ${drafts.length} lançamento(s) a receber criados para ${quote.clientName}.`, 'success');
+    } catch (error) {
+      console.error('Erro ao converter orçamento:', error);
+      showToast('Erro ao converter o orçamento.', 'error');
     }
   };
 
@@ -751,6 +804,10 @@ export const Quotes: React.FC = () => {
                         <button onClick={() => { updateStatus(quote.id, 'sent'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">Marcar como Enviado</button>
                         <button onClick={() => { updateStatus(quote.id, 'approved'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">Marcar como Aprovado</button>
                         <button onClick={() => { updateStatus(quote.id, 'rejected'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">Marcar como Recusado</button>
+                        <div className="my-1 border-t border-line" />
+                        <button onClick={() => convertQuote(quote)} className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Converter em Receita (OS)
+                        </button>
                       </div>
                     </>
                   )}
@@ -868,7 +925,15 @@ export const Quotes: React.FC = () => {
                         <Package className="h-3.5 w-3.5" />
                         + Serviço
                       </button>
-                      <button 
+                      <button
+                        type="button"
+                        onClick={() => handleAddItem('product')}
+                        className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" />
+                        + Produto
+                      </button>
+                      <button
                         type="button"
                         onClick={() => handleAddItem('plan')}
                         className="flex items-center gap-1.5 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-600 hover:bg-purple-100"
@@ -896,6 +961,8 @@ export const Quotes: React.FC = () => {
                             <option value="">Selecione...</option>
                             {item.type === 'service' ? (
                               services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
+                            ) : item.type === 'product' ? (
+                              products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
                             ) : (
                               plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
                             )}

@@ -26,9 +26,10 @@ export const Services: React.FC = () => {
   const { selectedEntity } = useEntity();
   const { showToast, confirm } = useUI();
   const [services, setServices] = useState<Service[]>([]);
+  const [products, setProducts] = useState<Service[]>([]); // produto usa o mesmo formato de serviço
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'services' | 'plans'>('services');
+  const [activeTab, setActiveTab] = useState<'services' | 'plans' | 'products'>('services');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Service | Plan | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,6 +57,7 @@ export const Services: React.FC = () => {
     if (!selectedEntity) return;
 
     const servicesQ = query(collection(db, `entities/${selectedEntity.id}/services`), orderBy('createdAt', 'desc'));
+    const productsQ = query(collection(db, `entities/${selectedEntity.id}/products`), orderBy('createdAt', 'desc'));
     const plansQ = query(collection(db, `entities/${selectedEntity.id}/plans`), orderBy('createdAt', 'desc'));
 
     const unsubServices = onSnapshot(servicesQ, (snapshot) => {
@@ -63,6 +65,13 @@ export const Services: React.FC = () => {
     }, (error) => {
       console.error("Error fetching services:", error);
       handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/services`);
+    });
+
+    const unsubProducts = onSnapshot(productsQ, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[]);
+    }, (error) => {
+      console.error("Error fetching products:", error);
+      handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/products`);
     });
 
     const unsubPlans = onSnapshot(plansQ, (snapshot) => {
@@ -75,6 +84,7 @@ export const Services: React.FC = () => {
 
     return () => {
       unsubServices();
+      unsubProducts();
       unsubPlans();
     };
   }, [selectedEntity]);
@@ -84,12 +94,12 @@ export const Services: React.FC = () => {
     if (!selectedEntity) return;
 
     try {
-      if (activeTab === 'services') {
+      if (activeTab === 'services' || activeTab === 'products') {
         const serviceData = {
           name,
           description,
           basePrice: Number(price) || 0,
-          category,
+          category: category || (activeTab === 'products' ? 'Produto' : ''),
           code: code.trim() || null,
           unit,
           costPrice: costPrice === '' ? null : Number(costPrice) || 0,
@@ -106,9 +116,9 @@ export const Services: React.FC = () => {
         };
 
         if (editingItem) {
-          await updateDoc(doc(db, `entities/${selectedEntity.id}/services/${editingItem.id}`), serviceData);
+          await updateDoc(doc(db, `entities/${selectedEntity.id}/${activeTab}/${editingItem.id}`), serviceData);
         } else {
-          await addDoc(collection(db, `entities/${selectedEntity.id}/services`), serviceData);
+          await addDoc(collection(db, `entities/${selectedEntity.id}/${activeTab}`), serviceData);
         }
       } else {
         const planData = {
@@ -132,7 +142,7 @@ export const Services: React.FC = () => {
 
       resetForm();
       setIsModalOpen(false);
-      showToast(`${activeTab === 'services' ? 'Serviço' : 'Plano'} salvo com sucesso!`, 'success');
+      showToast(`${activeTab === 'plans' ? 'Plano' : activeTab === 'products' ? 'Produto' : 'Serviço'} salvo com sucesso!`, 'success');
     } catch (error) {
       console.error("Error saving service/plan:", error);
       showToast('Erro ao salvar item.', 'error');
@@ -159,7 +169,7 @@ export const Services: React.FC = () => {
       ? String((item as Service).basePrice ?? '')
       : String((item as Plan).price ?? ''));
     
-    if (activeTab === 'services') {
+    if (activeTab === 'services' || activeTab === 'products') {
       const sv = item as Service;
       setCategory(sv.category);
       setCode(sv.code || '');
@@ -183,7 +193,7 @@ export const Services: React.FC = () => {
     if (!selectedEntity) return;
     const confirmed = await confirm({
       title: 'Excluir Item',
-      message: `Tem certeza que deseja excluir este ${activeTab === 'services' ? 'serviço' : 'plano'}?`,
+      message: `Tem certeza que deseja excluir este ${activeTab === 'plans' ? 'plano' : activeTab === 'products' ? 'produto' : 'serviço'}?`,
       variant: 'danger'
     });
     if (!confirmed) return;
@@ -202,8 +212,13 @@ export const Services: React.FC = () => {
     s.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredPlans = plans.filter(p => 
+  const filteredPlans = plans.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -287,7 +302,7 @@ export const Services: React.FC = () => {
               className="flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-purple-700 transition-all transform hover:scale-105 active:scale-95"
             >
               <Plus className="h-5 w-5" />
-              {activeTab === 'services' ? 'Novo Serviço' : 'Novo Plano'}
+              {activeTab === 'plans' ? 'Novo Plano' : activeTab === 'products' ? 'Novo Produto' : 'Novo Serviço'}
             </button>
           </div>
         </div>
@@ -310,7 +325,17 @@ export const Services: React.FC = () => {
             <Tag className="h-4 w-4" />
             Serviços
           </button>
-          <button 
+          <button
+            onClick={() => setActiveTab('products')}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all",
+              activeTab === 'products' ? "bg-surface text-primary shadow-sm" : "text-content-subtle hover:text-content-muted"
+            )}
+          >
+            <Package className="h-4 w-4" />
+            Produtos
+          </button>
+          <button
             onClick={() => setActiveTab('plans')}
             className={cn(
               "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all",
@@ -335,9 +360,9 @@ export const Services: React.FC = () => {
       </div>
 
       {viewMode === 'list' && (
-        activeTab === 'services' ? (
+        activeTab !== 'plans' ? (
           <DataTable
-            itens={filteredServices}
+            itens={activeTab === 'products' ? filteredProducts : filteredServices}
             colunas={colunasServicos}
             acoes={(sv) => (
               <>
@@ -351,7 +376,7 @@ export const Services: React.FC = () => {
                 </button>
               </>
             )}
-            vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum serviço encontrado.</p>}
+            vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum {activeTab === 'products' ? 'produto' : 'serviço'} encontrado.</p>}
           />
         ) : (
           <DataTable
@@ -376,8 +401,8 @@ export const Services: React.FC = () => {
 
       {/* Content Grid */}
       {viewMode === 'grid' && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {activeTab === 'services' ? (
-          filteredServices.map(service => (
+        {activeTab !== 'plans' ? (
+          (activeTab === 'products' ? filteredProducts : filteredServices).map(service => (
             <motion.div 
               layout
               key={service.id}

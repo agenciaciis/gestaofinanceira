@@ -13,6 +13,7 @@ import {
   getFirestore, collection, doc, writeBatch, setDoc, serverTimestamp,
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+import { quoteToRevenueTransactions } from '../src/lib/orders';
 
 const EMAIL = process.env.SEED_EMAIL ?? '';
 const PASSWORD = process.env.SEED_PASSWORD ?? '';
@@ -32,8 +33,8 @@ const rand = (min: number, max: number) => Math.round((Math.random() * (max - mi
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
 const today = new Date();
-// 4 meses atrás (início do mês)
-const startMonth = new Date(today.getFullYear(), today.getMonth() - 4, 1);
+// 12 meses atrás (início do mês) — simula ~1 ano de uso.
+const startMonth = new Date(today.getFullYear(), today.getMonth() - 12, 1);
 
 type Doc = { path: string; data: any };
 const docs: Doc[] = [];
@@ -127,6 +128,14 @@ async function seedEntity(uid: string, email: string, name: string, type: 'PF' |
     add(P('plans'), { ...base, name: 'Plano Start', description: 'Social + Tráfego', price: 2500, billingCycle: 'monthly', services: [servIds[0], servIds[1]], createdAt: serverTimestamp() });
     add(P('plans'), { ...base, name: 'Plano Full', description: 'Tudo incluso', price: 4500, billingCycle: 'monthly', services: servIds.slice(0, 4), createdAt: serverTimestamp() });
 
+    // ---------- produtos digitais ----------
+    [
+      { name: 'E-book: Marketing para Pequenos Negócios', basePrice: 47, costPrice: 5 },
+      { name: 'Pacote de Templates para Social Media', basePrice: 97, costPrice: 10 },
+      { name: 'Presets de Edição', basePrice: 37, costPrice: 3 },
+      { name: 'Mini-curso de Tráfego Pago', basePrice: 197, costPrice: 20 },
+    ].forEach(p => add(P('products'), { ...base, name: p.name, description: 'Produto digital', basePrice: p.basePrice, costPrice: p.costPrice, category: 'Produto', active: true, createdAt: serverTimestamp() }));
+
     // ---------- orçamentos ----------
     const statuses = ['draft', 'sent', 'approved', 'rejected'];
     for (let i = 0; i < 4; i++) {
@@ -142,6 +151,30 @@ async function seedEntity(uid: string, email: string, name: string, type: 'PF' |
         createdAt: serverTimestamp(),
       });
     }
+
+    // ---------- OS convertidas (orçamento aprovado -> receita a receber) ----------
+    const osDefs = [
+      { cli: clientIds[0], total: 3500, installments: 1, desc: 'Criação de Site' },
+      { cli: clientIds[1], total: 2800, installments: 3, desc: 'Identidade Visual (3x)' },
+    ];
+    osDefs.forEach((os, i) => {
+      const qref = doc(collection(db, P('quotes')));
+      const qid = qref.id;
+      const qDate = new Date(today.getFullYear(), today.getMonth() - 3, 10 + i);
+      const quoteData: any = {
+        entityId, ownerUid: uid, collaboratorsEmails: [], seed: true,
+        quoteNumber: `ORC-OS-${2000 + i}`, clientId: os.cli.id, clientName: os.cli.name,
+        date: ymd(qDate), validUntil: ymd(qDate),
+        items: [{ id: 'i1', description: os.desc, quantity: 1, unitPrice: os.total, discount: 0, total: os.total, type: 'service' }],
+        subtotal: os.total, discountTotal: 0, total: os.total,
+        paymentMethod: 'PIX', installments: os.installments, status: 'converted',
+        createdAt: serverTimestamp(),
+      };
+      docs.push({ path: P('quotes'), data: { ...quoteData, id: qid, _ref: qref } });
+      // Gera as receitas a receber pelo MESMO motor da tela (sourceQuoteId = qid).
+      const drafts = quoteToRevenueTransactions({ id: qid, ...quoteData }, { id: entityId, ownerUid: uid, collaboratorsEmails: [] });
+      drafts.forEach(d => add(`entities/${entityId}/transactions`, { ...d, createdAt: serverTimestamp() }));
+    });
 
     // ---------- orçamento/metas ----------
     docs.push({ path: P('config'), data: {
@@ -168,7 +201,7 @@ async function seedEntity(uid: string, email: string, name: string, type: 'PF' |
     { desc: 'Farmácia', cat: 'saude', min: 30, max: 200, card: true },
   ];
 
-  for (let m = 0; m <= 4; m++) {
+  for (let m = 0; m <= 12; m++) {
     const monthDate = new Date(startMonth.getFullYear(), startMonth.getMonth() + m, 1);
     const isFuture = monthDate.getMonth() === today.getMonth() && monthDate.getFullYear() === today.getFullYear();
     const completed = !isFuture; // mês corrente deixa alguns pendentes
