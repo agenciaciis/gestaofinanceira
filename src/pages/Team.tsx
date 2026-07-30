@@ -178,7 +178,11 @@ export const Team: React.FC = () => {
                 <div className="flex items-center gap-2 text-content-subtle">
                   <Clock className="h-3.5 w-3.5" />
                   <span className="text-[10px] font-bold uppercase tracking-widest">
-                    Desde {new Date(member.addedAt).toLocaleDateString('pt-BR')}
+                    {(() => {
+                      const raw: any = member.addedAt;
+                      const d = raw?.toDate ? raw.toDate() : (raw ? new Date(raw) : null);
+                      return d && !Number.isNaN(d.getTime()) ? `Desde ${d.toLocaleDateString('pt-BR')}` : 'Colaborador';
+                    })()}
                   </span>
                 </div>
                 {member.entityOwnerUid !== user?.uid && (

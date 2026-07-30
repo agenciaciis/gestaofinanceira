@@ -229,29 +229,28 @@ export const Reports: React.FC = () => {
 
   const cashFlowProjection = useMemo(() => {
     const data = [...monthlyTrend];
-    let currentBalance = stats.balance;
-    
-    // Calculate average monthly income/expense from last 6 months
-    const avgIncome = monthlyTrend.reduce((acc, m) => acc + m.income, 0) / monthlyTrend.length;
-    const avgExpense = monthlyTrend.reduce((acc, m) => acc + m.expense, 0) / monthlyTrend.length;
 
-    // Project next 6 months
+    // Média dos últimos meses COM movimento (evita diluir por meses vazios).
+    const meses = monthlyTrend.length || 1;
+    const avgIncome = monthlyTrend.reduce((acc, m) => acc + m.income, 0) / meses;
+    const avgExpense = monthlyTrend.reduce((acc, m) => acc + m.expense, 0) / meses;
+
+    // A série toda é RESULTADO MENSAL (receita − despesa), consistente entre
+    // histórico e projeção. Antes o histórico mostrava o líquido do mês e o
+    // futuro acumulava — duas escalas no mesmo gráfico, partindo de um número
+    // que não era o saldo real.
     for (let i = 1; i <= 6; i++) {
       const d = new Date(selectedYear, selectedMonth + i, 1);
-      const m = d.getMonth();
-      
-      currentBalance += (avgIncome - avgExpense);
-      
       data.push({
-        name: MONTHS[m].substring(0, 3),
+        name: MONTHS[d.getMonth()].substring(0, 3),
         income: avgIncome,
         expense: avgExpense,
-        balance: currentBalance,
+        balance: avgIncome - avgExpense,
         isProjection: true
       });
     }
     return data;
-  }, [monthlyTrend, stats.balance, selectedMonth, selectedYear]);
+  }, [monthlyTrend, selectedMonth, selectedYear]);
 
   const changeMonth = (delta: number) => {
     let newMonth = selectedMonth + delta;
@@ -814,8 +813,8 @@ export const Reports: React.FC = () => {
                   stroke="#3b82f6" 
                   strokeWidth={3}
                   fillOpacity={1} 
-                  fill="url(#colorBalance)" 
-                  name="Saldo Acumulado"
+                  fill="url(#colorBalance)"
+                  name="Resultado do mês"
                 />
                 <Line 
                   type="monotone" 

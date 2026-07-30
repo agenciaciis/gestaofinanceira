@@ -286,7 +286,7 @@ export const Transactions: React.FC = () => {
 
   const exportToExcel = () => {
     const data = transactions.map(t => ({
-      Data: new Date(t.date).toLocaleDateString(),
+      Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
       Categoria: CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros',
@@ -304,7 +304,7 @@ export const Transactions: React.FC = () => {
 
   const exportToCSV = () => {
     const data = transactions.map(t => ({
-      Data: new Date(t.date).toLocaleDateString(),
+      Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
       Categoria: CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros',

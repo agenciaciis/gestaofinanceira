@@ -157,6 +157,16 @@ export const Goals: React.FC = () => {
         { items: upsertGoal(daEntidade, registro), updatedAt: serverTimestamp() },
         { merge: true }
       );
+      // Se a caixinha MUDOU de entidade na edição, remove da entidade antiga —
+      // senão ela passava a existir nas duas ao mesmo tempo (totais em dobro).
+      if (editing && editing.entityId && editing.entityId !== entityId) {
+        const restanteNaAntiga = goals.filter(g => g.entityId === editing.entityId && g.id !== registro.id);
+        await setDoc(
+          doc(db, goalsDocPath(editing.entityId)),
+          { items: restanteNaAntiga, updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+      }
       showToast(editing ? 'Caixinha atualizada!' : 'Caixinha criada! Agora registre seus depósitos nela.', 'success');
       setIsModalOpen(false); resetForm();
     } catch (error) {
