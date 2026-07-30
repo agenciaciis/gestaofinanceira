@@ -1,3 +1,12 @@
+> **RESOLUÇÃO (2026-07-29, branch `auditoria-hardening`):** corrigidos P0.1, P1.1–P1.4,
+> P2.1–P2.18 (menos o mass-delete real, deixado honesto por segurança), C2.1 (mobile) e os
+> P3 de maior impacto (classes Tailwind inválidas, NaN, stopPropagation, dark mode, datas).
+> Verificação: **334 testes verdes** (inclui nova simulação de 6 meses cruzando todos os
+> motores), `tsc --noEmit` limpo, `vite build` verde; conferência visual ao vivo de login,
+> Dashboard, Lançamentos (mobile), Orçamentos (desconto) e Metas (orçado×realizado).
+> Pendências que exigem VOCÊ: trocar a senha no Firebase, chave Gemini, deploy das regras,
+> git remote, e a decisão de cifra at-rest / mass-delete real.
+
 # Relatório de Auditoria — Camada 1 (código)
 
 **Data:** 2026-07-29 · **Branch:** `auditoria-hardening`
