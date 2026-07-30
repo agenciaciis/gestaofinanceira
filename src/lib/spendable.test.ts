@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  loanAlreadyPaidThisMonth,
   averageMonthlyExpense, averageMonthlyIncome, suggestReserve, computeSpendable,
   detectDuplicateLoanCommitments,
 } from './spendable';
@@ -108,6 +109,30 @@ describe('detectDuplicateLoanCommitments', () => {
   });
 });
 
+describe('loanAlreadyPaidThisMonth', () => {
+  const loan = { id: 'l1', name: 'Empréstimo Itaú', monthlyPayment: 900 };
+
+  it('reconhece pagamento já concluído no mês pelo valor', () => {
+    const txs = [tx({ id: '1', amount: 900, date: '2026-07-10', status: 'completed' })];
+    expect(loanAlreadyPaidThisMonth(loan, txs, REF)).toBe(true);
+  });
+
+  it('reconhece pelo nome do empréstimo na descrição', () => {
+    const txs = [tx({ id: '1', amount: 123, date: '2026-07-10', status: 'completed', description: 'Parcela Empréstimo Itaú' })];
+    expect(loanAlreadyPaidThisMonth(loan, txs, REF)).toBe(true);
+  });
+
+  it('pendente NÃO conta como pago — o dinheiro ainda vai sair', () => {
+    const txs = [tx({ id: '1', amount: 900, date: '2026-07-20', status: 'pending' })];
+    expect(loanAlreadyPaidThisMonth(loan, txs, REF)).toBe(false);
+  });
+
+  it('pagamento de outro mês não conta', () => {
+    const txs = [tx({ id: '1', amount: 900, date: '2026-06-10', status: 'completed' })];
+    expect(loanAlreadyPaidThisMonth(loan, txs, REF)).toBe(false);
+  });
+});
+
 describe('computeSpendable', () => {
   const base = {
     accounts: [acc({ initialBalance: 10000 })],
@@ -154,6 +179,14 @@ describe('computeSpendable', () => {
     const r = computeSpendable({ ...base, transactions: [], loans: [{ id: 'l1', name: 'Banco', monthlyPayment: 700 }] });
     expect(r.loanPayments).toBe(700);
     expect(r.spendable).toBe(9300);
+  });
+
+  it('NÃO reserva a parcela que já foi paga neste mês', () => {
+    // O dinheiro já saiu do saldo: descontar de novo puniria em dobro e faria
+    // o "posso gastar" mostrar menos do que a pessoa realmente tem.
+    const txs = [tx({ id: '1', amount: 700, date: '2026-07-05', status: 'completed', accountId: 'a1', description: 'Parcela Banco' })];
+    const r = computeSpendable({ ...base, transactions: txs, loans: [{ id: 'l1', name: 'Banco', monthlyPayment: 700 }] });
+    expect(r.loanPayments).toBe(0);
   });
 
   it('desconta a reserva protegida', () => {

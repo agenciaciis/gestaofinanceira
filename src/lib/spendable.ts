@@ -121,12 +121,46 @@ export function suggestReserve(
   return { months, amount: round2(monthlyExpense * months), monthlyExpense };
 }
 
+/** `true` se o lançamento parece ser a parcela deste empréstimo. */
+function pareceParcelaDo(loan: LoanCommitment, t: Transaction): boolean {
+  const payment = Number(loan.monthlyPayment) || 0;
+  if (payment <= 0) return false;
+  const amount = Number(t.amount) || 0;
+  const mesmoValor = Math.abs(amount - payment) <= Math.max(0.01, payment * 0.01);
+  const nomeCitado =
+    loan.name.trim().length > 2 &&
+    t.description.toLowerCase().includes(loan.name.trim().toLowerCase());
+  return mesmoValor || nomeCitado;
+}
+
 /**
- * Empréstimos cadastrados que provavelmente JÁ estão lançados como conta a
- * pagar do mês — nesse caso a parcela é descontada duas vezes.
+ * `true` se a parcela deste empréstimo já foi PAGA no mês de referência.
  *
- * Não corrige sozinho de propósito: adivinhar errado esconderia um
- * compromisso real. Avisa e deixa o usuário decidir.
+ * Importa porque o dinheiro já saiu do saldo. Reservar a parcela de novo
+ * puniria em dobro e faria o "posso gastar" mostrar menos do que a pessoa
+ * realmente tem — todo mês, depois do dia do pagamento.
+ */
+export function loanAlreadyPaidThisMonth(
+  loan: LoanCommitment,
+  transactions: Transaction[],
+  reference: Date = new Date()
+): boolean {
+  const monthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const monthEnd = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
+  return transactions.some(t => {
+    if (t.type !== 'expense' || t.status !== 'completed') return false;
+    const d = parseLocalDate(t.date);
+    if (Number.isNaN(d.getTime()) || d < monthStart || d >= monthEnd) return false;
+    return pareceParcelaDo(loan, t);
+  });
+}
+
+/**
+ * Empréstimos que provavelmente JÁ estão lançados como conta a pagar do mês —
+ * nesse caso a parcela seria descontada duas vezes.
+ *
+ * Não corrige sozinho de propósito: adivinhar errado esconderia um compromisso
+ * real. Avisa e deixa o usuário decidir.
  */
 export function detectDuplicateLoanCommitments(
   loans: LoanCommitment[],
@@ -142,19 +176,10 @@ export function detectDuplicateLoanCommitments(
     return !Number.isNaN(d.getTime()) && d >= monthStart && d < monthEnd;
   });
 
-  return loans.filter(loan => {
-    const payment = Number(loan.monthlyPayment) || 0;
-    if (payment <= 0) return false;
-    return pendingThisMonth.some(t => {
-      const amount = Number(t.amount) || 0;
-      // Mesmo valor (1% de folga) OU descrição que cita o nome do empréstimo.
-      const sameAmount = Math.abs(amount - payment) <= Math.max(0.01, payment * 0.01);
-      const nameMentioned =
-        loan.name.trim().length > 2 &&
-        t.description.toLowerCase().includes(loan.name.trim().toLowerCase());
-      return sameAmount || nameMentioned;
-    });
-  });
+  return loans.filter(loan =>
+    (Number(loan.monthlyPayment) || 0) > 0 &&
+    pendingThisMonth.some(t => pareceParcelaDo(loan, t))
+  );
 }
 
 export function computeSpendable(input: SpendableInput): SpendableResult {
@@ -187,8 +212,12 @@ export function computeSpendable(input: SpendableInput): SpendableResult {
     )
   );
 
+  // Parcela já paga neste mês não é reservada de novo: o valor já saiu do saldo.
   const loanPayments = round2(
-    input.loans.reduce((acc, l) => acc + (Number(l.monthlyPayment) || 0), 0)
+    input.loans.reduce(
+      (acc, l) => acc + (loanAlreadyPaidThisMonth(l, input.transactions, today) ? 0 : (Number(l.monthlyPayment) || 0)),
+      0
+    )
   );
 
   // Gasto variável que ainda deve acontecer: a média mensal, proporcional aos
