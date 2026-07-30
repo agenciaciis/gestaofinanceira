@@ -819,7 +819,7 @@ export const FinancialHealth: React.FC = () => {
                   ? simulateOne(debtView, simPayment)
                   : { months: 0, totalInterest: 0 };
                 const payoffDate = monthsToPay === Infinity ? null : addMonths(new Date(), monthsToPay);
-                const progress = ((debt.totalAmount - debt.remainingAmount) / debt.totalAmount) * 100;
+                const progress = debt.totalAmount > 0 ? ((debt.totalAmount - debt.remainingAmount) / debt.totalAmount) * 100 : 0;
 
                 return (
                   <motion.div 

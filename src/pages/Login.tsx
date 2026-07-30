@@ -5,8 +5,8 @@ import { motion } from 'motion/react';
 
 export const Login: React.FC = () => {
   const { login, loginWithEmail, registerWithEmail } = useAuth();
-  const [email, setEmail] = useState('lucas@agenciaciis.com.br');
-  const [password, setPassword] = useState('136479');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [loading, setLoading] = useState(false);

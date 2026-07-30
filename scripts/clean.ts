@@ -10,8 +10,12 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const EMAIL = process.env.SEED_EMAIL || 'lucas@agenciaciis.com.br';
-const PASSWORD = process.env.SEED_PASSWORD || '136479';
+const EMAIL = process.env.SEED_EMAIL ?? '';
+const PASSWORD = process.env.SEED_PASSWORD ?? '';
+if (!EMAIL || !PASSWORD) {
+  console.error('❌ Defina SEED_EMAIL e SEED_PASSWORD no ambiente. Ex.: SEED_EMAIL=voce@dominio.com SEED_PASSWORD=suaSenha npm run seed:clean');
+  process.exit(1);
+}
 
 const app = initializeApp(firebaseConfig as any);
 const auth = getAuth(app);

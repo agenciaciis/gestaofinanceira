@@ -286,7 +286,7 @@ export const Transactions: React.FC = () => {
 
   const exportToExcel = () => {
     const data = transactions.map(t => ({
-      Data: new Date(t.date).toLocaleDateString(),
+      Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
       Categoria: CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros',
@@ -304,7 +304,7 @@ export const Transactions: React.FC = () => {
 
   const exportToCSV = () => {
     const data = transactions.map(t => ({
-      Data: new Date(t.date).toLocaleDateString(),
+      Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
       Categoria: CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros',
@@ -701,8 +701,8 @@ export const Transactions: React.FC = () => {
           <h2 className="text-2xl font-bold text-content">Lançamentos</h2>
           <p className="text-sm text-content-subtle">Histórico completo de receitas, despesas e transferências.</p>
         </div>
-        <div className="flex gap-3">
-          <button 
+        <div className="flex flex-wrap gap-3">
+          <button
             onClick={() => setIsImportModalOpen(true)}
             className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-content-muted shadow-sm hover:bg-canvas"
           >
@@ -1419,7 +1419,7 @@ export const Transactions: React.FC = () => {
                               className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                             />
                             <p className="mt-1 text-[10px] text-content-subtle">
-                              Serão criados {totalInstallments} lançamentos de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(amount) / Number(totalInstallments))} cada.
+                              Serão criados {totalInstallments} lançamentos de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(splitInstallments(Number(amount) || 0, Number(totalInstallments) || 1)[0])} cada.
                             </p>
                           </div>
                         )}

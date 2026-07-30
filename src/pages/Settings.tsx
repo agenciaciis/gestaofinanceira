@@ -100,15 +100,24 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleDeleteAllData = async () => {
-    const confirmed = await confirm({
-      title: 'EXCLUIR TODOS OS DADOS',
-      message: 'ESTA AÇÃO É IRREVERSÍVEL. Todos os seus dados serão apagados permanentemente. Deseja continuar?',
-      variant: 'danger'
+  // Preferências de notificação (persistidas). Vão alimentar os alertas de
+  // Telegram/e-mail. Antes os toggles eram decorativos (não guardavam nada).
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('finanflow:notif-prefs') || '{}'); } catch { return {}; }
+  });
+  const toggleNotif = (key: string) => {
+    setNotifPrefs(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem('finanflow:notif-prefs', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
     });
-    if (confirmed) {
-      showToast('Funcionalidade de exclusão total em desenvolvimento.', 'info');
-    }
+  };
+
+  const handleDeleteAllData = async () => {
+    // Exclusão total é irreversível e destrutiva; não é disparada às cegas pelo
+    // app. Fica honesta: avisa que ainda não está ativa em vez de mostrar um
+    // diálogo de perigo que não apaga nada.
+    showToast('Por segurança, a exclusão total de dados ainda não está ativa neste app.', 'info');
   };
 
   return (
@@ -204,22 +213,32 @@ export const Settings: React.FC = () => {
               className="space-y-6"
             >
               <h3 className="text-lg font-bold text-content">Preferências de Notificação</h3>
+              <p className="text-xs text-content-subtle">Estas preferências serão usadas pelos alertas no Telegram/e-mail.</p>
               <div className="space-y-4">
                 {[
-                  { title: 'Lembretes de Pagamento', desc: 'Receba avisos sobre contas a vencer.' },
-                  { title: 'Resumo Semanal', desc: 'Um relatório por e-mail com seus gastos da semana.' },
-                  { title: 'Alertas de Meta', desc: 'Avisar quando atingir 80% do orçamento de uma categoria.' }
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-xl border border-gray-50 p-4">
-                    <div>
-                      <p className="font-bold text-content">{item.title}</p>
-                      <p className="text-xs text-content-subtle">{item.desc}</p>
+                  { key: 'payment', title: 'Lembretes de Pagamento', desc: 'Receba avisos sobre contas a vencer.' },
+                  { key: 'weekly', title: 'Resumo Semanal', desc: 'Um relatório com seus gastos da semana.' },
+                  { key: 'goal', title: 'Alertas de Meta', desc: 'Avisar quando atingir 80% do orçamento de uma categoria.' }
+                ].map((item) => {
+                  const on = !!notifPrefs[item.key];
+                  return (
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-line p-4">
+                      <div>
+                        <p className="font-bold text-content">{item.title}</p>
+                        <p className="text-xs text-content-subtle">{item.desc}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleNotif(item.key)}
+                        aria-pressed={on}
+                        aria-label={`Alternar ${item.title}`}
+                        className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', on ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600')}
+                      >
+                        <span className={cn('absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-all', on ? 'left-6' : 'left-1')} />
+                      </button>
                     </div>
-                    <div className="h-6 w-11 rounded-full bg-gray-200 p-1 cursor-not-allowed">
-                      <div className="h-4 w-4 rounded-full bg-surface shadow-sm"></div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </motion.div>
           )}

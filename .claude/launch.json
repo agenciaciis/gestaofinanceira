@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "finanflow-dev",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd '/Volumes/SSD CIIS/Sistemas/agência-ciis---gestão-&-orçamentos' && PORT=4322 exec npm run dev"],
+      "port": 4322
+    }
+  ]
+}

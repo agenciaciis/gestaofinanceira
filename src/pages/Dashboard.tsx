@@ -116,7 +116,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
   const [cards, setCards] = useState<CreditCard[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [budgets, setBudgets] = useState<Record<string, number>>({});
+  const [budgetsByEntity, setBudgetsByEntity] = useState<Record<string, Record<string, number>>>({});
   const [timeFilter, setTimeFilter] = useState<'today' | 'month' | 'year'>('month');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -153,6 +153,9 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     let currentCards: CreditCard[] = [];
     let currentDebts: Debt[] = [];
 
+    // Reinicia os orçamentos ao trocar de entidade/filtro (senão sobrava o do período anterior).
+    setBudgetsByEntity({});
+
     entityIds.forEach(id => {
       // Accounts
       const unsubA = onSnapshot(query(collection(db, `entities/${id}/bank_accounts`)), (snapshot) => {
@@ -186,11 +189,9 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${id}/transactions`));
       unsubscribes.push(unsubT);
 
-      // Budgets
+      // Budgets — guardados por entidade (agregados depois), com reset ao trocar filtro.
       const unsubB = onSnapshot(doc(db, `entities/${id}/config/budgets`), (snapshot) => {
-        if (snapshot.exists()) {
-          setBudgets(prev => ({ ...prev, ...snapshot.data() }));
-        }
+        setBudgetsByEntity(prev => ({ ...prev, [id]: snapshot.exists() ? (snapshot.data() as Record<string, number>) : {} }));
       }, (error) => handleFirestoreError(error, OperationType.GET, `entities/${id}/config/budgets`));
       unsubscribes.push(unsubB);
     });
@@ -215,6 +216,22 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
 
   // Saldo calculado por conta (fonte da verdade), usado também na lista lateral.
   const accountBalances = useMemo(() => computeBalances(accounts, transactions), [accounts, transactions]);
+
+  // Orçamentos agregados por categoria. No consolidado SOMA os limites das
+  // entidades (antes o último a responder sobrescrevia os outros). Ignora as
+  // chaves de metadado (ownerUid/collaboratorsEmails) gravadas no mesmo doc.
+  const budgets = useMemo(() => {
+    const agg: Record<string, number> = {};
+    for (const map of Object.values(budgetsByEntity)) {
+      for (const [k, v] of Object.entries(map)) {
+        if (k === 'ownerUid' || k === 'collaboratorsEmails') continue;
+        const n = Number(v);
+        if (!Number.isFinite(n)) continue;
+        agg[k] = round2((agg[k] || 0) + n);
+      }
+    }
+    return agg;
+  }, [budgetsByEntity]);
 
   const stats = useMemo(() => {
     const balancesByAccount = computeBalances(accounts, transactions);
@@ -286,7 +303,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     const budgetProgress = CATEGORIES.filter(c => budgets[c.id]).map(cat => {
       const isIncome = cat.type === 'income';
       const realized = transactions
-        .filter(t => t.categoryId === cat.id && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), now))
+        .filter(t => t.categoryId === cat.id && (isIncome ? t.type === 'income' : t.type === 'expense') && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), now))
         .reduce((acc, t) => acc + t.amount, 0);
       const goal = budgets[cat.id];
       const percentage = goal > 0 ? (realized / goal) * 100 : 0;
@@ -468,7 +485,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
           </h2>
           <p className="text-content-subtle font-medium">Visão estratégica e projeções do seu ecossistema financeiro.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 rounded-xl bg-surface-muted dark:bg-gray-800 p-1">
             <button 
               onClick={() => setTimeFilter('today')}
@@ -1200,7 +1217,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                     </p>
                     <button
-                      onClick={() => toggleStatus(t)}
+                      onClick={(e) => { e.stopPropagation(); toggleStatus(t); }}
                       className="flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-all hover:bg-emerald-600 hover:shadow active:scale-95"
                     >
                       <CheckCircle2 className="h-3 w-3" />

@@ -54,6 +54,19 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   }
+  // IMPORTANTE: esta função é chamada SOMENTE em callbacks de erro do
+  // onSnapshot (leituras). Lançar aqui virava uma exceção não tratada dentro do
+  // callback assíncrono e podia desestabilizar/derrubar a tela — por exemplo,
+  // quando a regra de uma subcoleção (ex.: `goals`) ainda não foi publicada e o
+  // Firestore devolve permission-denied. Então a política é: LOGAR e seguir com
+  // dados vazios daquela coleção, nunca derrubar a UI.
+  const code = (error as { code?: string } | null | undefined)?.code;
+  if (code === 'permission-denied') {
+    console.warn(
+      `Firestore: sem permissão para "${operationType}" em "${path}". ` +
+      `Provável regra ainda não publicada (firebase deploy --only firestore:rules). Seguindo sem esses dados.`
+    );
+    return;
+  }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
 }

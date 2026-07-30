@@ -1,22 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, onSnapshot, setDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, setDoc, doc, query } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { CATEGORIES } from '../constants';
-import { Target, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { motion } from 'motion/react';
-import { cn } from '../lib/utils';
-
-interface Budget {
-  categoryId: string;
-  amount: number;
-}
+import { Target, Save } from 'lucide-react';
+import { Transaction } from '../types';
+import { budgetProgress, BudgetLine } from '../lib/budgets';
 
 export const Budgets: React.FC = () => {
   const { entities, filterType } = useEntity();
   const { showToast } = useUI();
   const [budgets, setBudgets] = useState<Record<string, number>>({});
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -25,16 +21,49 @@ export const Budgets: React.FC = () => {
     const entity = entities.find(e => e.type === filterType);
     if (!entity) return;
 
-    const unsub = onSnapshot(doc(db, `entities/${entity.id}/config/budgets`), (snapshot) => {
-      if (snapshot.exists()) {
-        setBudgets(snapshot.data() as Record<string, number>);
-      } else {
-        setBudgets({});
-      }
+    const unsubB = onSnapshot(doc(db, `entities/${entity.id}/config/budgets`), (snapshot) => {
+      setBudgets(snapshot.exists() ? (snapshot.data() as Record<string, number>) : {});
     }, (error) => handleFirestoreError(error, OperationType.GET, `entities/${entity.id}/config/budgets`));
 
-    return () => unsub();
+    // Transações da entidade para mostrar o REALIZADO ao lado do orçado.
+    const unsubT = onSnapshot(query(collection(db, `entities/${entity.id}/transactions`)), (snap) => {
+      setTransactions(snap.docs.map(d => d.data() as Transaction));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/transactions`));
+
+    return () => { unsubB(); unsubT(); };
   }, [entities, filterType]);
+
+  // Orçado × realizado do mês corrente, pela fonte única testada (lib/budgets).
+  const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
+  const expenseLines = useMemo(() => {
+    const m = new Map<string, BudgetLine>();
+    for (const l of budgetProgress(budgets, transactions, new Date(), 'expense')) m.set(l.categoryId, l);
+    return m;
+  }, [budgets, transactions]);
+  const incomeLines = useMemo(() => {
+    const m = new Map<string, BudgetLine>();
+    for (const l of budgetProgress(budgets, transactions, new Date(), 'income')) m.set(l.categoryId, l);
+    return m;
+  }, [budgets, transactions]);
+
+  const renderProgress = (line?: BudgetLine) => {
+    if (!line || line.limit <= 0) return null;
+    const pct = Math.min(line.percent, 100);
+    return (
+      <div className="mt-3">
+        <div className="mb-1 flex justify-between text-[11px] font-bold">
+          <span className={line.exceeded ? 'text-rose-600' : 'text-content-subtle'}>{brl(line.spent)} de {brl(line.limit)}</span>
+          <span className={line.exceeded ? 'text-rose-600' : 'text-content-subtle'}>{line.percent.toFixed(0)}%</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: line.exceeded ? '#ef4444' : '#10b981' }} />
+        </div>
+        <p className="mt-1 text-[11px] text-content-subtle">
+          {line.exceeded ? `Estourou ${brl(Math.abs(line.remaining))}` : `Resta ${brl(line.remaining)}`}
+        </p>
+      </div>
+    );
+  };
 
   const handleSave = async () => {
     if (filterType === 'ALL') {
@@ -161,6 +190,7 @@ export const Budgets: React.FC = () => {
                     className="w-full rounded-xl border border-line bg-canvas py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/5 transition-all"
                   />
                 </div>
+                {renderProgress(expenseLines.get(category.id))}
               </div>
             ))}
           </div>
@@ -197,6 +227,7 @@ export const Budgets: React.FC = () => {
                     className="w-full rounded-xl border border-line bg-canvas py-3 pl-10 pr-4 text-lg font-bold outline-none focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/5 transition-all"
                   />
                 </div>
+                {renderProgress(incomeLines.get(category.id))}
               </div>
             ))}
           </div>

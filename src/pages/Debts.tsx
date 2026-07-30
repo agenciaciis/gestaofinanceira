@@ -134,14 +134,19 @@ export const Debts: React.FC = () => {
 
   const filteredDebts = transactions.filter(t => {
     const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
     const isOverdue = isBefore(parseLocalDate(t.date), startOfDay(new Date()));
 
-    if (filter === 'overdue') return matchesSearch && isOverdue;
-    // "Pendentes" mostra TODAS as pendências (inclusive as atrasadas).
-    return matchesSearch;
+    if (filter === 'overdue') return isOverdue;       // Atrasados (já venceram)
+    if (filter === 'pending') return !isOverdue;      // A vencer (ainda no prazo)
+    return true;                                       // Todos (a vencer + atrasados)
   });
 
-  const totalPending = filteredDebts.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : -t.amount), 0);
+  // "Total Pendente" = total A PAGAR ainda em aberto. Antes abatia as contas a
+  // receber contra as a pagar (com Math.abs), escondendo o tamanho da dívida.
+  const totalPending = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
   if (loading) {
     return (
@@ -168,7 +173,7 @@ export const Debts: React.FC = () => {
           <div className="text-right">
             <p className="text-xs font-bold uppercase tracking-widest text-red-400 dark:text-white/60 mb-1">Total Pendente</p>
             <p className="text-4xl font-black tracking-tighter">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(totalPending))}
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPending)}
             </p>
           </div>
         </div>
@@ -184,7 +189,7 @@ export const Debts: React.FC = () => {
               filter === 'pending' ? "bg-surface text-primary shadow-sm" : "text-content-subtle hover:text-content-muted"
             )}
           >
-            Pendentes
+            A vencer
           </button>
           <button 
             onClick={() => setFilter('overdue')}

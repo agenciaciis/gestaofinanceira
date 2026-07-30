@@ -155,7 +155,9 @@ export const Services: React.FC = () => {
     setEditingItem(item);
     setName(item.name);
     setDescription(item.description || '');
-    setPrice(activeTab === 'services' ? (item as Service).basePrice.toString() : (item as Plan).price.toString());
+    setPrice(activeTab === 'services'
+      ? String((item as Service).basePrice ?? '')
+      : String((item as Plan).price ?? ''));
     
     if (activeTab === 'services') {
       const sv = item as Service;
@@ -171,7 +173,7 @@ export const Services: React.FC = () => {
       setActive(sv.active !== false);
     } else {
       setBillingCycle((item as Plan).billingCycle);
-      setSelectedServices((item as Plan).services);
+      setSelectedServices((item as Plan).services || []);
     }
     
     setIsModalOpen(true);
@@ -450,7 +452,7 @@ export const Services: React.FC = () => {
                 <div className="mt-4 space-y-2">
                   <p className="text-xs font-bold text-content-subtle uppercase tracking-widest">Serviços Inclusos</p>
                   <div className="flex flex-wrap gap-1">
-                    {plan.services.map(sId => {
+                    {(plan.services || []).map(sId => {
                       const s = services.find(serv => serv.id === sId);
                       return s ? (
                         <span key={sId} className="rounded-md bg-canvas px-2 py-1 text-[10px] font-medium text-content-muted border border-line">
