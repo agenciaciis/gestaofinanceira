@@ -245,7 +245,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         className="w-full max-w-4xl rounded-2xl bg-surface shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-bottom border-line p-6">
+        <div className="flex items-center justify-between border-b border-line p-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Upload className="h-5 w-5" />
@@ -261,7 +261,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         </div>
 
         {/* Steps Indicator */}
-        <div className="flex border-bottom border-line bg-gray-50/50 px-6 py-3">
+        <div className="flex border-b border-line bg-surface-muted px-6 py-3">
           {[
             { id: 'upload', label: 'Upload', icon: Upload },
             { id: 'mapping', label: 'Mapeamento', icon: Table },
@@ -530,7 +530,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className="border-top border-line bg-canvas p-6 flex justify-between items-center">
+        <div className="border-t border-line bg-canvas p-6 flex justify-between items-center">
           <button 
             onClick={() => {
               if (step === 'mapping') setStep('upload');

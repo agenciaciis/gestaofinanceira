@@ -1419,7 +1419,7 @@ export const Transactions: React.FC = () => {
                               className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                             />
                             <p className="mt-1 text-[10px] text-content-subtle">
-                              Serão criados {totalInstallments} lançamentos de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(amount) / Number(totalInstallments))} cada.
+                              Serão criados {totalInstallments} lançamentos de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(splitInstallments(Number(amount) || 0, Number(totalInstallments) || 1)[0])} cada.
                             </p>
                           </div>
                         )}

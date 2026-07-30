@@ -1217,7 +1217,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                     </p>
                     <button
-                      onClick={() => toggleStatus(t)}
+                      onClick={(e) => { e.stopPropagation(); toggleStatus(t); }}
                       className="flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-all hover:bg-emerald-600 hover:shadow active:scale-95"
                     >
                       <CheckCircle2 className="h-3 w-3" />
