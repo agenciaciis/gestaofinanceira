@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  computeCardUsage,
   round2,
   isRealized,
   isNotCancelled,
@@ -170,5 +171,50 @@ describe('currentInvoiceWindow / computeCardInvoice', () => {
       tx({ type: 'expense', amount: 999, cardId: 'c1', date: '2026-05-20', status: 'cancelled' }), // cancelado
     ], ref);
     expect(total).toBe(150);
+  });
+});
+
+
+describe('computeCardUsage', () => {
+  const tx = (over: any) => ({
+    id: 'x', description: 'x', amount: 0, type: 'expense', date: '2026-07-10',
+    categoryId: 'c', status: 'completed', entityId: 'e', ...over,
+  });
+  // Fechamento dia 5 => em 15/07 o ciclo aberto vai de 05/07 a 05/08.
+  const REF = new Date(2026, 6, 15);
+
+  it('conta a fatura aberta', () => {
+    const txs = [tx({ cardId: 'c1', amount: 300, date: '2026-07-10' })];
+    expect(computeCardUsage('c1', 5, txs, REF)).toBe(300);
+  });
+
+  it('NÃO conta compra de ciclo já fechado — o limite volta quando a fatura é paga', () => {
+    // Este era o bug: somava desde sempre, então o utilizado só crescia.
+    const txs = [
+      tx({ cardId: 'c1', amount: 5000, date: '2026-03-10' }),
+      tx({ cardId: 'c1', amount: 300, date: '2026-07-10' }),
+    ];
+    expect(computeCardUsage('c1', 5, txs, REF)).toBe(300);
+  });
+
+  it('conta parcela FUTURA em aberto, que ainda ocupa limite', () => {
+    const txs = [
+      tx({ cardId: 'c1', amount: 300, date: '2026-07-10' }),
+      tx({ cardId: 'c1', amount: 200, date: '2026-09-10', status: 'pending', installmentGroupId: 'g' }),
+    ];
+    expect(computeCardUsage('c1', 5, txs, REF)).toBe(500);
+  });
+
+  it('ignora cancelado, receita e outro cartão', () => {
+    const txs = [
+      tx({ cardId: 'c1', amount: 999, date: '2026-07-10', status: 'cancelled' }),
+      tx({ cardId: 'c1', amount: 999, date: '2026-07-11', type: 'income' }),
+      tx({ cardId: 'outro', amount: 999, date: '2026-07-12' }),
+    ];
+    expect(computeCardUsage('c1', 5, txs, REF)).toBe(0);
+  });
+
+  it('cartão sem movimento devolve zero', () => {
+    expect(computeCardUsage('c1', 5, [], REF)).toBe(0);
   });
 });

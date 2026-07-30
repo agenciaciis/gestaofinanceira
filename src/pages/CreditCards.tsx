@@ -8,6 +8,7 @@ import { Plus, CreditCard as CardIcon, Trash2, Edit2, AlertCircle, Calendar, Inf
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
+import { computeCardUsage } from '../lib/finance';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -166,12 +167,15 @@ export const CreditCards: React.FC = () => {
     }
   };
 
+  /**
+   * Limite utilizado = fatura do ciclo aberto + parcelas futuras pendentes.
+   * A conta anterior somava TODAS as despesas do cartão desde sempre, então o
+   * utilizado só crescia e o disponível derretia mesmo com as faturas pagas.
+   */
   const calculateUsage = (cardId: string) => {
-    const transactions = cardTransactions[cardId] || [];
-    // Only consider pending or completed expenses for current usage
-    return transactions
-      .filter(t => t.type === 'expense' && t.status !== 'cancelled')
-      .reduce((acc, t) => acc + t.amount, 0);
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return 0;
+    return computeCardUsage(cardId, card.closingDay, cardTransactions[cardId] || []);
   };
 
   const getComparisonData = (card: CreditCard) => {

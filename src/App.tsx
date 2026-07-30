@@ -83,7 +83,7 @@ const AppContent: React.FC = () => {
   return (
     <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
       <Suspense fallback={<PageLoader />}>
-        {currentPage === 'dashboard' ? <Dashboard /> :
+        {currentPage === 'dashboard' ? <Dashboard onNavigate={setCurrentPage} /> :
          currentPage === 'accounts' ? <BankAccounts /> :
          currentPage === 'cards' ? <CreditCards /> :
          currentPage === 'transactions' ? <Transactions /> :

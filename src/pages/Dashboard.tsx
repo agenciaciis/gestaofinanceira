@@ -108,7 +108,7 @@ const StatCard: React.FC<{
   </motion.div>
 );
 
-export const Dashboard: React.FC = () => {
+export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate }) => {
   const { entities, filterType } = useEntity();
   const { theme } = useTheme();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -493,7 +493,12 @@ export const Dashboard: React.FC = () => {
               Movimento PF ⇄ PJ
             </button>
           )}
-          <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
+          <button
+            onClick={() => onNavigate?.('transactions')}
+            title="Novo lançamento"
+            aria-label="Novo lançamento"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+          >
             <Plus className="h-5 w-5" />
           </button>
         </div>
@@ -814,7 +819,7 @@ export const Dashboard: React.FC = () => {
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.overdue)}
                   </p>
                 </div>
-                <button className="ml-auto rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">Resolver</button>
+                <button onClick={() => onNavigate?.('transactions')} className="ml-auto rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">Resolver</button>
               </div>
             )}
             {stats.pendingExpense > 0 && (
@@ -828,7 +833,7 @@ export const Dashboard: React.FC = () => {
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.pendingExpense)}
                   </p>
                 </div>
-                <button className="ml-auto rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">Ver Lista</button>
+                <button onClick={() => onNavigate?.('transactions')} className="ml-auto rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">Ver Lista</button>
               </div>
             )}
           </motion.div>
@@ -1092,7 +1097,7 @@ export const Dashboard: React.FC = () => {
               </div>
             ) : (
               upcomingBills.map(t => (
-                <div key={t.id} className="flex items-center justify-between group cursor-pointer">
+                <div key={t.id} onClick={() => onNavigate?.('transactions')} className="flex items-center justify-between group cursor-pointer">
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col items-center justify-center h-12 w-12 rounded-2xl bg-surface-muted border border-line group-hover:bg-primary group-hover:border-primary transition-all">
                       <span className="text-[10px] font-black text-content-subtle group-hover:text-white/70 uppercase">
@@ -1126,8 +1131,11 @@ export const Dashboard: React.FC = () => {
             )}
           </div>
           {upcomingBills.length > 0 && (
-            <button className="mt-8 w-full rounded-2xl bg-surface-muted py-3 text-xs font-black uppercase tracking-widest text-content-subtle hover:bg-surface-muted hover:text-content-muted transition-all">
-              Ver Calendário Completo
+            <button
+              onClick={() => onNavigate?.('transactions')}
+              className="mt-8 w-full rounded-2xl bg-surface-muted py-3 text-xs font-black uppercase tracking-widest text-content-subtle hover:text-content-muted transition-all"
+            >
+              Ver todos os vencimentos
             </button>
           )}
         </div>
@@ -1164,7 +1172,10 @@ export const Dashboard: React.FC = () => {
               </div>
             ))}
           </div>
-          <button className="mt-8 w-full flex items-center justify-center gap-2 rounded-2xl border border-line py-3 text-xs font-black uppercase tracking-widest text-content-muted hover:bg-surface-muted transition-all">
+          <button
+            onClick={() => onNavigate?.('transactions')}
+            className="mt-8 w-full flex items-center justify-center gap-2 rounded-2xl border border-line py-3 text-xs font-black uppercase tracking-widest text-content-muted hover:bg-surface-muted transition-all"
+          >
             Ver Extrato Completo
             <ArrowRight className="h-4 w-4" />
           </button>

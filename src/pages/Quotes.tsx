@@ -45,6 +45,7 @@ export const Quotes: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
   const [letterhead, setLetterhead] = useState<string | null>(null);
   const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
 
@@ -652,15 +653,29 @@ export const Quotes: React.FC = () => {
                 >
                   <Trash2 className="h-5 w-5" />
                 </button>
-                <div className="relative group/status">
-                  <button className="rounded-xl bg-canvas p-2.5 text-content-subtle hover:bg-surface-muted transition-all">
-                    <ChevronRight className="h-5 w-5" />
+                {/* Menu por CLIQUE, não hover: no celular não existe hover,
+                    então o menu era inalcançável. */}
+                <div className="relative">
+                  <button
+                    onClick={() => setStatusMenuFor(prev => prev === quote.id ? null : quote.id)}
+                    title="Mudar status"
+                    aria-label="Mudar status do orçamento"
+                    aria-expanded={statusMenuFor === quote.id}
+                    className="rounded-xl bg-canvas p-2.5 text-content-subtle hover:bg-surface-muted transition-all"
+                  >
+                    <ChevronRight className={cn('h-5 w-5 transition-transform', statusMenuFor === quote.id && 'rotate-90')} />
                   </button>
-                  <div className="absolute right-0 top-full z-10 mt-2 hidden w-40 rounded-xl border bg-surface p-2 shadow-xl group-hover/status:block">
-                    <button onClick={() => updateStatus(quote.id, 'sent')} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-blue-600 hover:bg-blue-50">Marcar como Enviado</button>
-                    <button onClick={() => updateStatus(quote.id, 'approved')} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50">Marcar como Aprovado</button>
-                    <button onClick={() => updateStatus(quote.id, 'rejected')} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50">Marcar como Recusado</button>
-                  </div>
+                  {statusMenuFor === quote.id && (
+                    <>
+                      {/* Camada invisível: clicar fora fecha o menu. */}
+                      <div className="fixed inset-0 z-10" onClick={() => setStatusMenuFor(null)} />
+                      <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-xl border border-line bg-surface p-2 shadow-xl">
+                        <button onClick={() => { updateStatus(quote.id, 'sent'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">Marcar como Enviado</button>
+                        <button onClick={() => { updateStatus(quote.id, 'approved'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">Marcar como Aprovado</button>
+                        <button onClick={() => { updateStatus(quote.id, 'rejected'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">Marcar como Recusado</button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

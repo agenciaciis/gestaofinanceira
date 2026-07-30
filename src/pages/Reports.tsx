@@ -47,6 +47,25 @@ export const Reports: React.FC = () => {
   const { entities, filterType, selectedEntity } = useEntity();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
+  /**
+   * Baixa uma tabela como CSV. Antes esses botões de download não faziam nada.
+   * Ponto e vírgula como separador: é o que o Excel em português espera, e
+   * vírgula quebraria por causa do decimal brasileiro.
+   */
+  const exportCSV = (nomeArquivo: string, linhas: { name: string; value: number }[]) => {
+    if (linhas.length === 0) return;
+    const corpo = linhas.map(l => `"${l.name.replace(/"/g, '""')}";${l.value.toFixed(2).replace('.', ',')}`);
+    const csv = ['Categoria;Valor', ...corpo].join('\r\n');
+    // BOM para o Excel reconhecer acento.
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${nomeArquivo}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -558,7 +577,13 @@ export const Reports: React.FC = () => {
               <PieChartIcon className="h-5 w-5 text-primary" />
               Gastos por Categoria
             </h3>
-            <button className="text-content-subtle hover:text-content-muted">
+            <button
+              onClick={() => exportCSV(`gastos-por-categoria-${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`, expenseCategoryData)}
+              disabled={expenseCategoryData.length === 0}
+              title="Baixar em CSV"
+              aria-label="Baixar gastos por categoria em CSV"
+              className="text-content-subtle hover:text-primary disabled:opacity-40 transition-colors"
+            >
               <Download className="h-4 w-4" />
             </button>
           </div>
@@ -603,7 +628,13 @@ export const Reports: React.FC = () => {
               <TrendingUp className="h-5 w-5 text-emerald-500" />
               Receitas por Categoria
             </h3>
-            <button className="text-content-subtle hover:text-content-muted">
+            <button
+              onClick={() => exportCSV(`receitas-por-categoria-${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`, incomeCategoryData)}
+              disabled={incomeCategoryData.length === 0}
+              title="Baixar em CSV"
+              aria-label="Baixar receitas por categoria em CSV"
+              className="text-content-subtle hover:text-primary disabled:opacity-40 transition-colors"
+            >
               <Download className="h-4 w-4" />
             </button>
           </div>

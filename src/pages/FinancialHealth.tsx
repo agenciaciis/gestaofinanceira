@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, setDoc } from 'firebase/firestore';
+import { useUI } from '../contexts/UIContext';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, orderBy, setDoc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Transaction, BankAccount, Debt, CreditCard } from '../types';
+import { Transaction, BankAccount, Debt, CreditCard, Goal } from '../types';
 import { 
   Heart, 
   Target, 
@@ -39,9 +40,10 @@ import { cn } from '../lib/utils';
 import { format, addMonths, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getFinancialAdvice } from "../services/geminiService";
-import { computeBalances, daysUntilDueDay, parseLocalDate, round2 } from '../lib/finance';
+import { computeBalances, daysUntilDueDay, parseLocalDate, round2, formatLocalDate } from '../lib/finance';
 import { averageMonthlyExpense, averageMonthlyIncome } from '../lib/spendable';
 import { computeHealthScore } from '../lib/health';
+import { goalsDocPath, readGoals, upsertGoal } from '../lib/goalStore';
 import { CreditScorePanel } from '../components/CreditScorePanel';
 import {
   collectDebts,
@@ -59,6 +61,7 @@ const fmt = (n: number) =>
 
 export const FinancialHealth: React.FC = () => {
   const { selectedEntity } = useEntity();
+  const { showToast } = useUI();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -201,6 +204,44 @@ export const FinancialHealth: React.FC = () => {
   };
 
   /** Grava a taxa mensal informada pelo usuário na fonte certa. */
+  /**
+   * Cria a caixinha sugerida pelo painel de investimento, já com a meta
+   * calculada. O botão precisa FAZER algo — antes ele só parecia clicável.
+   */
+  const criarCaixinhaSugerida = async (nome: string, meta: number, prazoMeses: number, cor: string) => {
+    if (!selectedEntity) return;
+    try {
+      const snap = await getDoc(doc(db, goalsDocPath(selectedEntity.id)));
+      const atuais = readGoals(snap.data(), selectedEntity.id);
+      if (atuais.some(g => g.name.toLowerCase() === nome.toLowerCase())) {
+        showToast(`Você já tem uma caixinha "${nome}". Abra Caixinhas para acompanhar.`, 'error');
+        return;
+      }
+      const fim = new Date();
+      fim.setMonth(fim.getMonth() + prazoMeses + 1, 0);   // último dia do mês alvo
+      const nova: Goal = {
+        id: crypto.randomUUID(),
+        name: nome,
+        targetAmount: round2(meta) || 0,
+        deadline: formatLocalDate(fim),
+        color: cor,
+        entityId: selectedEntity.id,
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, goalsDocPath(selectedEntity.id)),
+        { items: upsertGoal(atuais, nova), updatedAt: serverTimestamp() }, { merge: true });
+      showToast(
+        meta > 0
+          ? `Caixinha "${nome}" criada com meta de ${fmt(meta)}. Ajuste em Caixinhas se quiser.`
+          : `Caixinha "${nome}" criada. Abra Caixinhas e defina o valor da meta.`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Erro ao criar caixinha sugerida:', error);
+      showToast('Não consegui criar a caixinha.', 'error');
+    }
+  };
+
   const saveInterestRate = async (view: DebtView, rate: number) => {
     if (!selectedEntity) return;
     if (!Number.isFinite(rate) || rate < 0 || rate > 100) return;
@@ -1094,64 +1135,137 @@ export const FinancialHealth: React.FC = () => {
         </div>
       )}
 
-      {/* Investment Suggestions */}
-      <div className="rounded-3xl bg-slate-900 p-8 text-white">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h3 className="text-xl font-black flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-emerald-400" />
-              Onde Investir Agora
-            </h3>
-            <p className="text-content-subtle text-sm font-medium">Sugestões baseadas no seu perfil e saldo atual.</p>
-          </div>
-          <div className="hidden sm:block">
-             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-xs font-bold">
-               Saldo Disponível: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalBalance)}
-             </div>
-          </div>
-        </div>
+      {/* Onde investir — só faz sentido depois que a casa está em ordem */}
+      {(() => {
+        // Cor FIXA neste painel: ele é escuro nos dois temas, então usar token
+        // de tema deixaria o texto cinza-escuro sobre fundo quase preto.
+        const sub = 'rgba(255,255,255,0.72)';
+        const caraDemais = ranked.find(r => (r.interestRate ?? 0) >= 1.5 && r.balance > 0);
+        const semFolga = totalBalance <= 0;
+        const mesesDespesa = averageMonthlyExpense(transactions, new Date(), 3);
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-2xl bg-white/5 p-6 border border-white/10 hover:bg-white/10 transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <h4 className="font-black text-lg">Reserva de Emergência</h4>
-            <p className="text-sm text-content-subtle mt-2 leading-relaxed">
-              O primeiro passo. Guarde o equivalente a 6 meses de seus gastos fixos em um investimento de liquidez diária (CDB 100% CDI ou Tesouro Selic).
-            </p>
-            <div className="mt-6 flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-widest">
-              Começar Agora <ChevronRight className="h-4 w-4" />
-            </div>
-          </div>
+        if (caraDemais || semFolga) {
+          return (
+            <div className="rounded-3xl bg-slate-900 p-8 text-white">
+              <h3 className="text-xl font-black flex items-center gap-2">
+                <ShieldCheck className="h-6 w-6 text-amber-400" />
+                Antes de investir
+              </h3>
+              <p className="mt-2 text-sm" style={{ color: sub }}>
+                Sugerir investimento agora seria conselho ruim. Investir rende cerca de 1% ao mês;
+                {caraDemais
+                  ? ` a sua dívida "${caraDemais.name}" custa ${caraDemais.interestRate}% ao mês. Aplicar dinheiro enquanto ela corre é perder a diferença todo mês.`
+                  : ' e o seu saldo está negativo, então não existe sobra para aplicar.'}
+              </p>
 
-          <div className="rounded-2xl bg-white/5 p-6 border border-white/10 hover:bg-white/10 transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <h4 className="font-black text-lg">Renda Fixa (Longo Prazo)</h4>
-            <p className="text-sm text-content-subtle mt-2 leading-relaxed">
-              Para objetivos de 2 a 5 anos. Considere IPCA+ para proteger seu dinheiro da inflação e garantir ganho real.
-            </p>
-            <div className="mt-6 flex items-center gap-2 text-blue-400 text-xs font-black uppercase tracking-widest">
-              Ver Opções <ChevronRight className="h-4 w-4" />
-            </div>
-          </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {caraDemais && (
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+                    <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: sub }}>
+                      Prioridade 1 — quitar
+                    </p>
+                    <p className="mt-1 text-lg font-black">{caraDemais.name}</p>
+                    <p className="text-sm" style={{ color: sub }}>
+                      {fmt(caraDemais.balance)} a {caraDemais.interestRate}% ao mês
+                      {caraDemais.monthlyCost !== null && <> — está custando {fmt(caraDemais.monthlyCost)} por mês</>}
+                    </p>
+                  </div>
+                )}
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: sub }}>
+                    Prioridade 2 — para-choque
+                  </p>
+                  <p className="mt-1 text-lg font-black">
+                    {mesesDespesa > 0 ? fmt(mesesDespesa) : 'Reserva mínima'}
+                  </p>
+                  <p className="text-sm" style={{ color: sub }}>
+                    Um mês da sua despesa guardado impede que o próximo imprevisto vire dívida nova.
+                  </p>
+                </div>
+              </div>
 
-          <div className="rounded-2xl bg-white/5 p-6 border border-white/10 hover:bg-white/10 transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <ArrowUpRight className="h-5 w-5" />
+              <p className="mt-6 text-xs" style={{ color: sub }}>
+                Quando a dívida cara acabar e houver saldo positivo, as sugestões de investimento
+                aparecem aqui automaticamente.
+              </p>
             </div>
-            <h4 className="font-black text-lg">Diversificação</h4>
-            <p className="text-sm text-content-subtle mt-2 leading-relaxed">
-              Se já tem reserva e renda fixa, explore Fundos Imobiliários (FIIs) para renda passiva mensal ou Ações para crescimento.
-            </p>
-            <div className="mt-6 flex items-center gap-2 text-indigo-400 text-xs font-black uppercase tracking-widest">
-              Explorar <ChevronRight className="h-4 w-4" />
+          );
+        }
+
+        return (
+          <div className="rounded-3xl bg-slate-900 p-8 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+              <div>
+                <h3 className="text-xl font-black flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-emerald-400" />
+                  Onde Investir Agora
+                </h3>
+                <p className="text-sm font-medium" style={{ color: sub }}>
+                  Sua casa está em ordem: sem dívida cara e com saldo positivo.
+                </p>
+              </div>
+              <div className="rounded-full bg-white/10 px-4 py-2 text-xs font-bold">
+                Saldo disponível: {fmt(totalBalance)}
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="rounded-2xl bg-white/5 p-6 border border-white/10">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <h4 className="font-black text-lg">Reserva de Emergência</h4>
+                <p className="text-sm mt-2 leading-relaxed" style={{ color: sub }}>
+                  O primeiro passo: 6 meses da sua despesa em liquidez diária (CDB 100% CDI ou
+                  Tesouro Selic).
+                  {mesesDespesa > 0 && <> No seu caso, <strong className="text-white">{fmt(mesesDespesa * 6)}</strong>.</>}
+                </p>
+                <button
+                  onClick={() => criarCaixinhaSugerida('Reserva de Emergência', mesesDespesa * 6, 24, '#10b981')}
+                  disabled={mesesDespesa <= 0}
+                  className="mt-6 flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-widest hover:text-emerald-300 disabled:opacity-40"
+                  title={mesesDespesa <= 0 ? 'Preciso de histórico de despesa para calcular a meta' : 'Cria a caixinha já com a meta calculada'}
+                >
+                  Criar caixinha <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="rounded-2xl bg-white/5 p-6 border border-white/10">
+                <div className="h-10 w-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <h4 className="font-black text-lg">Objetivo de médio prazo</h4>
+                <p className="text-sm mt-2 leading-relaxed" style={{ color: sub }}>
+                  Para 2 a 5 anos, renda fixa atrelada ao IPCA protege da inflação. Crie a caixinha
+                  aqui e o sistema acompanha o quanto falta.
+                </p>
+                <button
+                  onClick={() => criarCaixinhaSugerida('Objetivo de médio prazo', 0, 36, '#3b82f6')}
+                  className="mt-6 flex items-center gap-2 text-blue-400 text-xs font-black uppercase tracking-widest hover:text-blue-300"
+                >
+                  Criar caixinha <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Sem botão de propósito: o sistema não executa investimento em
+                  bolsa, e um botão que não age é pior que nenhum. */}
+              <div className="rounded-2xl bg-white/5 p-6 border border-white/10">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4">
+                  <ArrowUpRight className="h-5 w-5" />
+                </div>
+                <h4 className="font-black text-lg">Diversificação</h4>
+                <p className="text-sm mt-2 leading-relaxed" style={{ color: sub }}>
+                  Com reserva feita e renda fixa em pé, FIIs geram renda mensal e ações buscam
+                  crescimento. Isso se faz na sua corretora — o sistema não executa aplicação.
+                </p>
+                <p className="mt-6 text-[10px] font-black uppercase tracking-widest" style={{ color: sub }}>
+                  Apenas informativo
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Debt Modal */}
       {isDebtModalOpen && (

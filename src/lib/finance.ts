@@ -180,3 +180,35 @@ export function currentInvoiceWindow(
   const start = new Date(end.getFullYear(), end.getMonth() - 1, day);
   return { start, end };
 }
+
+/**
+ * Limite UTILIZADO de um cartão: o que está comprometido e ainda não foi pago.
+ *
+ * Conta a fatura do ciclo aberto mais as parcelas futuras ainda pendentes
+ * (elas seguram limite mesmo sem ter fechado). Compras de ciclos já
+ * ENCERRADOS ficam de fora — presume-se pagas, e o limite volta.
+ *
+ * A conta anterior somava todas as despesas do cartão desde sempre, então o
+ * "utilizado" só crescia e o "disponível" derretia mês após mês, mesmo com as
+ * faturas em dia.
+ */
+export function computeCardUsage(
+  cardId: string,
+  closingDay: number,
+  transactions: Transaction[],
+  reference: Date = new Date()
+): number {
+  const { start } = currentInvoiceWindow(closingDay, reference);
+  let total = 0;
+  for (const t of transactions) {
+    if (t.cardId !== cardId) continue;
+    if (t.type !== 'expense') continue;
+    if (t.status === 'cancelled') continue;
+    const d = parseLocalDate(t.date);
+    if (Number.isNaN(d.getTime())) continue;
+    // Do início do ciclo aberto para frente: inclui a fatura atual e o futuro.
+    if (d < start) continue;
+    total = round2(total + (Number(t.amount) || 0));
+  }
+  return total;
+}
