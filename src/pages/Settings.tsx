@@ -130,7 +130,7 @@ export const Settings: React.FC = () => {
       setTgLink(data.deepLink || null);
       if (!data.deepLink) showToast(`Abra o seu bot no Telegram e envie: /start ${data.code}`, 'info');
     } catch {
-      showToast('Erro ao conectar com o Telegram. O servidor precisa do TELEGRAM_BOT_TOKEN.', 'error');
+      showToast('Não consegui falar com o servidor. O Telegram só funciona com o app publicado (deploy) e o TELEGRAM_BOT_TOKEN configurado.', 'error');
     } finally {
       setTgLoading(false);
     }
