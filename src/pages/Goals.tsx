@@ -18,6 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { computeGoalProgress, monthlyNeeded, goalForecast, goalStatus, timeProgress, paceVerdict } from '../lib/goals';
 import { goalsDocPath, readGoals, upsertGoal, removeGoal } from '../lib/goalStore';
 import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
+import { ColorField } from '../components/ColorField';
 import { formatLocalDate } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 
@@ -482,7 +483,7 @@ export const Goals: React.FC = () => {
                   >
                     <PiggyBank className="h-5 w-5" />
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEdit(goal)} className="rounded-lg p-2 text-content-subtle hover:text-primary hover:bg-surface-muted">
                       <Edit2 className="h-4 w-4" />
                     </button>
@@ -613,7 +614,7 @@ export const Goals: React.FC = () => {
       {moving && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-lg rounded-3xl bg-surface p-8 shadow-2xl">
+            className="w-full max-w-2xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
             <h3 className="text-xl font-black text-content">
               {moving.mode === 'guardar' ? 'Guardar em' : 'Resgatar de'} {moving.goal.name}
             </h3>
@@ -731,7 +732,7 @@ export const Goals: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-lg rounded-3xl bg-surface p-8 shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[92vh] overflow-y-auto"
           >
             <h3 className="text-xl font-black text-content">{editing ? 'Editar caixinha' : 'Nova caixinha'}</h3>
             <p className="text-sm text-content-subtle">Um objetivo por caixinha. O progresso vem dos lançamentos.</p>
@@ -856,22 +857,8 @@ export const Goals: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-content-muted">Cor</label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {BANK_PRESETS.slice(0, 12).map(p => (
-                    <button
-                      key={p.id} type="button" title={p.name}
-                      onClick={() => setColor(p.color)} style={{ backgroundColor: p.color }}
-                      className={cn('h-7 w-7 rounded-full border transition-all',
-                        normalizeHex(color) === p.color ? 'ring-2 ring-primary ring-offset-2 scale-110' : 'border-line hover:scale-110')}
-                    />
-                  ))}
-                  <input
-                    type="color" value={normalizeHex(color) || '#2563eb'}
-                    onChange={e => setColor(e.target.value)}
-                    className="h-7 w-10 cursor-pointer rounded-lg border border-line bg-transparent p-0.5"
-                  />
-                </div>
+                <label className="block text-sm font-medium text-content-muted mb-2">Cor</label>
+                <ColorField value={color} onChange={setColor} />
               </div>
 
               <div className="flex gap-3 pt-2">

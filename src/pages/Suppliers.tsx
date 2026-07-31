@@ -180,8 +180,8 @@ export const Suppliers: React.FC = () => {
   };
 
   const filteredSuppliers = suppliers.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.cnpjOrCpf?.includes(searchTerm)
   );
 
@@ -338,7 +338,7 @@ export const Suppliers: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-lg rounded-2xl bg-surface shadow-2xl overflow-hidden"
+            className="w-full max-w-3xl rounded-2xl bg-surface shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto"
           >
             <div className="p-6 border-b flex items-center justify-between bg-gray-50/50">
               <h3 className="text-xl font-bold text-content">

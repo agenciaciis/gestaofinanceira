@@ -311,7 +311,7 @@ export const BankAccounts: React.FC = () => {
             <h3 className="text-lg font-bold text-content">Nenhuma conta cadastrada</h3>
             <p className="mt-1 text-content-subtle">Comece cadastrando sua primeira conta bancária.</p>
             <button 
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => { resetForm(); setIsModalOpen(true); }}
               className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
             >
               Cadastrar Agora

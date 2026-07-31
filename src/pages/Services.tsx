@@ -54,7 +54,9 @@ export const Services: React.FC = () => {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!selectedEntity) return;
+    // Sem entidade selecionada não há o que carregar — mas precisa DESLIGAR o
+    // loading, senão a tela fica presa no spinner e nenhum botão é alcançável.
+    if (!selectedEntity) { setLoading(false); return; }
 
     const servicesQ = query(collection(db, `entities/${selectedEntity.id}/services`), orderBy('createdAt', 'desc'));
     const productsQ = query(collection(db, `entities/${selectedEntity.id}/products`), orderBy('createdAt', 'desc'));
@@ -165,9 +167,9 @@ export const Services: React.FC = () => {
     setEditingItem(item);
     setName(item.name);
     setDescription(item.description || '');
-    setPrice(activeTab === 'services'
-      ? String((item as Service).basePrice ?? '')
-      : String((item as Plan).price ?? ''));
+    setPrice(activeTab === 'plans'
+      ? String((item as Plan).price ?? '')
+      : String((item as Service).basePrice ?? ''));
     
     if (activeTab === 'services' || activeTab === 'products') {
       const sv = item as Service;
@@ -510,11 +512,11 @@ export const Services: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-3xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+              className="w-full max-w-4xl rounded-3xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
             >
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-bold text-content">
-                  {editingItem ? 'Editar' : 'Novo'} {activeTab === 'services' ? 'Serviço' : 'Plano'}
+                  {editingItem ? 'Editar' : 'Novo'} {activeTab === 'plans' ? 'Plano' : activeTab === 'products' ? 'Produto' : 'Serviço'}
                 </h3>
                 <button onClick={() => setIsModalOpen(false)} className="rounded-full p-2 hover:bg-surface-muted">
                   <X className="h-6 w-6 text-content-subtle" />
@@ -529,7 +531,7 @@ export const Services: React.FC = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                    placeholder={activeTab === 'services' ? "Ex: Gestão de Redes Sociais" : "Ex: Plano Premium"}
+                    placeholder={activeTab === 'plans' ? "Ex: Plano Premium" : activeTab === 'products' ? "Ex: E-book, Template, Curso" : "Ex: Gestão de Redes Sociais"}
                     required
                   />
                 </div>
@@ -557,16 +559,15 @@ export const Services: React.FC = () => {
                       required
                     />
                   </div>
-                  {activeTab === 'services' ? (
+                  {activeTab !== 'plans' ? (
                     <div>
                       <label className="block text-sm font-bold text-content-muted mb-2">Categoria</label>
-                      <input 
+                      <input
                         type="text"
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
                         className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                        placeholder="Ex: Marketing, Design..."
-                        required
+                        placeholder={activeTab === 'products' ? "Ex: Produto digital" : "Ex: Marketing, Design..."}
                       />
                     </div>
                   ) : (
@@ -719,7 +720,7 @@ export const Services: React.FC = () => {
                     type="submit"
                     className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
                   >
-                    Salvar {activeTab === 'services' ? 'Serviço' : 'Plano'}
+                    Salvar {activeTab === 'plans' ? 'Plano' : activeTab === 'products' ? 'Produto' : 'Serviço'}
                   </button>
                 </div>
               </form>

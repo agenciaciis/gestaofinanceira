@@ -737,7 +737,7 @@ export const Transactions: React.FC = () => {
             )}
           </div>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
@@ -909,8 +909,8 @@ export const Transactions: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={cn(
-                          "flex h-8 w-8 items-center justify-center rounded-full",
-                          t.type === 'income' ? "bg-green-100 text-green-600" : 
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                          t.type === 'income' ? "bg-green-100 text-green-600" :
                           t.type === 'expense' ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
                         )}>
                           {t.type === 'income' ? <ArrowUpCircle className="h-4 w-4" /> : 
@@ -1469,7 +1469,7 @@ export const Transactions: React.FC = () => {
               <div className="mt-8 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { resetForm(); setIsModalOpen(false); }}
                   className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-content-muted hover:bg-canvas"
                 >
                   Cancelar

@@ -288,8 +288,8 @@ export const Clients: React.FC = () => {
     setContracts(contracts.filter(c => c.id !== id));
   };
 
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredClients = clients.filter(c =>
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.cnpj?.includes(searchTerm) ||
     c.responsibleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -623,7 +623,7 @@ export const Clients: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl"
+                className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl"
               >
                 <div className="flex items-center justify-between border-b border-line p-6">
                   <div>
@@ -690,7 +690,7 @@ export const Clients: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-2xl rounded-2xl bg-surface shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="w-full max-w-4xl rounded-2xl bg-surface shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             {/* Modal Header */}
             <div className="p-6 border-b flex items-center justify-between bg-gray-50/50">

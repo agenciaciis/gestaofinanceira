@@ -308,7 +308,8 @@ export const Layout: React.FC<{
                currentPage === 'quotes' ? 'Orçamentos' :
                currentPage === 'suppliers' ? 'Fornecedores e Locais' :
                currentPage === 'health' ? 'Saúde Financeira' :
-               currentPage === 'settings' ? 'Configurações' : 'Entidades'}
+               currentPage === 'settings' ? 'Configurações' :
+               currentPage === 'team' ? 'Equipe' : 'Entidades'}
             </h1>
             <span className={cn(
               "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",

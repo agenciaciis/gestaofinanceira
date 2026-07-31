@@ -61,7 +61,7 @@ const fmt = (n: number) =>
 
 export const FinancialHealth: React.FC = () => {
   const { selectedEntity } = useEntity();
-  const { showToast } = useUI();
+  const { showToast, confirm } = useUI();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -363,6 +363,8 @@ export const FinancialHealth: React.FC = () => {
 
   const handleDeleteDebt = async (id: string) => {
     if (!selectedEntity) return;
+    const ok = await confirm({ title: 'Excluir dívida', message: 'Tem certeza que deseja excluir esta dívida?', variant: 'danger' });
+    if (!ok) return;
     await deleteDoc(doc(db, `entities/${selectedEntity.id}/debts`, id));
   };
 

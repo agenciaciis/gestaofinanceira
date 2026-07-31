@@ -319,7 +319,7 @@ export const Debts: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-md rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl"
+              className="w-full max-w-2xl rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl max-h-[92vh] overflow-y-auto"
             >
               <h3 className="text-xl font-black text-content dark:text-gray-100">Corrigir Pendência</h3>
               <p className="text-sm text-content-subtle mb-6">Ajuste o valor, a data ou a descrição lançada.</p>

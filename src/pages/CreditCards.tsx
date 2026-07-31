@@ -8,6 +8,7 @@ import { Plus, CreditCard as CardIcon, Trash2, Edit2, AlertCircle, Calendar, Inf
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
+import { ColorField } from '../components/ColorField';
 import { computeCardUsage, currentInvoiceWindow, parseLocalDate } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
@@ -260,7 +261,7 @@ export const CreditCards: React.FC = () => {
         <div className="flex items-center gap-3">
           <ViewToggle mode={viewMode} onChange={setViewMode} />
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
@@ -413,7 +414,7 @@ export const CreditCards: React.FC = () => {
               </div>
 
               {/* Entity Badge */}
-              <div className="absolute right-4 top-4">
+              <div className="pointer-events-none absolute right-4 top-4">
                 <span className={cn(
                   "rounded-full px-2 py-0.5 text-[8px] font-bold uppercase",
                   entities.find(e => e.id === card.entityId)?.type === 'PF' ? "bg-blue-500/20 text-blue-300" : "bg-purple-500/20 text-purple-300"
@@ -464,7 +465,7 @@ export const CreditCards: React.FC = () => {
                   // Só despesas não-canceladas entram na fatura (antes somava
                   // canceladas e até receitas lançadas no cartão).
                   const transactions = (cardTransactions[selectedCardForInvoices.id] || [])
-                    .filter(t => t.type === 'expense' && t.status !== 'cancelled');
+                    .filter(t => t.type === 'expense' && t.status !== 'cancelled' && !Number.isNaN(parseLocalDate(t.date).getTime()));
                   const groupedByMonth = transactions.reduce((acc, t) => {
                     const key = invoiceKey(t.date);
                     (acc[key] ||= []).push(t);
@@ -652,7 +653,7 @@ export const CreditCards: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md rounded-2xl bg-surface p-8 shadow-2xl"
+            className="w-full max-w-2xl rounded-2xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
           >
             <h3 className="text-xl font-bold text-content">
               {editingCard ? 'Editar Cartão' : 'Novo Cartão de Crédito'}
@@ -709,45 +710,14 @@ export const CreditCards: React.FC = () => {
 
               {/* Cor do cartão */}
               <div>
-                <label className="block text-sm font-medium text-content-muted">Cor do cartão</label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {BANK_PRESETS.map(preset => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      title={preset.name}
-                      onClick={() => setColor(preset.color)}
-                      style={{ backgroundColor: preset.color }}
-                      className={cn(
-                        'h-8 w-8 rounded-full border transition-all',
-                        normalizeHex(color) === preset.color
-                          ? 'ring-2 ring-primary ring-offset-2 border-transparent scale-110'
-                          : 'border-line hover:scale-110'
-                      )}
-                    />
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={normalizeHex(color) || '#111827'}
-                    onChange={(e) => setColor(e.target.value)}
-                    title="Escolher qualquer cor"
-                    className="h-9 w-14 cursor-pointer rounded-lg border border-line bg-transparent p-1"
-                  />
-                  <span className="text-xs text-content-subtle">
-                    {color ? BANK_PRESETS.find(p => p.color === normalizeHex(color))?.name || normalizeHex(color) : 'Sem cor — usa o visual escuro padrão'}
-                  </span>
-                  {color && (
-                    <button
-                      type="button"
-                      onClick={() => setColor('')}
-                      className="ml-auto text-xs font-bold text-content-subtle hover:text-rose-600"
-                    >
-                      Remover cor
-                    </button>
-                  )}
-                </div>
+                <label className="block text-sm font-medium text-content-muted mb-2">Cor do cartão</label>
+                <ColorField value={color} onChange={setColor} />
+                {color && (
+                  <button type="button" onClick={() => setColor('')}
+                    className="mt-2 text-xs font-bold text-content-subtle hover:text-rose-600">
+                    Remover cor (usar visual escuro padrão)
+                  </button>
+                )}
 
                 {/* Prévia com o texto já na cor que o sistema vai calcular */}
                 <div
@@ -792,7 +762,7 @@ export const CreditCards: React.FC = () => {
               <div className="mt-8 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { resetForm(); setIsModalOpen(false); }}
                   className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-content-muted hover:bg-canvas"
                 >
                   Cancelar
