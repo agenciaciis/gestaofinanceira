@@ -1420,7 +1420,7 @@ export const Quotes: React.FC = () => {
 
               {/* Folha da proposta — tamanho A4 (210×297mm ≈ 794×1123px a 96dpi). */}
               <div className="flex-1 overflow-auto bg-gray-100 p-4 sm:p-8">
-                <div className="mx-auto w-[794px] max-w-full min-h-[1123px] bg-white px-[56px] py-[56px] shadow-sm text-gray-800">
+                <div className="mx-auto flex w-[794px] max-w-full min-h-[1123px] flex-col bg-white px-[56px] py-[56px] shadow-sm text-gray-800">
                   {/* Cabeçalho */}
                   <div className="flex items-start justify-between gap-4 border-b-2 pb-3" style={{ borderColor: PURPLE }}>
                     {logo
@@ -1490,8 +1490,8 @@ export const Quotes: React.FC = () => {
                     <p className="whitespace-pre-wrap text-sm text-gray-700">{pd.notes}</p>
                   </>)}
 
-                  {/* Rodapé */}
-                  <div className="mt-10 border-t border-gray-200 pt-3 text-center text-[11px] text-gray-500">
+                  {/* Rodapé — fixo no pé da folha A4 (mt-auto empurra pro fundo). */}
+                  <div className="mt-auto border-t border-gray-200 pt-3 text-center text-[11px] text-gray-500">
                     {[company.name, company.phone, company.email, company.site].filter(Boolean).join('   ·   ')}
                   </div>
                 </div>
