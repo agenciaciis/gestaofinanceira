@@ -340,21 +340,31 @@ export const Clients: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-content">Gestão de Clientes</h2>
-          <p className="text-sm text-content-subtle">Gerencie informações, acessos e contratos dos seus clientes.</p>
+      <div className="rounded-[2.5rem] bg-emerald-50 dark:bg-gradient-to-br dark:from-emerald-900 dark:to-teal-950 p-8 text-emerald-900 dark:text-white shadow-xl shadow-emerald-100 dark:shadow-none relative overflow-hidden border border-emerald-100 dark:border-emerald-900/30">
+        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-6">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-surface dark:bg-white/10 backdrop-blur-md border border-emerald-200 dark:border-white/30 shadow-inner">
+              <User className="h-10 w-10 text-emerald-600 dark:text-white" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400 dark:text-white/60">Agência CIIS</span>
+              <h2 className="text-4xl font-black tracking-tighter">Clientes</h2>
+              <p className="text-sm font-medium text-emerald-700 dark:text-white/80 mt-1">Dados, acessos, pacotes e histórico de cada cliente.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+            <button
+              onClick={() => { resetForm(); setIsModalOpen(true); }}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-emerald-700 transition-all transform hover:scale-105 active:scale-95"
+            >
+              <Plus className="h-5 w-5" />
+              Novo Cliente
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
-          <button
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90 transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Cliente
-          </button>
-        </div>
+        <div className="pointer-events-none absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-emerald-400/20 blur-2xl" />
       </div>
 
       <div className="relative">

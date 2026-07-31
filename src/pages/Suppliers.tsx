@@ -198,21 +198,31 @@ export const Suppliers: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-content">Fornecedores e Locais</h2>
-          <p className="text-sm text-content-subtle">Cadastre locais e pessoas que você precisa pagar.</p>
+      <div className="rounded-[2.5rem] bg-amber-50 dark:bg-gradient-to-br dark:from-amber-900 dark:to-orange-950 p-8 text-amber-900 dark:text-white shadow-xl shadow-amber-100 dark:shadow-none relative overflow-hidden border border-amber-100 dark:border-amber-900/30">
+        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-6">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-surface dark:bg-white/10 backdrop-blur-md border border-amber-200 dark:border-white/30 shadow-inner">
+              <Truck className="h-10 w-10 text-amber-600 dark:text-white" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 dark:text-white/60">Agência CIIS</span>
+              <h2 className="text-4xl font-black tracking-tighter">Fornecedores & Locais</h2>
+              <p className="text-sm font-medium text-amber-700 dark:text-white/80 mt-1">Cadastre locais e pessoas que você precisa pagar.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+            <button
+              onClick={() => { resetForm(); setIsModalOpen(true); }}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-amber-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-amber-700 transition-all transform hover:scale-105 active:scale-95"
+            >
+              <Plus className="h-5 w-5" />
+              Novo Cadastro
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
-          <button
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary/90 transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Cadastro
-          </button>
-        </div>
+        <div className="pointer-events-none absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-amber-400/20 blur-2xl" />
       </div>
 
       <div className="relative">
