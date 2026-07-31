@@ -54,6 +54,8 @@ export const Quotes: React.FC = () => {
   const [viewMode, setViewMode] = useViewMode('orcamentos', 'grid');
   const [logo, setLogo] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewNumber, setPreviewNumber] = useState('');
   const [company, setCompany] = useState<CompanyInfo>(DEFAULT_COMPANY);
   const [savingCompany, setSavingCompany] = useState(false);
 
@@ -396,18 +398,20 @@ export const Quotes: React.FC = () => {
   }, [selectedEntity]);
 
   const handleLogoUpload = async (file: File) => {
-    if (!selectedEntity) return;
+    if (!selectedEntity) { showToast('Selecione uma empresa antes de enviar a logo.', 'error'); return; }
     setUploadingLogo(true);
     try {
       const compressed = await compressLogo(file);
       const check = validateLogo(compressed);
       if (!check.ok) { showToast(check.reason || 'Imagem inválida.', 'error'); return; }
+      // Preview otimista: aparece na hora, sem esperar o Firestore responder.
+      setLogo(compressed);
       await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`),
         { logo: compressed, updatedAt: serverTimestamp() }, { merge: true });
       showToast('Logomarca salva! Os próximos orçamentos já saem com ela.', 'success');
     } catch (error: any) {
       console.error('Erro na logomarca:', error);
-      showToast(error?.message || 'Não consegui processar a imagem.', 'error');
+      showToast(error?.message || 'Não consegui salvar a imagem. Recarregue a página (Cmd+Shift+R) e tente de novo.', 'error');
     } finally {
       setUploadingLogo(false);
     }
@@ -415,6 +419,7 @@ export const Quotes: React.FC = () => {
 
   const removeLogo = async () => {
     if (!selectedEntity) return;
+    setLogo(null);
     await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`), { logo: null }, { merge: true });
     showToast('Logomarca removida.', 'success');
   };
@@ -570,10 +575,15 @@ export const Quotes: React.FC = () => {
     buildPDF(quote).save(`Orcamento_${quote.quoteNumber}.pdf`);
   };
 
-  /** Abre o PDF numa aba só para VER como ficou — não baixa nem imprime. */
+  /** Mostra o PDF numa prévia dentro do próprio sistema (não baixa nem imprime).
+   *  Modal com iframe evita o bloqueio de popup do window.open. */
   const previewQuote = (quote: Quote) => {
-    const url = buildPDF(quote).output('bloburl');
-    window.open(url as unknown as string, '_blank');
+    const url = buildPDF(quote).output('bloburl') as unknown as string;
+    setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+    setPreviewNumber(quote.quoteNumber);
+  };
+  const closePreview = () => {
+    setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
   };
 
   /** Abre o PDF numa aba e dispara a impressão — sai idêntico ao arquivo. */
@@ -695,7 +705,12 @@ export const Quotes: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             {logo && (
-              <img src={logo} alt="Logomarca" className="h-14 w-auto rounded-lg border border-line bg-white p-1" />
+              <div className="flex flex-col items-center gap-1">
+                <img src={logo} alt="Logomarca" className="h-14 w-auto rounded-lg border border-line bg-white p-1" />
+                <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Logo aplicada
+                </span>
+              </div>
             )}
             <label className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">
               {uploadingLogo ? 'Processando...' : logo ? 'Trocar logo' : 'Enviar logo (PNG)'}
@@ -1253,6 +1268,52 @@ export const Quotes: React.FC = () => {
               </form>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Prévia do PDF dentro do sistema — quase tela cheia. iframe com o
+          bloburl gerado, sem depender de popup (que o navegador bloqueia). */}
+      <AnimatePresence>
+        {previewUrl && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex flex-col bg-black/70 p-3 sm:p-6"
+            onClick={closePreview}
+          >
+            <motion.div
+              initial={{ scale: 0.97, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.97, opacity: 0 }}
+              className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Eye className="h-5 w-5 shrink-0 text-primary" />
+                  <p className="truncate font-black text-content">Prévia — Orçamento {previewNumber}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={previewUrl} download={`Orcamento_${previewNumber}.pdf`}
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90"
+                  >
+                    Baixar
+                  </a>
+                  <button onClick={closePreview}
+                    className="rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content" title="Fechar">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              <object data={previewUrl} type="application/pdf" className="h-full w-full flex-1 bg-white">
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                  <p className="text-sm text-content-muted">Seu navegador não abriu a prévia embutida.</p>
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">
+                    Abrir PDF em nova aba
+                  </a>
+                </div>
+              </object>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
