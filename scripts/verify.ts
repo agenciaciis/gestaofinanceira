@@ -1,4 +1,5 @@
 /** Verificação read-only dos dados de simulação. Uso: npm run seed:verify */
+import 'dotenv/config'; // carrega SEED_EMAIL/SEED_PASSWORD do .env
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore';

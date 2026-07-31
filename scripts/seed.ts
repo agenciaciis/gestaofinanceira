@@ -7,6 +7,7 @@
  * Requer que o login por E-mail/Senha esteja habilitado no Firebase Auth.
  * Credenciais padrão: as mesmas pré-preenchidas na tela de login.
  */
+import 'dotenv/config'; // carrega SEED_EMAIL/SEED_PASSWORD do .env
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import {

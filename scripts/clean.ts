@@ -3,6 +3,7 @@
  * Uso:  npm run seed:clean
  * Seguro: só apaga entidades com seed===true e suas subcoleções.
  */
+import 'dotenv/config'; // carrega SEED_EMAIL/SEED_PASSWORD do .env
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import {
