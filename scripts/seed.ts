@@ -143,18 +143,25 @@ async function seedEntity(uid: string, email: string, name: string, type: 'PF' |
       { name: 'Mini-curso de Tráfego Pago', basePrice: 197, costPrice: 20 },
     ].forEach(p => add(P('products'), { ...base, name: p.name, description: 'Produto digital', basePrice: p.basePrice, costPrice: p.costPrice, category: 'Produto', active: true, createdAt: serverTimestamp() }));
 
-    // ---------- orçamentos ----------
-    const statuses = ['draft', 'sent', 'approved', 'rejected'];
-    for (let i = 0; i < 4; i++) {
-      const cli = clientIds[i];
+    // ---------- orçamentos (~28 ao longo do ano, vários status) ----------
+    const statuses = ['draft', 'sent', 'approved', 'rejected', 'converted', 'sent', 'approved', 'converted'];
+    const formas = ['PIX', 'Boleto', 'Cartão de Crédito', 'Transferência'];
+    for (let i = 0; i < 28; i++) {
+      const cli = clientIds[i % clientIds.length];
       const sv = servicos[i % servicos.length];
+      const total = sv.basePrice + (i % 3) * 250;
+      const parcelas = i % 5 === 0 ? 3 : 1;
+      const recorrente = i % 7 === 0;
+      const qDate = new Date(today.getFullYear(), today.getMonth() - (11 - (i % 12)), 3 + (i % 24));
       add(P('quotes'), {
         ...base, quoteNumber: `ORC-SIM-${1000 + i}`, clientId: cli.id, clientName: cli.name,
-        date: ymd(new Date(today.getFullYear(), today.getMonth(), 1 + i)),
-        validUntil: ymd(new Date(today.getFullYear(), today.getMonth() + 1, 1)),
-        items: [{ id: 'i1', description: sv.name, quantity: 1, unitPrice: sv.basePrice, discount: 0, total: sv.basePrice, type: 'service' }],
-        subtotal: sv.basePrice, discountTotal: 0, total: sv.basePrice,
-        paymentMethod: 'PIX', installments: 1, status: statuses[i], notes: 'Orçamento de simulação',
+        date: ymd(qDate),
+        validUntil: ymd(new Date(qDate.getFullYear(), qDate.getMonth(), qDate.getDate() + 15)),
+        items: [{ id: 'i1', description: sv.name, quantity: 1, unitPrice: total, discount: 0, total, type: 'service' }],
+        subtotal: total, discountTotal: 0, total,
+        paymentMethod: pick(formas), installments: parcelas, status: statuses[i % statuses.length],
+        notes: 'Orçamento de simulação',
+        recurrenceConfig: { enabled: recorrente, frequency: 'monthly', startDate: ymd(qDate) },
         createdAt: serverTimestamp(),
       });
     }

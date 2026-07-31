@@ -63,6 +63,8 @@ export const Quotes: React.FC = () => {
   const [quoteDate, setQuoteDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [validUntil, setValidUntil] = useState(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
+  // Itens avulsos que o usuário quer também salvar no catálogo (serviços/produtos).
+  const [saveToCatalog, setSaveToCatalog] = useState<Record<string, boolean>>({});
   const [paymentMethod, setPaymentMethod] = useState('PIX');
   const [installments, setInstallments] = useState(1);
   const [notes, setNotes] = useState('');
@@ -209,6 +211,21 @@ export const Quotes: React.FC = () => {
         clientName = newClientName;
       }
 
+      // Cadastra no catálogo os itens AVULSOS marcados "Cadastrar" (serviço/produto).
+      for (const it of quoteItems) {
+        if (!saveToCatalog[it.id] || it.referenceId || it.type === 'plan') continue;
+        const nome = (it.description || '').trim();
+        const preco = Number(it.unitPrice) || 0;
+        if (!nome || preco <= 0) continue;
+        const col = it.type === 'product' ? 'products' : 'services';
+        await addDoc(collection(db, `entities/${selectedEntity.id}/${col}`), {
+          name: nome, description: '', basePrice: preco,
+          category: it.type === 'product' ? 'Produto' : 'Serviço', active: true,
+          entityId: selectedEntity.id, ownerUid: selectedEntity.ownerUid,
+          collaboratorsEmails: selectedEntity.collaboratorsEmails || [], createdAt: serverTimestamp(),
+        });
+      }
+
       // Número sequential por mês (ORC-AAAAMM-0001), derivado dos orçamentos já
       // carregados — legível e sem número aleatório.
       const uniqueQuoteNumber = () => {
@@ -273,6 +290,7 @@ export const Quotes: React.FC = () => {
     setQuoteDate(format(new Date(), 'yyyy-MM-dd'));
     setValidUntil(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
     setQuoteItems([]);
+    setSaveToCatalog({});
     setPaymentMethod('PIX');
     setInstallments(1);
     setNotes('');
@@ -948,75 +966,85 @@ export const Quotes: React.FC = () => {
 
                   <div className="space-y-3">
                     {quoteItems.map((item, index) => (
-                      <motion.div 
+                      <motion.div
                         layout
                         key={item.id}
-                        className="grid gap-4 sm:grid-cols-12 items-end rounded-2xl border border-line p-4 bg-surface shadow-sm"
+                        className="rounded-2xl border border-line p-4 bg-surface shadow-sm space-y-3"
                       >
-                        <div className="sm:col-span-3">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Item / Descrição</label>
-                          <select
-                            value={item.referenceId || ''}
-                            onChange={(e) => updateItem(item.id, { referenceId: e.target.value })}
-                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary bg-surface"
-                          >
-                            <option value="">Selecione...</option>
-                            {item.type === 'service' ? (
-                              services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
-                            ) : item.type === 'product' ? (
-                              products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
-                            ) : (
-                              plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                        {/* Linha 1: descrição (digitável) + puxar do catálogo */}
+                        <div className="grid gap-3 sm:grid-cols-12 items-end">
+                          <div className="sm:col-span-7">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">
+                              {item.type === 'plan' ? 'Plano' : item.type === 'product' ? 'Produto' : 'Serviço'} / Descrição
+                            </label>
+                            <input
+                              type="text"
+                              value={item.description}
+                              onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                              placeholder="Digite aqui, ou puxe do catálogo ao lado"
+                              className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary bg-surface"
+                            />
+                          </div>
+                          <div className="sm:col-span-5">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Puxar do catálogo (opcional)</label>
+                            <select
+                              value={item.referenceId || ''}
+                              onChange={(e) => updateItem(item.id, { referenceId: e.target.value })}
+                              className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary bg-surface"
+                            >
+                              <option value="">— avulso (digitar acima) —</option>
+                              {item.type === 'service' ? (
+                                services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
+                              ) : item.type === 'product' ? (
+                                products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                              ) : (
+                                plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                              )}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Linha 2: qtd, unitário, desconto, total, cadastrar, remover */}
+                        <div className="grid gap-3 sm:grid-cols-12 items-end">
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Qtd</label>
+                            <input type="number" min="0" value={item.quantity}
+                              onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) })}
+                              className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary" />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Unitário</label>
+                            <input type="number" min="0" step="0.01" value={item.unitPrice}
+                              onChange={(e) => updateItem(item.id, { unitPrice: parseFloat(e.target.value) })}
+                              className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary" />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Desconto (R$)</label>
+                            <input type="number" min="0" step="0.01" value={item.discount || 0}
+                              onChange={(e) => updateItem(item.id, { discount: parseFloat(e.target.value) })}
+                              className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary" />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Total</label>
+                            <p className="px-3 py-2 text-sm font-bold text-content">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
+                            </p>
+                          </div>
+                          <div className="sm:col-span-2 flex items-center">
+                            {item.type !== 'plan' && !item.referenceId && (
+                              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-bold text-content-subtle" title="Salvar este item no catálogo de serviços/produtos">
+                                <input type="checkbox" checked={!!saveToCatalog[item.id]}
+                                  onChange={(e) => setSaveToCatalog(s => ({ ...s, [item.id]: e.target.checked }))} />
+                                Cadastrar
+                              </label>
                             )}
-                          </select>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Qtd</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) })}
-                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Unitário</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.unitPrice}
-                            onChange={(e) => updateItem(item.id, { unitPrice: parseFloat(e.target.value) })}
-                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Desconto (R$)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.discount || 0}
-                            onChange={(e) => updateItem(item.id, { discount: parseFloat(e.target.value) })}
-                            className="w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1">Total</label>
-                          <p className="px-3 py-2 text-sm font-bold text-content">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
-                          </p>
-                        </div>
-                        <div className="sm:col-span-1 flex justify-end sm:items-center">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.id)}
-                            className="rounded-lg p-2 text-content-subtle hover:bg-red-50 hover:text-red-500"
-                            title="Remover item"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          </div>
+                          <div className="sm:col-span-1 flex justify-end sm:items-center">
+                            <button type="button" onClick={() => removeItem(item.id)}
+                              className="rounded-lg p-2 text-content-subtle hover:bg-red-50 hover:text-red-500" title="Remover item">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </motion.div>
                     ))}
