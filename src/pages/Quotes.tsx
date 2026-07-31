@@ -35,7 +35,7 @@ import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewTo
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
-import { compressLetterhead, validateLetterhead } from '../lib/branding';
+import { compressLogo, validateLogo, CompanyInfo, DEFAULT_COMPANY } from '../lib/branding';
 import autoTable from 'jspdf-autotable';
 
 export const Quotes: React.FC = () => {
@@ -52,8 +52,10 @@ export const Quotes: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
   const [viewMode, setViewMode] = useViewMode('orcamentos', 'grid');
-  const [letterhead, setLetterhead] = useState<string | null>(null);
-  const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
+  const [logo, setLogo] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [company, setCompany] = useState<CompanyInfo>(DEFAULT_COMPANY);
+  const [savingCompany, setSavingCompany] = useState(false);
 
   // Form states
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -383,149 +385,182 @@ export const Quotes: React.FC = () => {
     }
   };
 
-  // Papel timbrado da entidade (guardado como imagem no próprio Firestore).
+  // Logo + dados da empresa (guardados em config/branding). Saem no topo/rodapé do PDF.
   useEffect(() => {
     if (!selectedEntity) return;
     return onSnapshot(doc(db, `entities/${selectedEntity.id}/config/branding`), snap => {
-      setLetterhead((snap.data()?.letterhead as string) || null);
+      const d = snap.data() || {};
+      setLogo((d.logo as string) || null);
+      setCompany({ ...DEFAULT_COMPANY, ...((d.company as Partial<CompanyInfo>) || {}) });
     }, e => handleFirestoreError(e, OperationType.GET, `entities/${selectedEntity.id}/config/branding`));
   }, [selectedEntity]);
 
-  const handleLetterheadUpload = async (file: File) => {
+  const handleLogoUpload = async (file: File) => {
     if (!selectedEntity) return;
-    setUploadingLetterhead(true);
+    setUploadingLogo(true);
     try {
-      const compressed = await compressLetterhead(file);
-      const check = validateLetterhead(compressed);
+      const compressed = await compressLogo(file);
+      const check = validateLogo(compressed);
       if (!check.ok) { showToast(check.reason || 'Imagem inválida.', 'error'); return; }
       await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`),
-        { letterhead: compressed, updatedAt: serverTimestamp() }, { merge: true });
-      showToast('Papel timbrado salvo! Os próximos orçamentos já saem nele.', 'success');
+        { logo: compressed, updatedAt: serverTimestamp() }, { merge: true });
+      showToast('Logomarca salva! Os próximos orçamentos já saem com ela.', 'success');
     } catch (error: any) {
-      console.error('Erro no papel timbrado:', error);
+      console.error('Erro na logomarca:', error);
       showToast(error?.message || 'Não consegui processar a imagem.', 'error');
     } finally {
-      setUploadingLetterhead(false);
+      setUploadingLogo(false);
     }
   };
 
-  const removeLetterhead = async () => {
+  const removeLogo = async () => {
     if (!selectedEntity) return;
-    await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`), { letterhead: null }, { merge: true });
-    showToast('Papel timbrado removido.', 'success');
+    await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`), { logo: null }, { merge: true });
+    showToast('Logomarca removida.', 'success');
+  };
+
+  const saveCompany = async () => {
+    if (!selectedEntity) return;
+    setSavingCompany(true);
+    try {
+      await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`), { company, updatedAt: serverTimestamp() }, { merge: true });
+      showToast('Dados da empresa salvos — já saem no PDF.', 'success');
+    } catch {
+      showToast('Erro ao salvar os dados da empresa.', 'error');
+    } finally {
+      setSavingCompany(false);
+    }
   };
 
   const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
 
   /**
-   * Monta o PDF COMPLETO (itens, totais, pagamento) — com ou sem papel timbrado.
-   * Antes, o caminho com timbrado saía só com o cabeçalho, sem valores.
-   * Os totais são recalculados por `quoteTotals` para não depender do que ficou gravado.
+   * Monta o PDF no estilo da PROPOSTA COMERCIAL: topo com logo + dados da empresa,
+   * rodapé de contato, faixa "PROPOSTA COMERCIAL", tabela de itens e totais.
+   * Topo/rodapé são fixos; o usuário só sobe a logo e edita os dados da empresa.
    */
   const buildPDF = (quote: Quote): jsPDF => {
     const doc = new jsPDF();
+    const PW = 210, PH = 297, M = 16;
+    const purple: [number, number, number] = [107, 63, 160];
+    const purpleDark: [number, number, number] = [76, 29, 149];
+    const lav: [number, number, number] = [238, 233, 247];
+    const magenta: [number, number, number] = [176, 32, 150];
+    const gray: [number, number, number] = [90, 90, 96];
     const itens = quote.items || [];
     const totais = quoteTotals(itens);
-    let bodyStartY: number;
+    const rx = PW - M;
 
-    if (letterhead) {
-      // A4 = 210 x 297 mm. O timbrado ocupa a página inteira, como fundo.
-      doc.addImage(letterhead, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`ORÇAMENTO ${quote.quoteNumber}`, 14, 52);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Cliente: ${quote.clientName}`, 14, 60);
-      doc.text(`Data: ${format(parseLocalDate(quote.date), 'dd/MM/yyyy')}`, 150, 60);
-      doc.text(`Validade: ${format(parseLocalDate(quote.validUntil), 'dd/MM/yyyy')}`, 150, 66);
-      bodyStartY = 78;
-    } else {
-      // Cabeçalho azul padrão (sem papel timbrado cadastrado).
-      doc.setFillColor(37, 99, 235);
-      doc.rect(0, 0, 210, 40, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.setFont('helvetica', 'bold');
-      doc.text('AGÊNCIA CIIS', 14, 25);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Soluções Digitais & Gestão Financeira', 14, 32);
-      doc.setFontSize(12);
-      doc.text(`ORÇAMENTO: ${quote.quoteNumber}`, 150, 25);
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('CLIENTE:', 14, 55);
-      doc.setFont('helvetica', 'normal');
-      doc.text(quote.clientName, 14, 62);
-      doc.setFont('helvetica', 'bold');
-      doc.text('DATA:', 150, 55);
-      doc.setFont('helvetica', 'normal');
-      doc.text(format(parseLocalDate(quote.date), 'dd/MM/yyyy'), 150, 62);
-      doc.setFont('helvetica', 'bold');
-      doc.text('VALIDADE:', 150, 72);
-      doc.setFont('helvetica', 'normal');
-      doc.text(format(parseLocalDate(quote.validUntil), 'dd/MM/yyyy'), 150, 79);
-      bodyStartY = 90;
-    }
+    const drawHeader = () => {
+      if (logo) {
+        try {
+          const p: any = (doc as any).getImageProperties(logo);
+          const maxH = 15, maxW = 48;
+          let w = (p.width / p.height) * maxH, h = maxH;
+          if (w > maxW) { w = maxW; h = (p.height / p.width) * maxW; }
+          doc.addImage(logo, 'PNG', M, 9, w, h);
+        } catch { /* logo inválida — ignora */ }
+      } else {
+        doc.setTextColor(...purpleDark); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+        doc.text(company.name || 'Agência Ciis', M, 20);
+      }
+      let ty = 12;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
+      if (company.owner) { doc.text(company.owner, rx, ty, { align: 'right' }); ty += 4; }
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(...gray);
+      if (company.cnpj) { doc.text(`CNPJ ${company.cnpj}`, rx, ty, { align: 'right' }); ty += 4; }
+      if (company.phone) { doc.text(company.phone, rx, ty, { align: 'right' }); ty += 4; }
+      doc.setTextColor(...magenta);
+      if (company.email) { doc.text(company.email, rx, ty, { align: 'right' }); ty += 4; }
+      if (company.site) { doc.text(company.site, rx, ty, { align: 'right' }); ty += 4; }
+      if (company.address) { doc.setTextColor(...gray); doc.text(company.address, rx, ty, { align: 'right', maxWidth: 95 }); }
+      doc.setDrawColor(...purple); doc.setLineWidth(0.8); doc.line(M, 34, rx, 34);
+    };
+    const drawFooter = () => {
+      doc.setDrawColor(212, 212, 216); doc.setLineWidth(0.2); doc.line(M, PH - 16, rx, PH - 16);
+      doc.setFontSize(8); doc.setTextColor(...gray); doc.setFont('helvetica', 'normal');
+      const parts = [company.name, company.phone, company.email, company.site].filter(Boolean).join('   ·   ');
+      doc.text(parts, PW / 2, PH - 11, { align: 'center' });
+    };
 
-    // Tabela de itens (comum aos dois caminhos).
-    const tableData = itens.map(item => [
-      item.description,
-      String(item.quantity),
-      brl(item.unitPrice),
-      brl(itemGross(item)),
-    ]);
+    drawHeader(); drawFooter();
+
+    // Faixa "PROPOSTA COMERCIAL"
+    let y = 44;
+    doc.setFillColor(...purple); doc.rect(M, y, PW - 2 * M, 10, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('PROPOSTA COMERCIAL', M + 4, y + 6.8);
+    y += 14;
+
+    // Caixa de capa (cliente + datas)
+    const boxH = 30;
+    doc.setFillColor(...lav); doc.rect(M, y, PW - 2 * M, boxH, 'F');
+    doc.setTextColor(...purpleDark); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+    doc.text(quote.clientName || 'Cliente', M + 5, y + 12);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(70, 70, 76);
+    doc.text(`Orçamento ${quote.quoteNumber}`, M + 5, y + 19);
+    doc.text(`Emitido em ${format(parseLocalDate(quote.date), 'dd/MM/yyyy')}  ·  válido até ${format(parseLocalDate(quote.validUntil), 'dd/MM/yyyy')}`, M + 5, y + 25);
+    y += boxH + 12;
+
+    // Seção Itens
+    doc.setFillColor(...purple); doc.rect(M, y - 4.5, 1.6, 6, 'F');
+    doc.setTextColor(...purpleDark); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+    doc.text('Itens da proposta', M + 4, y);
+    y += 4;
 
     autoTable(doc, {
-      startY: bodyStartY,
+      startY: y,
       head: [['Descrição', 'Qtd', 'Unitário', 'Total']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [37, 99, 235] },
-      styles: { fontSize: 10 },
-      margin: { left: 14, right: 14 },
+      body: itens.map(it => [it.description || '-', String(it.quantity), brl(it.unitPrice), brl(itemGross(it))]),
+      theme: 'grid',
+      headStyles: { fillColor: purple, textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 246, 251] },
+      styles: { fontSize: 10, cellPadding: 3, lineColor: [230, 225, 240] },
+      columnStyles: { 1: { halign: 'center', cellWidth: 18 }, 2: { halign: 'right', cellWidth: 32 }, 3: { halign: 'right', cellWidth: 32 } },
+      margin: { left: M, right: M, top: 40, bottom: 20 },
+      didDrawPage: () => { drawHeader(); drawFooter(); },
     });
 
-    // Totais.
-    let y = (doc as any).lastAutoTable.finalY + 10;
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Subtotal:', 140, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(brl(totais.subtotal), 170, y);
+    y = (doc as any).lastAutoTable.finalY + 8;
+    const ensure = (need: number) => { if (y + need > PH - 22) { doc.addPage(); drawHeader(); drawFooter(); y = 44; } };
 
-    if (totais.discountTotal > 0) {
-      y += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Desconto:', 140, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`- ${brl(totais.discountTotal)}`, 170, y);
-    }
+    // Totais (caixa à direita)
+    ensure(34);
+    const tbX = rx - 80, tbW = 80, tbH = totais.discountTotal > 0 ? 28 : 20;
+    doc.setFillColor(...lav); doc.rect(tbX, y, tbW, tbH, 'F');
+    doc.setFontSize(10); doc.setTextColor(70, 70, 76); doc.setFont('helvetica', 'normal');
+    doc.text('Subtotal', tbX + 4, y + 7); doc.text(brl(totais.subtotal), tbX + tbW - 4, y + 7, { align: 'right' });
+    let ty2 = y + 7;
+    if (totais.discountTotal > 0) { ty2 += 6; doc.text('Desconto', tbX + 4, ty2); doc.text(`- ${brl(totais.discountTotal)}`, tbX + tbW - 4, ty2, { align: 'right' }); }
+    ty2 += 8;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...purpleDark);
+    doc.text('TOTAL', tbX + 4, ty2); doc.text(brl(totais.total), tbX + tbW - 4, ty2, { align: 'right' });
+    y += tbH + 12;
 
-    y += 10;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(37, 99, 235);
-    doc.text('TOTAL:', 140, y);
-    doc.text(brl(totais.total), 170, y);
+    // Forma de pagamento
+    ensure(22);
+    doc.setFillColor(...purple); doc.rect(M, y - 4.5, 1.6, 6, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...purpleDark);
+    doc.text('Forma de pagamento', M + 4, y);
+    y += 7;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(50, 50, 56);
+    const n = quote.installments || 1;
+    const parc = n > 1 ? ` em ${n}x de ${brl(totais.total / n)}` : ' à vista';
+    const freq = quote.recurrenceConfig?.frequency;
+    const rec = quote.recurrenceConfig?.enabled ? ` (recorrência ${freq === 'weekly' ? 'semanal' : freq === 'yearly' ? 'anual' : 'mensal'})` : '';
+    doc.text(`›  ${quote.paymentMethod || 'A combinar'}${parc}${rec}`, M + 2, y);
+    y += 11;
 
-    // Pagamento e observações.
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('FORMA DE PAGAMENTO:', 14, y + 13);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${quote.paymentMethod || '-'} ${(quote.installments || 1) > 1 ? `(${quote.installments}x)` : ''}`, 14, y + 20);
-
+    // Observações
     if (quote.notes) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('OBSERVAÇÕES:', 14, y + 33);
-      doc.setFont('helvetica', 'normal');
-      doc.text(quote.notes, 14, y + 40, { maxWidth: 180 });
+      ensure(20);
+      doc.setFillColor(...purple); doc.rect(M, y - 4.5, 1.6, 6, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...purpleDark);
+      doc.text('Observações', M + 4, y);
+      y += 7;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(70, 70, 76);
+      doc.text(doc.splitTextToSize(quote.notes, PW - 2 * M), M, y);
     }
 
     return doc;
@@ -636,39 +671,69 @@ export const Quotes: React.FC = () => {
           </div>
         </div>
 
-      {/* Papel timbrado — sai no PDF de todos os orçamentos desta entidade.
-          mt-6: respiro em relação ao título. relative z-10: fica ACIMA dos blobs
-          decorativos (senão o blob engolia o clique do botão "Enviar imagem"). */}
+      {/* Logomarca & dados da empresa — saem no topo/rodapé do PDF de TODO orçamento.
+          O usuário só sobe a logo (PNG) e edita os campos; o layout do PDF é fixo,
+          igual ao modelo de proposta. relative z-10: fica ACIMA dos blobs decorativos. */}
       <div className="relative z-10 mt-6 rounded-2xl bg-surface p-5 border border-line shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-muted text-content-muted">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-surface-muted text-content-muted">
               <ImagePlus className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-black text-content">Papel timbrado</p>
+              <p className="font-black text-content">Logomarca & dados da empresa</p>
               <p className="text-xs text-content-subtle">
-                Envie o A4 com sua logo. Todo orçamento passa a sair nele, pronto para baixar, imprimir ou enviar.
+                Suba sua logo em PNG e ajuste os dados. Todo orçamento sai no padrão da proposta comercial, pronto para baixar, imprimir ou enviar.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {letterhead && (
-              <img src={letterhead} alt="Papel timbrado" className="h-16 w-auto rounded-lg border border-line" />
+            {logo && (
+              <img src={logo} alt="Logomarca" className="h-14 w-auto rounded-lg border border-line bg-white p-1" />
             )}
             <label className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">
-              {uploadingLetterhead ? 'Processando...' : letterhead ? 'Trocar' : 'Enviar imagem'}
+              {uploadingLogo ? 'Processando...' : logo ? 'Trocar logo' : 'Enviar logo (PNG)'}
               <input
-                type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-                disabled={uploadingLetterhead}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleLetterheadUpload(f); e.target.value = ''; }}
+                type="file" accept="image/png" className="hidden"
+                disabled={uploadingLogo}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = ''; }}
               />
             </label>
-            {letterhead && (
-              <button onClick={removeLetterhead}
+            {logo && (
+              <button onClick={removeLogo}
                 className="text-xs font-bold text-content-subtle hover:text-rose-600">Remover</button>
             )}
           </div>
+        </div>
+
+        {/* Campos editáveis que aparecem no cabeçalho/rodapé do PDF. */}
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {([
+            ['owner', 'Nome do responsável'],
+            ['cnpj', 'CNPJ'],
+            ['phone', 'Telefone'],
+            ['email', 'E-mail'],
+            ['site', 'Site'],
+            ['address', 'Endereço'],
+          ] as [keyof CompanyInfo, string][]).map(([field, label]) => (
+            <div key={field}>
+              <label className="mb-1 block text-xs font-bold text-content-subtle">{label}</label>
+              <input
+                value={company[field]}
+                onChange={e => setCompany(c => ({ ...c, [field]: e.target.value }))}
+                className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
+              />
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={saveCompany}
+            disabled={savingCompany}
+            className="rounded-xl bg-content px-5 py-2 text-sm font-bold text-surface hover:opacity-90 disabled:opacity-60"
+          >
+            {savingCompany ? 'Salvando...' : 'Salvar dados da empresa'}
+          </button>
         </div>
       </div>
 
