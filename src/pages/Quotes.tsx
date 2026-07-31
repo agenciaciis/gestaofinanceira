@@ -637,9 +637,9 @@ export const Quotes: React.FC = () => {
         </div>
 
       {/* Papel timbrado — sai no PDF de todos os orçamentos desta entidade.
-          relative z-10: fica ACIMA dos blobs decorativos (senão o blob engolia
-          o clique do botão "Enviar imagem"). */}
-      <div className="relative z-10 rounded-2xl bg-surface p-5 border border-line shadow-sm">
+          mt-6: respiro em relação ao título. relative z-10: fica ACIMA dos blobs
+          decorativos (senão o blob engolia o clique do botão "Enviar imagem"). */}
+      <div className="relative z-10 mt-6 rounded-2xl bg-surface p-5 border border-line shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-muted text-content-muted">
