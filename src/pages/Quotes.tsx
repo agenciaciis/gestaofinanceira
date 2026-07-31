@@ -50,6 +50,7 @@ export const Quotes: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'aguardando' | 'aprovado' | 'reprovado'>('todos');
   const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
   const [viewMode, setViewMode] = useViewMode('orcamentos', 'grid');
   const [logo, setLogo] = useState<string | null>(null);
@@ -662,17 +663,31 @@ export const Quotes: React.FC = () => {
     showToast('Compartilhamento não disponível aqui — baixei o PDF.', 'success');
   };
 
-  const filteredQuotes = quotes.filter(q => 
-    q.clientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    q.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Agrupa os status técnicos em 3 situações do fluxo comercial.
+  // approved/converted = Aprovado (vira Ordem de Serviço); rejected = Reprovado; resto = Aguardando.
+  const statusGroup = (s?: string): 'aguardando' | 'aprovado' | 'reprovado' =>
+    s === 'approved' || s === 'converted' ? 'aprovado' : s === 'rejected' ? 'reprovado' : 'aguardando';
+
+  const filteredQuotes = quotes.filter(q => {
+    const matchBusca = q.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = statusFilter === 'todos' || statusGroup(q.status) === statusFilter;
+    return matchBusca && matchStatus;
+  });
+
+  const contagem = {
+    todos: quotes.length,
+    aguardando: quotes.filter(q => statusGroup(q.status) === 'aguardando').length,
+    aprovado: quotes.filter(q => statusGroup(q.status) === 'aprovado').length,
+    reprovado: quotes.filter(q => statusGroup(q.status) === 'reprovado').length,
+  };
 
   const STATUS_ROTULO: Record<string, { texto: string; cor: string }> = {
-    draft: { texto: 'Rascunho', cor: 'text-content-subtle' },
-    sent: { texto: 'Enviado', cor: 'text-blue-600' },
-    approved: { texto: 'Aprovado', cor: 'text-emerald-600' },
-    converted: { texto: 'Convertido', cor: 'text-emerald-700' },
-    rejected: { texto: 'Recusado', cor: 'text-rose-600' },
+    draft: { texto: 'Aguardando', cor: 'text-amber-600' },
+    sent: { texto: 'Aguardando', cor: 'text-amber-600' },
+    approved: { texto: 'Aprovado (OS)', cor: 'text-emerald-600' },
+    converted: { texto: 'Aprovado · Lançado', cor: 'text-emerald-700' },
+    rejected: { texto: 'Reprovado', cor: 'text-rose-600' },
   };
 
   const colunasOrcamentos: Column<Quote>[] = [
@@ -832,6 +847,27 @@ export const Quotes: React.FC = () => {
         </div>
       </div>
 
+      {/* Filtro por situação — Aprovados = Ordens de Serviço. */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          ['todos', 'Todos', 'text-content'],
+          ['aguardando', 'Aguardando', 'text-amber-600'],
+          ['aprovado', 'Aprovados (OS)', 'text-emerald-600'],
+          ['reprovado', 'Reprovados', 'text-rose-600'],
+        ] as [typeof statusFilter, string, string][]).map(([key, label, cor]) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(key)}
+            className={cn(
+              'rounded-full border px-4 py-1.5 text-xs font-bold transition-all',
+              statusFilter === key ? 'border-primary bg-primary/10 text-primary' : `border-line bg-surface ${cor} hover:bg-surface-muted`
+            )}
+          >
+            {label} <span className="opacity-60">({contagem[key]})</span>
+          </button>
+        ))}
+      </div>
+
       {viewMode === 'list' && (
         <DataTable
           itens={filteredQuotes}
@@ -878,14 +914,12 @@ export const Quotes: React.FC = () => {
                   <span className="text-xs font-black text-primary uppercase tracking-widest">{quote.quoteNumber}</span>
                   <span className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                    quote.status === 'approved' ? "bg-emerald-100 text-emerald-700" :
-                    quote.status === 'sent' ? "bg-blue-100 text-blue-700" :
-                    quote.status === 'rejected' ? "bg-red-100 text-red-700" : "bg-surface-muted text-content-muted"
+                    statusGroup(quote.status) === 'aprovado' ? "bg-emerald-100 text-emerald-700" :
+                    statusGroup(quote.status) === 'reprovado' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
                   )}>
-                    {quote.status === 'draft' ? 'Rascunho' : 
-                     quote.status === 'sent' ? 'Enviado' :
-                     quote.status === 'approved' ? 'Aprovado' :
-                     quote.status === 'rejected' ? 'Recusado' : 'Convertido'}
+                    {quote.status === 'converted' ? 'Aprovado · Lançado' :
+                     statusGroup(quote.status) === 'aprovado' ? 'Aprovado (OS)' :
+                     statusGroup(quote.status) === 'reprovado' ? 'Reprovado' : 'Aguardando'}
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-content">{quote.clientName}</h3>
@@ -971,14 +1005,23 @@ export const Quotes: React.FC = () => {
                     <>
                       {/* Camada invisível: clicar fora fecha o menu. */}
                       <div className="fixed inset-0 z-10" onClick={() => setStatusMenuFor(null)} />
-                      <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-xl border border-line bg-surface p-2 shadow-xl">
-                        <button onClick={() => { updateStatus(quote.id, 'sent'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">Marcar como Enviado</button>
-                        <button onClick={() => { updateStatus(quote.id, 'approved'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">Marcar como Aprovado</button>
-                        <button onClick={() => { updateStatus(quote.id, 'rejected'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">Marcar como Recusado</button>
-                        <div className="my-1 border-t border-line" />
-                        <button onClick={() => convertQuote(quote)} className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Converter em Receita (OS)
-                        </button>
+                      <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-line bg-surface p-2 shadow-xl">
+                        <p className="px-3 py-1 text-[10px] font-black uppercase tracking-widest text-content-subtle">Situação</p>
+                        <button onClick={() => { updateStatus(quote.id, 'sent'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40">⏳ Aguardando</button>
+                        <button onClick={() => { updateStatus(quote.id, 'approved'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">✓ Aprovar (vira OS)</button>
+                        <button onClick={() => { updateStatus(quote.id, 'rejected'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40">✕ Reprovar</button>
+                        {statusGroup(quote.status) === 'aprovado' ? (
+                          <>
+                            <div className="my-1 border-t border-line" />
+                            <button onClick={() => { convertQuote(quote); setStatusMenuFor(null); }} className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> {quote.status === 'converted' ? 'Relançar em Contas a Receber' : 'Lançar em Contas a Receber'}
+                            </button>
+                          </>
+                        ) : (
+                          <p className="mt-1 border-t border-line px-3 pt-2 text-[10px] leading-snug text-content-subtle">
+                            Aprove o orçamento para lançar em Contas a Receber.
+                          </p>
+                        )}
                       </div>
                     </>
                   )}
