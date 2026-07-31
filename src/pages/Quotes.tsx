@@ -56,6 +56,7 @@ export const Quotes: React.FC = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewNumber, setPreviewNumber] = useState('');
+  const [previewData, setPreviewData] = useState<Quote | null>(null);
   const [company, setCompany] = useState<CompanyInfo>(DEFAULT_COMPANY);
   const [savingCompany, setSavingCompany] = useState(false);
 
@@ -617,12 +618,19 @@ export const Quotes: React.FC = () => {
   /** Mostra o PDF numa prévia dentro do próprio sistema (não baixa nem imprime).
    *  Modal com iframe evita o bloqueio de popup do window.open. */
   const previewQuote = (quote: Quote) => {
-    const url = buildPDF(quote).output('bloburl') as unknown as string;
-    setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+    try {
+      const url = buildPDF(quote).output('bloburl') as unknown as string;
+      setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+    } catch (e) {
+      console.error('Erro ao gerar PDF para prévia:', e);
+      setPreviewUrl(null); // segue mostrando a prévia em HTML mesmo se o PDF falhar
+    }
     setPreviewNumber(quote.quoteNumber);
+    setPreviewData(quote);
   };
   const closePreview = () => {
     setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+    setPreviewData(null);
   };
 
   /** Abre o PDF numa aba e dispara a impressão — sai idêntico ao arquivo. */
@@ -1372,50 +1380,126 @@ export const Quotes: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Prévia do PDF dentro do sistema — quase tela cheia. iframe com o
-          bloburl gerado, sem depender de popup (que o navegador bloqueia). */}
-      <AnimatePresence>
-        {previewUrl && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex flex-col bg-black/70 p-3 sm:p-6"
-            onClick={closePreview}
-          >
-            <motion.div
-              initial={{ scale: 0.97, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.97, opacity: 0 }}
-              className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+      {/* Prévia dentro do sistema em HTML (mesmo visual do PDF). Não usa o
+          visualizador de PDF do navegador — que fica preto em navegadores
+          embutidos/sem plugin. O PDF real fica em "Baixar" e "Abrir em nova aba". */}
+      {previewData && (() => {
+        const pd = previewData;
+        const t = quoteTotals(pd.items || []);
+        const freq = pd.recurrenceConfig?.frequency;
+        const freqWord = freq === 'weekly' ? 'semanal' : freq === 'yearly' ? 'anual' : 'mensal';
+        let pay: string;
+        if (pd.recurrenceConfig?.enabled) {
+          const per = freq === 'weekly' ? 'por semana' : freq === 'yearly' ? 'por ano' : 'por mês';
+          const cnt = pd.recurrenceConfig.count || 0;
+          const unit = freq === 'weekly' ? 'semana(s)' : freq === 'yearly' ? 'ano(s)' : 'mês(es)';
+          pay = `${pd.paymentMethod || 'A combinar'} · recorrência ${freqWord} — ${brl(t.total)} ${per}${cnt > 0 ? ` durante ${cnt} ${unit}` : ' por tempo indeterminado'}`;
+        } else {
+          const n = pd.installments || 1;
+          pay = `${pd.paymentMethod || 'A combinar'}${n > 1 ? ` em ${n}x de ${brl(t.total / n)}` : ' à vista'}`;
+        }
+        const PURPLE = '#6b3fa0', DARK = '#4c1d95', LAV = '#eee9f6', MAG = '#b02096';
+        return (
+          <div className="fixed inset-0 z-[60] flex flex-col bg-black/70 p-3 sm:p-6" onClick={closePreview}>
+            <div className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Eye className="h-5 w-5 shrink-0 text-primary" />
-                  <p className="truncate font-black text-content">Prévia — Orçamento {previewNumber}</p>
+                  <Eye className="h-5 w-5 shrink-0" style={{ color: PURPLE }} />
+                  <p className="truncate font-black text-gray-800">Prévia — Orçamento {previewNumber}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a
-                    href={previewUrl} target="_blank" rel="noopener noreferrer"
-                    className="rounded-xl border border-line px-3 py-2 text-sm font-bold text-content-muted hover:bg-surface-muted"
-                  >
-                    Abrir em nova aba
-                  </a>
-                  <a
-                    href={previewUrl} download={`Orcamento_${previewNumber}.pdf`}
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90"
-                  >
-                    Baixar
-                  </a>
-                  <button onClick={closePreview}
-                    className="rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content" title="Fechar">
-                    <X className="h-5 w-5" />
-                  </button>
+                  {previewUrl && (
+                    <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100">Abrir em nova aba</a>
+                  )}
+                  {previewUrl && (
+                    <a href={previewUrl} download={`Orcamento_${previewNumber}.pdf`} className="rounded-xl px-4 py-2 text-sm font-bold text-white" style={{ backgroundColor: PURPLE }}>Baixar</a>
+                  )}
+                  <button onClick={closePreview} className="rounded-xl p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800" title="Fechar"><X className="h-5 w-5" /></button>
                 </div>
               </div>
-              {/* iframe: forma mais confiável de renderizar PDF blob inline no Chrome. */}
-              <iframe src={previewUrl} title="Prévia do orçamento" className="h-full w-full flex-1 border-0 bg-white" />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+              {/* Folha da proposta */}
+              <div className="flex-1 overflow-y-auto bg-gray-100 p-4 sm:p-8">
+                <div className="mx-auto max-w-[820px] bg-white p-6 sm:p-10 shadow-sm text-gray-800">
+                  {/* Cabeçalho */}
+                  <div className="flex items-start justify-between gap-4 border-b-2 pb-3" style={{ borderColor: PURPLE }}>
+                    {logo
+                      ? <img src={logo} alt="logo" className="h-14 w-auto object-contain" />
+                      : <p className="text-xl font-black" style={{ color: DARK }}>{company.name}</p>}
+                    <div className="text-right text-[11px] leading-relaxed">
+                      {company.owner && <p className="font-bold text-gray-900">{company.owner}</p>}
+                      {company.cnpj && <p className="text-gray-500">CNPJ {company.cnpj}</p>}
+                      {company.phone && <p className="text-gray-500">{company.phone}</p>}
+                      {company.email && <p style={{ color: MAG }}>{company.email}</p>}
+                      {company.site && <p style={{ color: MAG }}>{company.site}</p>}
+                      {company.address && <p className="text-gray-500">{company.address}</p>}
+                    </div>
+                  </div>
+
+                  {/* Faixa */}
+                  <div className="mt-6 px-4 py-2.5 text-sm font-black tracking-wide text-white" style={{ backgroundColor: PURPLE }}>PROPOSTA COMERCIAL</div>
+
+                  {/* Capa */}
+                  <div className="mt-4 rounded-sm px-5 py-4" style={{ backgroundColor: LAV }}>
+                    <p className="text-2xl font-black" style={{ color: DARK }}>{pd.clientName || 'Cliente'}</p>
+                    <p className="mt-1 text-sm text-gray-600">Orçamento {pd.quoteNumber}</p>
+                    <p className="text-sm text-gray-600">Emitido em {format(parseLocalDate(pd.date), 'dd/MM/yyyy')} · válido até {format(parseLocalDate(pd.validUntil), 'dd/MM/yyyy')}</p>
+                  </div>
+
+                  {/* Itens */}
+                  <p className="mt-8 mb-2 border-l-4 pl-2 text-lg font-black" style={{ borderColor: PURPLE, color: DARK }}>Itens da proposta</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr style={{ backgroundColor: PURPLE }} className="text-white text-left">
+                          <th className="px-3 py-2 font-bold">Descrição</th>
+                          <th className="px-3 py-2 font-bold text-center w-16">Qtd</th>
+                          <th className="px-3 py-2 font-bold text-right w-28">Unitário</th>
+                          <th className="px-3 py-2 font-bold text-right w-28">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(pd.items || []).map((it, i) => (
+                          <tr key={i} className={i % 2 ? 'bg-[#f8f6fb]' : 'bg-white'}>
+                            <td className="border border-gray-200 px-3 py-2">{it.description || '-'}</td>
+                            <td className="border border-gray-200 px-3 py-2 text-center">{it.quantity}</td>
+                            <td className="border border-gray-200 px-3 py-2 text-right">{brl(it.unitPrice)}</td>
+                            <td className="border border-gray-200 px-3 py-2 text-right">{brl(itemGross(it))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Totais */}
+                  <div className="mt-6 flex justify-end">
+                    <div className="w-72 rounded-sm px-5 py-4" style={{ backgroundColor: LAV }}>
+                      <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>{brl(t.subtotal)}</span></div>
+                      {t.discountTotal > 0 && <div className="mt-1 flex justify-between text-sm text-gray-600"><span>Desconto</span><span>- {brl(t.discountTotal)}</span></div>}
+                      <div className="mt-2 flex justify-between text-lg font-black" style={{ color: DARK }}><span>TOTAL</span><span>{brl(t.total)}</span></div>
+                    </div>
+                  </div>
+
+                  {/* Pagamento */}
+                  <p className="mt-8 mb-1 border-l-4 pl-2 text-base font-black" style={{ borderColor: PURPLE, color: DARK }}>Forma de pagamento</p>
+                  <p className="text-sm text-gray-700">›&nbsp;&nbsp;{pay}</p>
+
+                  {/* Observações */}
+                  {pd.notes && (<>
+                    <p className="mt-6 mb-1 border-l-4 pl-2 text-base font-black" style={{ borderColor: PURPLE, color: DARK }}>Observações</p>
+                    <p className="whitespace-pre-wrap text-sm text-gray-700">{pd.notes}</p>
+                  </>)}
+
+                  {/* Rodapé */}
+                  <div className="mt-10 border-t border-gray-200 pt-3 text-center text-[11px] text-gray-500">
+                    {[company.name, company.phone, company.email, company.site].filter(Boolean).join('   ·   ')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
