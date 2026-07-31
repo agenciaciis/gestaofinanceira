@@ -74,6 +74,8 @@ export const Quotes: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [recurrenceEnabled, setRecurrenceEnabled] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
+  const [recurrenceCount, setRecurrenceCount] = useState(0); // 0 = por tempo indeterminado
+  const [noteTemplates, setNoteTemplates] = useState<string[]>([]);
 
   useEffect(() => {
     if (!selectedEntity) return;
@@ -255,7 +257,8 @@ export const Quotes: React.FC = () => {
         discountTotal,
         total,
         paymentMethod,
-        installments: Number(installments) || 1,
+        // Recorrência não tem parcelamento: se recorrente, força 1.
+        installments: recurrenceEnabled ? 1 : (Number(installments) || 1),
         status: editingQuote?.status || 'draft',
         notes,
         entityId: selectedEntity.id,
@@ -265,7 +268,8 @@ export const Quotes: React.FC = () => {
         recurrenceConfig: {
           enabled: recurrenceEnabled,
           frequency: recurrenceFrequency,
-          startDate: quoteDate
+          startDate: quoteDate,
+          count: recurrenceEnabled ? (Number(recurrenceCount) || 0) : 0
         }
       };
 
@@ -300,6 +304,7 @@ export const Quotes: React.FC = () => {
     setNotes('');
     setRecurrenceEnabled(false);
     setRecurrenceFrequency('monthly');
+    setRecurrenceCount(0);
     setEditingQuote(null);
   };
 
@@ -314,6 +319,7 @@ export const Quotes: React.FC = () => {
     setNotes(quote.notes || '');
     setRecurrenceEnabled(quote.recurrenceConfig?.enabled || false);
     setRecurrenceFrequency(quote.recurrenceConfig?.frequency || 'monthly');
+    setRecurrenceCount(quote.recurrenceConfig?.count || 0);
     setIsModalOpen(true);
   };
 
@@ -394,6 +400,7 @@ export const Quotes: React.FC = () => {
       const d = snap.data() || {};
       setLogo((d.logo as string) || null);
       setCompany({ ...DEFAULT_COMPANY, ...((d.company as Partial<CompanyInfo>) || {}) });
+      setNoteTemplates((d.noteTemplates as string[]) || []);
     }, e => handleFirestoreError(e, OperationType.GET, `entities/${selectedEntity.id}/config/branding`));
   }, [selectedEntity]);
 
@@ -435,6 +442,24 @@ export const Quotes: React.FC = () => {
     } finally {
       setSavingCompany(false);
     }
+  };
+
+  /** Observações salvas: modelos reutilizáveis guardados em config/branding. */
+  const saveNoteTemplate = async () => {
+    const t = notes.trim();
+    if (!t) { showToast('Escreva a observação antes de salvar como modelo.', 'error'); return; }
+    if (!selectedEntity) return;
+    if (noteTemplates.includes(t)) { showToast('Essa observação já está salva.', 'error'); return; }
+    const next = [...noteTemplates, t];
+    setNoteTemplates(next);
+    await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`), { noteTemplates: next }, { merge: true });
+    showToast('Observação salva como modelo.', 'success');
+  };
+  const deleteNoteTemplate = async (index: number) => {
+    if (!selectedEntity) return;
+    const next = noteTemplates.filter((_, i) => i !== index);
+    setNoteTemplates(next);
+    await setDoc(doc(db, `entities/${selectedEntity.id}/config/branding`), { noteTemplates: next }, { merge: true });
   };
 
   const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
@@ -550,11 +575,20 @@ export const Quotes: React.FC = () => {
     doc.text('Forma de pagamento', M + 4, y);
     y += 7;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(50, 50, 56);
-    const n = quote.installments || 1;
-    const parc = n > 1 ? ` em ${n}x de ${brl(totais.total / n)}` : ' à vista';
     const freq = quote.recurrenceConfig?.frequency;
-    const rec = quote.recurrenceConfig?.enabled ? ` (recorrência ${freq === 'weekly' ? 'semanal' : freq === 'yearly' ? 'anual' : 'mensal'})` : '';
-    doc.text(`›  ${quote.paymentMethod || 'A combinar'}${parc}${rec}`, M + 2, y);
+    const freqLabel = freq === 'weekly' ? 'semanal' : freq === 'yearly' ? 'anual' : 'mensal';
+    let pgto: string;
+    if (quote.recurrenceConfig?.enabled) {
+      // Recorrência NÃO tem parcelamento — cobrança por período.
+      const per = freq === 'weekly' ? 'por semana' : freq === 'yearly' ? 'por ano' : 'por mês';
+      const cnt = quote.recurrenceConfig.count || 0;
+      const dur = cnt > 0 ? ` durante ${cnt} ${freqLabel === 'anual' ? 'ano(s)' : freqLabel === 'semanal' ? 'semana(s)' : 'mês(es)'}` : ' por tempo indeterminado';
+      pgto = `${quote.paymentMethod || 'A combinar'} · recorrência ${freqLabel} — ${brl(totais.total)} ${per}${dur}`;
+    } else {
+      const n = quote.installments || 1;
+      pgto = `${quote.paymentMethod || 'A combinar'}${n > 1 ? ` em ${n}x de ${brl(totais.total / n)}` : ' à vista'}`;
+    }
+    doc.text(`›  ${pgto}`, M + 2, y);
     y += 11;
 
     // Observações
@@ -572,7 +606,12 @@ export const Quotes: React.FC = () => {
   };
 
   const exportPDF = (quote: Quote) => {
-    buildPDF(quote).save(`Orcamento_${quote.quoteNumber}.pdf`);
+    try {
+      buildPDF(quote).save(`Orcamento_${quote.quoteNumber}.pdf`);
+    } catch (e: any) {
+      console.error('Erro ao gerar PDF:', e);
+      showToast('Não consegui gerar o PDF. Recarregue a página (Cmd+Shift+R) e tente de novo.', 'error');
+    }
   };
 
   /** Mostra o PDF numa prévia dentro do próprio sistema (não baixa nem imprime).
@@ -588,10 +627,17 @@ export const Quotes: React.FC = () => {
 
   /** Abre o PDF numa aba e dispara a impressão — sai idêntico ao arquivo. */
   const printQuote = (quote: Quote) => {
-    const pdf = buildPDF(quote);
-    pdf.autoPrint();
-    const url = pdf.output('bloburl');
-    window.open(url as unknown as string, '_blank');
+    try {
+      const pdf = buildPDF(quote);
+      pdf.autoPrint();
+      const url = pdf.output('bloburl');
+      const w = window.open(url as unknown as string, '_blank');
+      // Popup bloqueado: cai na prévia embutida (o usuário imprime de lá com Ctrl+P).
+      if (!w) previewQuote(quote);
+    } catch (e: any) {
+      console.error('Erro ao imprimir:', e);
+      showToast('Não consegui abrir a impressão. Recarregue a página e tente de novo.', 'error');
+    }
   };
 
   /** Usa o compartilhamento nativo (celular). Sem suporte, baixa o arquivo. */
@@ -1060,6 +1106,9 @@ export const Quotes: React.FC = () => {
                       </button>
                     </div>
                   </div>
+                  <p className="-mt-2 text-xs text-content-subtle">
+                    Digite a descrição e o valor livremente. Puxar do catálogo é opcional — dá pra criar o item na hora.
+                  </p>
 
                   <div className="space-y-3">
                     {quoteItems.map((item, index) => (
@@ -1155,7 +1204,7 @@ export const Quotes: React.FC = () => {
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Forma</label>
-                        <select 
+                        <select
                           value={paymentMethod}
                           onChange={(e) => setPaymentMethod(e.target.value)}
                           className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
@@ -1168,14 +1217,23 @@ export const Quotes: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Parcelas</label>
-                        <input 
-                          type="number"
-                          min="1"
-                          max="12"
-                          value={installments}
-                          onChange={(e) => setInstallments(parseInt(e.target.value))}
-                          className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
-                        />
+                        {recurrenceEnabled ? (
+                          <p className="rounded-xl border border-dashed border-line px-4 py-2.5 text-xs text-content-subtle">
+                            Recorrência não tem parcelamento.
+                          </p>
+                        ) : (
+                          <input
+                            type="number"
+                            min="1"
+                            max="12"
+                            value={Number.isFinite(installments) ? installments : 1}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value);
+                              setInstallments(Number.isFinite(v) && v > 0 ? v : 1);
+                            }}
+                            className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1183,9 +1241,13 @@ export const Quotes: React.FC = () => {
                   <div className="rounded-3xl bg-canvas p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-black uppercase tracking-widest text-content-subtle">Recorrência</h4>
-                      <button 
+                      <button
                         type="button"
-                        onClick={() => setRecurrenceEnabled(!recurrenceEnabled)}
+                        onClick={() => {
+                          const next = !recurrenceEnabled;
+                          setRecurrenceEnabled(next);
+                          if (next) setInstallments(1); // recorrência não parcela
+                        }}
                         className={cn(
                           "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
                           recurrenceEnabled ? "bg-primary" : "bg-gray-200"
@@ -1197,11 +1259,11 @@ export const Quotes: React.FC = () => {
                         )} />
                       </button>
                     </div>
-                    {recurrenceEnabled && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                    {recurrenceEnabled ? (
+                      <div className="grid gap-4 sm:grid-cols-2 animate-in fade-in slide-in-from-top-2">
                         <div>
                           <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">Frequência</label>
-                          <select 
+                          <select
                             value={recurrenceFrequency}
                             onChange={(e) => setRecurrenceFrequency(e.target.value as any)}
                             className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
@@ -1211,19 +1273,58 @@ export const Quotes: React.FC = () => {
                             <option value="yearly">Anual</option>
                           </select>
                         </div>
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-content-subtle mb-1 ml-1">
+                            Duração {recurrenceFrequency === 'weekly' ? '(semanas)' : recurrenceFrequency === 'yearly' ? '(anos)' : '(meses)'}
+                          </label>
+                          <input
+                            type="number" min="0"
+                            value={Number.isFinite(recurrenceCount) ? recurrenceCount : 0}
+                            onChange={(e) => { const v = parseInt(e.target.value); setRecurrenceCount(Number.isFinite(v) && v > 0 ? v : 0); }}
+                            placeholder="0"
+                            className="w-full rounded-xl border border-line px-4 py-2.5 outline-none focus:border-primary bg-surface"
+                          />
+                          <p className="mt-1 text-[10px] text-content-subtle ml-1">0 = por tempo indeterminado</p>
+                        </div>
                       </div>
+                    ) : (
+                      <p className="text-xs text-content-subtle">Ative para cobrança periódica (assinatura), sem parcelamento.</p>
                     )}
                   </div>
                 </div>
 
-                {/* Notes */}
+                {/* Notes + modelos salvos reutilizáveis */}
                 <div>
-                  <label className="block text-sm font-black uppercase tracking-widest text-content-subtle mb-2 ml-1">Observações</label>
-                  <textarea 
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-sm font-black uppercase tracking-widest text-content-subtle ml-1">Observações</label>
+                    <button
+                      type="button"
+                      onClick={saveNoteTemplate}
+                      className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20"
+                    >
+                      + Salvar como modelo
+                    </button>
+                  </div>
+
+                  {noteTemplates.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      <span className="text-[11px] font-bold text-content-subtle self-center">Modelos:</span>
+                      {noteTemplates.map((t, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs text-content">
+                          <button type="button" onClick={() => setNotes(t)} title={t}
+                            className="max-w-[220px] truncate hover:text-primary">{t}</button>
+                          <button type="button" onClick={() => deleteNoteTemplate(i)} title="Apagar modelo"
+                            className="text-content-subtle hover:text-rose-600">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     className="w-full rounded-2xl border border-line px-4 py-3 outline-none focus:border-primary transition-all min-h-[100px]"
-                    placeholder="Condições especiais, prazos de entrega..."
+                    placeholder="Condições especiais, prazos de entrega... (clique num modelo acima para reutilizar)"
                   />
                 </div>
 
@@ -1292,6 +1393,12 @@ export const Quotes: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <a
+                    href={previewUrl} target="_blank" rel="noopener noreferrer"
+                    className="rounded-xl border border-line px-3 py-2 text-sm font-bold text-content-muted hover:bg-surface-muted"
+                  >
+                    Abrir em nova aba
+                  </a>
+                  <a
                     href={previewUrl} download={`Orcamento_${previewNumber}.pdf`}
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90"
                   >
@@ -1303,15 +1410,8 @@ export const Quotes: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <object data={previewUrl} type="application/pdf" className="h-full w-full flex-1 bg-white">
-                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-                  <p className="text-sm text-content-muted">Seu navegador não abriu a prévia embutida.</p>
-                  <a href={previewUrl} target="_blank" rel="noopener noreferrer"
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">
-                    Abrir PDF em nova aba
-                  </a>
-                </div>
-              </object>
+              {/* iframe: forma mais confiável de renderizar PDF blob inline no Chrome. */}
+              <iframe src={previewUrl} title="Prévia do orçamento" className="h-full w-full flex-1 border-0 bg-white" />
             </motion.div>
           </motion.div>
         )}

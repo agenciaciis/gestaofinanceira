@@ -300,5 +300,7 @@ export interface Quote {
     enabled: boolean;
     frequency: 'monthly' | 'weekly' | 'yearly';
     startDate: string;
+    /** Nº de cobranças da recorrência. 0 = por tempo indeterminado. */
+    count?: number;
   };
 }
