@@ -536,7 +536,7 @@ export const FinancialHealth: React.FC = () => {
               {aiAdvice || "Clique no botão acima para receber uma análise personalizada da sua situação financeira atual."}
             </div>
           </div>
-          <div className="absolute -right-8 -top-8 h-32 w-32 bg-indigo-200/20 dark:bg-white/10 rounded-full blur-2xl" />
+          <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 bg-indigo-200/20 dark:bg-white/10 rounded-full blur-2xl" />
         </div>
       </div>
 

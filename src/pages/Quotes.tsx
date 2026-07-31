@@ -618,8 +618,10 @@ export const Quotes: React.FC = () => {
           </div>
         </div>
 
-      {/* Papel timbrado — sai no PDF de todos os orçamentos desta entidade */}
-      <div className="rounded-2xl bg-surface p-5 border border-line shadow-sm">
+      {/* Papel timbrado — sai no PDF de todos os orçamentos desta entidade.
+          relative z-10: fica ACIMA dos blobs decorativos (senão o blob engolia
+          o clique do botão "Enviar imagem"). */}
+      <div className="relative z-10 rounded-2xl bg-surface p-5 border border-line shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-muted text-content-muted">
@@ -653,9 +655,9 @@ export const Quotes: React.FC = () => {
       </div>
 
         
-        {/* Decorative elements */}
-        <div className="absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-blue-400/20 blur-2xl" />
+        {/* Decorative elements — pointer-events-none para NUNCA interceptar cliques. */}
+        <div className="pointer-events-none absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-blue-400/20 blur-2xl" />
       </div>
 
       {/* Search & Filters */}

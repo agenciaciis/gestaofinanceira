@@ -107,26 +107,33 @@ async function seedEntity(uid: string, email: string, name: string, type: 'PF' |
       clientIds.push({ id, name: c.name, mensal: c.mensal });
     });
 
-    // ---------- fornecedores ----------
+    // ---------- fornecedores (genéricos + específicos) ----------
     [
       { name: 'Contabilidade Exata', category: 'Contador' },
       { name: 'Adobe Creative Cloud', category: 'Software' },
-      { name: 'Meta Ads', category: 'Mídia' },
+      { name: 'Meta (Facebook/Instagram Ads)', category: 'Mídia' },
+      { name: 'Google Ads', category: 'Mídia' },
       { name: 'Freelancer Designer', category: 'Funcionário' },
-      { name: 'Hostgator', category: 'Hospedagem' },
+      { name: 'Freelancer Redator', category: 'Funcionário' },
+      { name: 'Hostinger (Hospedagem)', category: 'Hospedagem' },
+      { name: 'Canva Pro', category: 'Software' },
+      { name: 'Banco do Brasil', category: 'Banco' },
+      { name: 'Cartório / Despachante', category: 'Serviços' },
     ].forEach((s, i) => add(P('suppliers'), { ...base, name: s.name, category: s.category, cnpjOrCpf: '', email: '', phone: '', pixKey: `pix${i}@${s.name.toLowerCase().replace(/[^a-z]/g, '')}.com`, createdAt: serverTimestamp() }));
 
-    // ---------- serviços e planos ----------
+    // ---------- serviços e planos (o que a agência realmente vende) ----------
     const servicos = [
-      { name: 'Gestão de Tráfego', basePrice: 1500, category: 'Marketing' },
-      { name: 'Social Media', basePrice: 1200, category: 'Marketing' },
-      { name: 'Criação de Site', basePrice: 3500, category: 'Desenvolvimento' },
-      { name: 'Branding / Identidade Visual', basePrice: 2800, category: 'Design' },
-      { name: 'Consultoria de Marketing', basePrice: 800, category: 'Consultoria' },
+      { name: 'Gestão de Redes Sociais', basePrice: 1200, category: 'Social Media' },
+      { name: 'Tráfego Pago — Meta Ads', basePrice: 1500, category: 'Tráfego' },
+      { name: 'Tráfego Pago — Google Ads', basePrice: 1500, category: 'Tráfego' },
+      { name: 'Criação de Site Institucional', basePrice: 3500, category: 'Sites' },
+      { name: 'Site E-commerce', basePrice: 6500, category: 'Sites' },
+      { name: 'Landing Page', basePrice: 1800, category: 'Sites' },
+      { name: 'Identidade Visual / Logomarca', basePrice: 2800, category: 'Design' },
     ];
     const servIds = servicos.map(s => add(P('services'), { ...base, name: s.name, description: '', basePrice: s.basePrice, category: s.category, createdAt: serverTimestamp() }));
-    add(P('plans'), { ...base, name: 'Plano Start', description: 'Social + Tráfego', price: 2500, billingCycle: 'monthly', services: [servIds[0], servIds[1]], createdAt: serverTimestamp() });
-    add(P('plans'), { ...base, name: 'Plano Full', description: 'Tudo incluso', price: 4500, billingCycle: 'monthly', services: servIds.slice(0, 4), createdAt: serverTimestamp() });
+    add(P('plans'), { ...base, name: 'Presença Digital', description: 'Redes Sociais + Tráfego Meta', price: 2500, billingCycle: 'monthly', services: [servIds[0], servIds[1]], createdAt: serverTimestamp() });
+    add(P('plans'), { ...base, name: 'Aceleração Completa', description: 'Redes + Meta + Google + Site', price: 4900, billingCycle: 'monthly', services: [servIds[0], servIds[1], servIds[2], servIds[3]], createdAt: serverTimestamp() });
 
     // ---------- produtos digitais ----------
     [

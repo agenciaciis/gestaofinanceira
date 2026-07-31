@@ -167,17 +167,6 @@ export const Clients: React.FC = () => {
     return () => unsubscribes.forEach(unsub => unsub());
   }, [entities, filterType]);
 
-  // Totais por cliente derivados de partyTotals (a MESMA fonte usada na visão
-  // em lista) — antes o grid tinha uma conta inline divergente.
-  const clientTotals = useMemo(() => {
-    const map: Record<string, { received: number; pending: number }> = {};
-    const ids = new Set(transactions.map(t => t.clientId).filter(Boolean) as string[]);
-    for (const id of ids) {
-      const pt = partyTotals(transactions, id);
-      map[id] = { received: pt.recebido, pending: pt.aReceber };
-    }
-    return map;
-  }, [transactions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -340,18 +329,11 @@ export const Clients: React.FC = () => {
     { chave: 'doc', titulo: 'CNPJ / CPF', escondeNoMobile: true, render: (c) => c.cnpj || c.cpf || '—' },
     { chave: 'contato', titulo: 'Contato', escondeNoMobile: true, render: (c) => c.email || c.responsibleName || '—' },
     {
-      chave: 'recebido', titulo: 'Já recebido', numerico: true,
-      render: (c) => <span className="font-bold text-emerald-600">{brl(partyTotals(transactions, c.id).recebido)}</span>,
+      chave: 'acessos', titulo: 'Acessos', numerico: true, escondeNoMobile: true,
+      render: (c) => String(Object.values(c.credentials || {}).filter(v => typeof v === 'string' && v.trim()).length),
     },
     {
-      chave: 'areceber', titulo: 'A receber', numerico: true,
-      render: (c) => {
-        const v = partyTotals(transactions, c.id).aReceber;
-        return <span className={cn('font-bold', v > 0 ? 'text-blue-600' : 'text-content-subtle')}>{brl(v)}</span>;
-      },
-    },
-    {
-      chave: 'contratos', titulo: 'Contratos', numerico: true, escondeNoMobile: true,
+      chave: 'contratos', titulo: 'Pacotes', numerico: true, escondeNoMobile: true,
       render: (c) => String(c.contracts?.filter(ct => ct.status !== 'inactive').length || 0),
     },
   ];
@@ -500,23 +482,6 @@ export const Clients: React.FC = () => {
                     {client.credentials?.wordpress && <Layout className="h-4 w-4 text-content-muted" />}
                   </div>
                 </div>
-
-                {(clientTotals[client.id]?.received || clientTotals[client.id]?.pending) ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-lg bg-emerald-50 p-2.5">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-500">Recebido</p>
-                      <p className="text-sm font-black text-emerald-700">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(clientTotals[client.id]?.received || 0)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-amber-50 p-2.5">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500">A Receber</p>
-                      <p className="text-sm font-black text-amber-700">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(clientTotals[client.id]?.pending || 0)}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
 
                 {client.contracts && client.contracts.length > 0 && (
                   <div className="space-y-2">

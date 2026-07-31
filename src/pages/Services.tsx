@@ -308,8 +308,8 @@ export const Services: React.FC = () => {
         </div>
         
         {/* Decorative elements */}
-        <div className="absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-purple-400/20 blur-2xl" />
+        <div className="pointer-events-none absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-purple-400/20 blur-2xl" />
       </div>
 
       {/* Tabs & Search */}
