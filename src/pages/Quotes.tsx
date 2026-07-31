@@ -1418,9 +1418,9 @@ export const Quotes: React.FC = () => {
                 </div>
               </div>
 
-              {/* Folha da proposta */}
-              <div className="flex-1 overflow-y-auto bg-gray-100 p-4 sm:p-8">
-                <div className="mx-auto max-w-[820px] bg-white p-6 sm:p-10 shadow-sm text-gray-800">
+              {/* Folha da proposta — tamanho A4 (210×297mm ≈ 794×1123px a 96dpi). */}
+              <div className="flex-1 overflow-auto bg-gray-100 p-4 sm:p-8">
+                <div className="mx-auto w-[794px] max-w-full min-h-[1123px] bg-white px-[56px] py-[56px] shadow-sm text-gray-800">
                   {/* Cabeçalho */}
                   <div className="flex items-start justify-between gap-4 border-b-2 pb-3" style={{ borderColor: PURPLE }}>
                     {logo
