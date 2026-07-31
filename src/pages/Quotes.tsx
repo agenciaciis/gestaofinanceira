@@ -25,7 +25,7 @@ import {
   Calendar,
   DollarSign,
   Briefcase
-, Share2, ImagePlus } from 'lucide-react';
+, Share2, ImagePlus, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { parseLocalDate } from '../lib/finance';
@@ -570,6 +570,12 @@ export const Quotes: React.FC = () => {
     buildPDF(quote).save(`Orcamento_${quote.quoteNumber}.pdf`);
   };
 
+  /** Abre o PDF numa aba só para VER como ficou — não baixa nem imprime. */
+  const previewQuote = (quote: Quote) => {
+    const url = buildPDF(quote).output('bloburl');
+    window.open(url as unknown as string, '_blank');
+  };
+
   /** Abre o PDF numa aba e dispara a impressão — sai idêntico ao arquivo. */
   const printQuote = (quote: Quote) => {
     const pdf = buildPDF(quote);
@@ -763,6 +769,10 @@ export const Quotes: React.FC = () => {
           colunas={colunasOrcamentos}
           acoes={(q) => (
             <>
+              <button onClick={() => previewQuote(q)} title="Visualizar"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <Eye className="h-4 w-4" />
+              </button>
               <button onClick={() => exportPDF(q)} title="Baixar PDF"
                 className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
                 <Download className="h-4 w-4" />
@@ -836,6 +846,13 @@ export const Quotes: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 border-t pt-4 sm:border-t-0 sm:pt-0 sm:pl-6 sm:border-l">
+                <button
+                  onClick={() => previewQuote(quote)}
+                  className="rounded-xl p-2.5 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
+                  title="Visualizar"
+                >
+                  <Eye className="h-5 w-5" />
+                </button>
                 <button
                   onClick={() => exportPDF(quote)}
                   className="rounded-xl p-2.5 text-content-subtle hover:bg-canvas hover:text-primary transition-all"
