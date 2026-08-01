@@ -285,32 +285,56 @@ export const Reports: React.FC = () => {
     doc.text(`Entidade: ${filterType === 'ALL' ? 'Consolidado' : filterType}`, 14, 32);
     doc.text(`Data de Geração: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 38);
 
-    // Summary Table
+    const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
+
+    // Resumo — realizado E projetado (como aparece na tela).
     autoTable(doc, {
       startY: 45,
-      head: [['Resumo', 'Valor']],
+      head: [['Resumo', 'Realizado', 'Projetado (se tudo confirmar)']],
       body: [
-        ['Receitas Realizadas', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.income)],
-        ['Despesas Pagas', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.expense)],
-        ['Saldo do Período', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.balance)],
+        ['Receitas', brl(stats.income), brl(stats.projectedIncome)],
+        ['Despesas', brl(stats.expense), brl(stats.projectedExpense)],
+        ['Saldo do período', brl(stats.balance), brl(stats.projectedBalance)],
       ],
       theme: 'striped',
-      headStyles: { fillColor: [37, 99, 235] }
+      headStyles: { fillColor: [37, 99, 235] },
     });
 
-    // Categories Table
-    const categoryRows = expenseCategoryData.map(cat => [
-      cat.name,
-      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cat.value),
-      `${(stats.expense > 0 ? (cat.value / stats.expense) * 100 : 0).toFixed(1)}%`
-    ]);
+    // Despesas por categoria.
+    if (expenseCategoryData.length) {
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 10,
+        head: [['Despesas por categoria', 'Valor', '%']],
+        body: expenseCategoryData.map(cat => [
+          cat.name, brl(cat.value),
+          `${(stats.expense > 0 ? (cat.value / stats.expense) * 100 : 0).toFixed(1)}%`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [239, 68, 68] },
+      });
+    }
 
+    // Receitas por categoria (faltava no PDF).
+    if (incomeCategoryData.length) {
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 10,
+        head: [['Receitas por categoria', 'Valor', '%']],
+        body: incomeCategoryData.map(cat => [
+          cat.name, brl(cat.value),
+          `${(stats.income > 0 ? (cat.value / stats.income) * 100 : 0).toFixed(1)}%`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [16, 185, 129] },
+      });
+    }
+
+    // Evolução dos últimos 6 meses (realizado).
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 10,
-      head: [['Categoria (Despesas)', 'Valor', '%']],
-      body: categoryRows,
-      theme: 'grid',
-      headStyles: { fillColor: [239, 68, 68] }
+      head: [['Mês', 'Receitas', 'Despesas', 'Saldo']],
+      body: monthlyTrend.map(m => [m.name, brl(m.income), brl(m.expense), brl(m.balance)]),
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] },
     });
 
     doc.save(`relatorio_${MONTHS[selectedMonth]}_${selectedYear}.pdf`);
