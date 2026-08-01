@@ -9,7 +9,7 @@ import { ColorField } from '../components/ColorField';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { normalizeHex, readableForeground } from '../lib/brandColors';
-import { computeBalances } from '../lib/finance';
+import { computeBalances, parseLocalDate } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 
 export const BankAccounts: React.FC = () => {
@@ -65,6 +65,17 @@ export const BankAccounts: React.FC = () => {
   const balances = computeBalances(accounts, transactions);
   const getBalance = (account: BankAccount) =>
     account.id in balances ? balances[account.id] : (account.currentBalance ?? account.initialBalance ?? 0);
+
+  // Última movimentação concluída que afetou a conta (com o sinal correto p/ ela).
+  const ultimaMovDe = (account: BankAccount) => {
+    const movs = transactions
+      .filter(t => (t.accountId === account.id || t.toAccountId === account.id) && t.status === 'completed')
+      .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
+    const t = movs[0];
+    if (!t) return null;
+    const sinal = t.type === 'income' ? 1 : t.type === 'expense' ? -1 : (t.toAccountId === account.id ? 1 : -1);
+    return { date: t.date, desc: t.description || (t.type === 'transfer' ? 'Transferência' : 'Lançamento'), value: sinal * (Number(t.amount) || 0) };
+  };
 
   const summary = accounts.reduce((acc, curr) => {
     const bal = getBalance(curr);
@@ -300,7 +311,7 @@ export const BankAccounts: React.FC = () => {
               >
                 <Landmark className="h-6 w-6" />
               </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => handleEdit(account)}
                   className="p-2 rounded-lg hover:bg-surface-muted text-content-subtle hover:text-primary transition-colors"
@@ -329,6 +340,19 @@ export const BankAccounts: React.FC = () => {
                   {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(getBalance(account))}
                 </p>
               </div>
+              {/* Última atualização de saldo — mostra que o saldo é vivo e abate os lançamentos. */}
+              {(() => {
+                const m = ultimaMovDe(account);
+                if (!m) return <p className="mt-3 text-[11px] text-content-subtle">Sem movimentações ainda</p>;
+                return (
+                  <p className="mt-3 text-[11px] text-content-subtle">
+                    Última mov.: {m.date.slice(8, 10)}/{m.date.slice(5, 7)} · {m.desc.slice(0, 22)}{' '}
+                    <span className={cn('font-bold', m.value < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                      {m.value < 0 ? '−' : '+'}{brl(Math.abs(m.value))}
+                    </span>
+                  </p>
+                );
+              })()}
             </div>
           </motion.div>
         ))}
