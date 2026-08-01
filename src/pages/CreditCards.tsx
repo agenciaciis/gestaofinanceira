@@ -142,14 +142,18 @@ export const CreditCards: React.FC = () => {
     const ent = payingCard.entityId;
     const owner = entities.find(e => e.id === ent);
     try {
+      // QUITAÇÃO (transferência), não uma nova despesa: a compra no cartão já foi
+      // contada como despesa quando feita. Assim o saldo do banco cai, mas o valor
+      // NÃO conta em dobro nas somas de despesa (que filtram type === 'expense').
       await addDoc(collection(db, `entities/${ent}/transactions`), {
         description: `Pagamento fatura ${payingCard.name}`,
         amount,
-        type: 'expense',
+        type: 'transfer',
         status: 'completed',
         date: payDate,
-        accountId: payAccountId,
+        accountId: payAccountId, // origem: o dinheiro sai desta conta
         categoryId: 'cartao',
+        cardPaymentFor: payingCard.id, // rastreio: quitação de qual cartão
         entityId: ent,
         ownerUid: owner?.ownerUid,
         collaboratorsEmails: owner?.collaboratorsEmails || [],
@@ -884,7 +888,7 @@ export const CreditCards: React.FC = () => {
             </button>
             <h3 className="text-xl font-bold text-content pr-10">Pagar fatura — {payingCard.name}</h3>
             <p className="mt-1 text-sm text-content-subtle">
-              Isto cria uma despesa na conta escolhida (o saldo do banco cai) e marca a fatura atual como paga, liberando o limite do cartão.
+              Registra a saída do dinheiro da conta (quitação da fatura) — o saldo do banco cai e o limite do cartão é liberado. Não conta como nova despesa: as compras no cartão já foram contadas quando feitas.
             </p>
             <div className="mt-6 space-y-4">
               <div>

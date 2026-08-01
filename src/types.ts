@@ -88,6 +88,8 @@ export interface Transaction {
   /** Gasto de cartão cuja fatura já foi paga: sai do "utilizado"/fatura atual. */
   settled?: boolean;
   settledAt?: string;
+  /** Transferência que é quitação de fatura: id do cartão pago (rastreio). */
+  cardPaymentFor?: string;
   entityId: string;
   paidAt?: string; // data em que foi efetivamente pago (YYYY-MM-DD)
   // Forma de pagamento (além de conta/cartão): pix, boleto, dinheiro, transferência...
