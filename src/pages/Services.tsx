@@ -507,12 +507,13 @@ export const Services: React.FC = () => {
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <motion.div 
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-4xl rounded-3xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
+              onClick={e => e.stopPropagation()}
+              className="relative w-full max-w-4xl rounded-3xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
             >
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-bold text-content">

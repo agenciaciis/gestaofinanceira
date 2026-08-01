@@ -16,7 +16,8 @@ import {
   ArrowDownLeft,
   Search,
   Filter,
-  Pencil
+  Pencil,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -314,14 +315,19 @@ export const Debts: React.FC = () => {
       {/* Modal de edição de pendência */}
       <AnimatePresence>
         {editingDebt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm" onClick={() => setEditingDebt(null)}>
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-2xl rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl max-h-[92vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+              className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl"
             >
-              <h3 className="text-xl font-black text-content dark:text-gray-100">Corrigir Pendência</h3>
+              <button type="button" aria-label="Fechar" onClick={() => setEditingDebt(null)}
+                className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
+                <X className="h-5 w-5" />
+              </button>
+              <h3 className="text-xl font-black text-content dark:text-gray-100 pr-10">Corrigir Pendência</h3>
               <p className="text-sm text-content-subtle mb-6">Ajuste o valor, a data ou a descrição lançada.</p>
               <form onSubmit={handleSaveEdit} className="space-y-4">
                 <div>

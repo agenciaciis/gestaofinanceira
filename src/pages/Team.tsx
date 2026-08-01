@@ -222,11 +222,12 @@ export const Team: React.FC = () => {
 
       {/* Invite Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div 
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
+          <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-md rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl border border-line dark:border-gray-800"
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl bg-surface dark:bg-gray-900 p-8 shadow-2xl border border-line dark:border-gray-800"
           >
             <div className="flex items-center justify-between mb-8">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">

@@ -429,12 +429,13 @@ export const CreditCards: React.FC = () => {
 
       <AnimatePresence>
         {selectedCardForInvoices && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <motion.div 
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setSelectedCardForInvoices(null)}>
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-4xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
+              onClick={e => e.stopPropagation()}
+              className="relative w-full max-w-4xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[92vh] overflow-hidden flex flex-col"
             >
               <div className="mb-6 flex items-center justify-between">
                 <div>
@@ -588,12 +589,13 @@ export const CreditCards: React.FC = () => {
         )}
 
         {isCompareModalOpen && comparingCard && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <motion.div 
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setIsCompareModalOpen(false)}>
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-3xl rounded-3xl bg-surface p-8 shadow-2xl"
+              onClick={e => e.stopPropagation()}
+              className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl bg-surface p-8 shadow-2xl"
             >
               <div className="mb-6 flex items-center justify-between">
                 <div>
@@ -649,13 +651,18 @@ export const CreditCards: React.FC = () => {
       </AnimatePresence>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <motion.div 
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => { resetForm(); setIsModalOpen(false); }}>
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-2xl rounded-2xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-3xl rounded-2xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
           >
-            <h3 className="text-xl font-bold text-content">
+            <button type="button" aria-label="Fechar" onClick={() => { resetForm(); setIsModalOpen(false); }}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-bold text-content pr-10">
               {editingCard ? 'Editar Cartão' : 'Novo Cartão de Crédito'}
             </h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">

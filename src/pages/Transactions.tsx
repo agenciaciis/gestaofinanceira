@@ -4,7 +4,7 @@ import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, where, writeBatch, doc, updateDoc, deleteDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Transaction, BankAccount, CreditCard, Client, Goal } from '../types';
-import { Plus, ArrowUpCircle, ArrowDownCircle, Search, Filter, Calendar, Tag, Wallet, CreditCard as CardIcon, ArrowRightLeft, Repeat, Download, CheckCircle2, Clock, AlertCircle, ChevronLeft, ChevronRight, Edit2, Trash2, Upload } from 'lucide-react';
+import { Plus, ArrowUpCircle, ArrowDownCircle, Search, Filter, Calendar, Tag, Wallet, CreditCard as CardIcon, ArrowRightLeft, Repeat, Download, CheckCircle2, Clock, AlertCircle, ChevronLeft, ChevronRight, Edit2, Trash2, Upload, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { addMonths, format } from 'date-fns';
@@ -1041,13 +1041,18 @@ export const Transactions: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <motion.div 
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm" onClick={() => { resetForm(); setIsModalOpen(false); }}>
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-lg rounded-2xl bg-surface p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl bg-surface p-8 shadow-2xl"
           >
-            <h3 className="text-xl font-bold text-content">
+            <button type="button" aria-label="Fechar" onClick={() => { resetForm(); setIsModalOpen(false); }}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-bold text-content pr-10">
               {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
             </h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">

@@ -4,10 +4,11 @@ import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { BankAccount, Transaction } from '../types';
-import { Plus, Landmark, Trash2, Edit2, Wallet } from 'lucide-react';
+import { Plus, Landmark, Trash2, Edit2, Wallet, X } from 'lucide-react';
+import { ColorField } from '../components/ColorField';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { BANK_PRESETS, normalizeHex, readableForeground } from '../lib/brandColors';
+import { normalizeHex, readableForeground } from '../lib/brandColors';
 import { computeBalances } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 
@@ -321,13 +322,18 @@ export const BankAccounts: React.FC = () => {
       </div>}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => { setIsModalOpen(false); resetForm(); }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-2xl bg-surface p-8 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl bg-surface p-6 sm:p-8 shadow-2xl"
           >
-            <h3 className="text-xl font-bold text-content">{editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</h3>
+            <button type="button" aria-label="Fechar" onClick={() => { setIsModalOpen(false); resetForm(); }}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-bold text-content pr-10">{editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-content-muted">Nome do Banco</label>
@@ -342,46 +348,16 @@ export const BankAccounts: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-content-muted">Cor do banco</label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {BANK_PRESETS.map(preset => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      title={preset.name}
-                      onClick={() => setColor(preset.color)}
-                      style={{ backgroundColor: preset.color }}
-                      className={cn(
-                        'h-7 w-7 rounded-full border transition-all',
-                        normalizeHex(color) === preset.color
-                          ? 'ring-2 ring-primary ring-offset-2 border-transparent scale-110'
-                          : 'border-line hover:scale-110'
-                      )}
-                    />
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={normalizeHex(color) || '#2563eb'}
-                    onChange={(e) => setColor(e.target.value)}
-                    title="Escolher qualquer cor"
-                    className="h-9 w-14 cursor-pointer rounded-lg border border-line bg-transparent p-1"
-                  />
-                  <span className="text-xs text-content-subtle">
-                    {color
-                      ? BANK_PRESETS.find(p => p.color === normalizeHex(color))?.name || normalizeHex(color)
-                      : 'Sem cor — usa o ícone padrão pelo tipo de conta'}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-content-muted">Cor do banco</label>
                   {color && (
-                    <button
-                      type="button"
-                      onClick={() => setColor('')}
-                      className="ml-auto text-xs font-bold text-content-subtle hover:text-rose-600"
-                    >
-                      Remover
+                    <button type="button" onClick={() => setColor('')} className="text-xs font-bold text-content-subtle hover:text-rose-600">
+                      Sem cor
                     </button>
                   )}
+                </div>
+                <div className="mt-2">
+                  <ColorField value={color} onChange={setColor} />
                 </div>
               </div>
               <div>

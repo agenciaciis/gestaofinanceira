@@ -10,7 +10,7 @@ import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Goal, Transaction, BankAccount } from '../types';
-import { PiggyBank, Plus, Trash2, Edit2, Target, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
+import { PiggyBank, Plus, Trash2, Edit2, Target, CheckCircle2, AlertCircle, TrendingUp, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
@@ -612,10 +612,15 @@ export const Goals: React.FC = () => {
       )}
 
       {moving && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setMoving(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-2xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
-            <h3 className="text-xl font-black text-content">
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-3xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <button type="button" aria-label="Fechar" onClick={() => setMoving(null)}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-black text-content pr-10">
               {moving.mode === 'guardar' ? 'Guardar em' : 'Resgatar de'} {moving.goal.name}
             </h3>
             <p className="text-sm text-content-subtle">
@@ -728,13 +733,18 @@ export const Goals: React.FC = () => {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => { setIsModalOpen(false); resetForm(); }}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-3xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[92vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-3xl rounded-3xl bg-surface p-8 shadow-2xl max-h-[92vh] overflow-y-auto"
           >
-            <h3 className="text-xl font-black text-content">{editing ? 'Editar caixinha' : 'Nova caixinha'}</h3>
+            <button type="button" aria-label="Fechar" onClick={() => { setIsModalOpen(false); resetForm(); }}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-black text-content pr-10">{editing ? 'Editar caixinha' : 'Nova caixinha'}</h3>
             <p className="text-sm text-content-subtle">Um objetivo por caixinha. O progresso vem dos lançamentos.</p>
 
             {!editing && (

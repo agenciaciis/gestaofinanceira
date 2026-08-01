@@ -334,11 +334,12 @@ export const Suppliers: React.FC = () => {
       </div>}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <motion.div 
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-3xl rounded-2xl bg-surface shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-3xl rounded-2xl bg-surface shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto"
           >
             <div className="p-6 border-b flex items-center justify-between bg-gray-50/50">
               <h3 className="text-xl font-bold text-content">
