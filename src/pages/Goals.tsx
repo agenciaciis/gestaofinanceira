@@ -604,9 +604,14 @@ export const Goals: React.FC = () => {
                       </strong>
                     </p>
                   )}
-                  {!p.complete && forecast.monthlyPace <= 0 && (
+                  {!p.complete && forecast.monthlyPace <= 0 && p.saved <= 0 && (
                     <p className="text-content-subtle">
                       Ainda sem depósitos. Marque um lançamento com esta caixinha para começar.
+                    </p>
+                  )}
+                  {!p.complete && forecast.monthlyPace <= 0 && p.saved > 0 && (
+                    <p className="text-content-subtle">
+                      Continue guardando para alcançar a meta.
                     </p>
                   )}
                 </div>
