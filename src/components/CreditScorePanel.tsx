@@ -24,10 +24,17 @@ const PROVIDERS: { id: CreditScoreEntry['provider']; label: string }[] = [
   { id: 'boavista', label: 'Boa Vista' },
 ];
 
+/** CPF para pessoa física, CNPJ para empresa — palpite inicial pelo tipo da entidade. */
+const defaultDocType = (entity: Entity): 'cpf' | 'cnpj' => (entity.type === 'PJ' ? 'cnpj' : 'cpf');
+
+const DOC_LABEL: Record<'cpf' | 'cnpj', string> = { cpf: 'CPF', cnpj: 'CNPJ' };
+
 export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
   const [entries, setEntries] = useState<CreditScoreEntry[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [provider, setProvider] = useState<CreditScoreEntry['provider']>('serasa');
+  const [docType, setDocType] = useState<'cpf' | 'cnpj'>(defaultDocType(entity));
+  const [activeType, setActiveType] = useState<'cpf' | 'cnpj'>(defaultDocType(entity));
   const [score, setScore] = useState('');
   const [date, setDate] = useState(formatLocalDate(new Date()));
   const [notes, setNotes] = useState('');
@@ -47,6 +54,7 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
           .map((e: any) => ({
             id: String(e.id || e.date),
             provider: ['serasa', 'spc', 'boavista'].includes(e.provider) ? e.provider : 'serasa',
+            docType: e.docType === 'cpf' || e.docType === 'cnpj' ? e.docType : defaultDocType(entity),
             score: Number(e.score),
             date: e.date,
             notes: typeof e.notes === 'string' ? e.notes : undefined,
@@ -60,19 +68,29 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
     });
   }, [entity.id, docPath]);
 
-  const trend = useMemo(() => scoreTrend(entries.map(e => ({ score: e.score, date: e.date }))), [entries]);
-  const latest = entries.length > 0
-    ? [...entries].sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())[0]
-    : null;
+  // Cada tipo (CPF/CNPJ) é uma trilha independente: score, tendência, gráfico e
+  // histórico saem só dos registros do tipo selecionado no toggle.
+  const typeEntries = useMemo(() => entries.filter(e => e.docType === activeType), [entries, activeType]);
+
+  const latestOf = (type: 'cpf' | 'cnpj') => {
+    const list = entries.filter(e => e.docType === type);
+    return list.length > 0
+      ? [...list].sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())[0]
+      : null;
+  };
+  const latestByType = { cpf: latestOf('cpf'), cnpj: latestOf('cnpj') };
+
+  const trend = useMemo(() => scoreTrend(typeEntries.map(e => ({ score: e.score, date: e.date }))), [typeEntries]);
+  const latest = latestByType[activeType];
   const band = latest ? scoreBand(latest.score) : null;
   const days = daysSinceUpdate(latest?.date);
   const stale = isStale(latest?.date);
 
   const chartData = useMemo(
-    () => [...entries]
+    () => [...typeEntries]
       .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime())
       .map(e => ({ data: format(parseLocalDate(e.date), 'dd/MM/yy'), score: e.score })),
-    [entries]
+    [typeEntries]
   );
 
   const handleSave = async (e: React.FormEvent) => {
@@ -81,16 +99,17 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
     if (!Number.isFinite(value) || value < 0 || value > SCORE_MAX) return;
     try {
       const novo = {
-        id: crypto.randomUUID(), provider, score: value, date,
+        id: crypto.randomUUID(), provider, docType, score: value, date,
         notes: notes.trim() || null, createdAt: new Date().toISOString(),
       };
       await setDoc(doc(db, docPath), {
         items: [...entries.map(e => ({
-          id: e.id, provider: e.provider, score: e.score, date: e.date,
+          id: e.id, provider: e.provider, docType: e.docType, score: e.score, date: e.date,
           notes: e.notes ?? null, createdAt: e.createdAt ?? null,
         })), novo],
         updatedAt: serverTimestamp(),
       }, { merge: true });
+      setActiveType(docType);
       setIsOpen(false); setScore(''); setNotes(''); setDate(formatLocalDate(new Date()));
     } catch (error) {
       console.error('Erro ao salvar score:', error);
@@ -111,12 +130,42 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
           </p>
         </div>
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => { setDocType(activeType); setIsOpen(true); }}
           className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" /> Anotar score
         </button>
       </div>
+
+      {/* Toggle CPF | CNPJ — cada um é uma trilha; mostra o número atual dos dois de relance. */}
+      {!blocked && (
+        <div className="mt-5 flex gap-2">
+          {(['cpf', 'cnpj'] as const).map(type => {
+            const lt = latestByType[type];
+            const active = activeType === type;
+            return (
+              <button
+                key={type}
+                onClick={() => setActiveType(type)}
+                className={cn(
+                  'flex flex-1 items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all',
+                  active ? 'border-primary bg-primary/10' : 'border-line hover:bg-surface-muted'
+                )}
+              >
+                <span className={cn('text-sm font-black uppercase tracking-wide', active ? 'text-primary' : 'text-content-subtle')}>
+                  {DOC_LABEL[type]}
+                  <span className="ml-1 normal-case font-medium">{type === 'cpf' ? '(pessoa)' : '(empresa)'}</span>
+                </span>
+                {lt ? (
+                  <span className="text-xl font-black" style={{ color: scoreBand(lt.score).color }}>{lt.score}</span>
+                ) : (
+                  <span className="text-xs font-medium text-content-subtle">sem registro</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {blocked ? (
         <div className="mt-6 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/40 p-6">
@@ -129,7 +178,7 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
         </div>
       ) : !latest ? (
         <div className="mt-6 rounded-2xl border border-dashed border-line p-8 text-center">
-          <p className="font-bold text-content">Nenhum score anotado ainda</p>
+          <p className="font-bold text-content">Nenhum score de {DOC_LABEL[activeType]} anotado ainda</p>
           <p className="mt-1 text-sm text-content-subtle">
             Consulte no Serasa e registre aqui. Com dois ou mais registros eu mostro a evolução.
           </p>
@@ -213,9 +262,9 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
           </div>
 
           <div className="mt-6 border-t border-line pt-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle mb-2">Histórico</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle mb-2">Histórico de {DOC_LABEL[activeType]}</p>
             <div className="space-y-1 max-h-48 overflow-y-auto">
-              {entries.map(e => (
+              {typeEntries.map(e => (
                 <div key={e.id} className="group flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-surface-muted">
                   <span className="text-sm text-content-muted">
                     {format(parseLocalDate(e.date), "dd 'de' MMM, yyyy", { locale: ptBR })}
@@ -229,7 +278,7 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
                     <button
                       onClick={() => setDoc(doc(db, docPath), {
                         items: entries.filter(x => x.id !== e.id).map(x => ({
-                          id: x.id, provider: x.provider, score: x.score, date: x.date,
+                          id: x.id, provider: x.provider, docType: x.docType, score: x.score, date: x.date,
                           notes: x.notes ?? null, createdAt: x.createdAt ?? null,
                         })),
                         updatedAt: serverTimestamp(),
@@ -253,6 +302,24 @@ export const CreditScorePanel: React.FC<{ entity: Entity }> = ({ entity }) => {
             <h3 className="text-xl font-black text-content">Anotar score</h3>
             <p className="text-sm text-content-subtle">Consultou no site? Registre aqui para acompanhar a evolução.</p>
             <form onSubmit={handleSave} className="mt-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-content-muted mb-1">Score de</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['cpf', 'cnpj'] as const).map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setDocType(type)}
+                      className={cn(
+                        'rounded-lg border px-4 py-2 text-sm font-bold transition-all',
+                        docType === type ? 'border-primary bg-primary/10 text-primary' : 'border-line text-content-muted hover:bg-surface-muted'
+                      )}
+                    >
+                      {DOC_LABEL[type]} <span className="font-medium">{type === 'cpf' ? '(pessoa)' : '(empresa)'}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-content-muted">Onde consultou</label>

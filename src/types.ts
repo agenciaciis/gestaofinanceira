@@ -157,6 +157,8 @@ export interface Goal {
 export interface CreditScoreEntry {
   id: string;
   provider: 'serasa' | 'spc' | 'boavista';
+  /** Documento a que o score se refere: CPF (pessoa) ou CNPJ (empresa). */
+  docType: 'cpf' | 'cnpj';
   score: number;
   date: string;
   notes?: string;
