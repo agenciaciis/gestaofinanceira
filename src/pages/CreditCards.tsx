@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
 import { ColorField } from '../components/ColorField';
-import { computeCardUsage, computeCardInvoice, currentInvoiceWindow, parseLocalDate } from '../lib/finance';
+import { computeCardUsage, computeCardInvoice, currentInvoiceWindow, parseLocalDate, nextDueDate } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -399,6 +399,8 @@ export const CreditCards: React.FC = () => {
           const usedLimit = calculateUsage(card.id);
           const availableLimit = card.limit - usedLimit;
           const usagePercentage = card.limit > 0 ? Math.min((usedLimit / card.limit) * 100, 100) : 0;
+          const invoiceAmount = computeCardInvoice(card.id, card.closingDay, cardTransactions[card.id] || [], new Date());
+          const dueDate = nextDueDate(card.dueDay);
 
           const gradient = cardGradient(card.color);
           const fg = readableForeground(gradient.from);
@@ -491,6 +493,29 @@ export const CreditCards: React.FC = () => {
                       <p className="text-xs font-bold">Dia {card.dueDay}</p>
                     </div>
                     <Info className="h-3 w-3 text-content-subtle" />
+                  </div>
+                </div>
+
+                {/* Fatura do mês a pagar — lembrete (cálculo ao vivo, sem lançamento duplicado) */}
+                <div
+                  style={{ backgroundColor: fg === '#ffffff' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.10)' }}
+                  className="flex items-center justify-between rounded-xl px-3 py-2"
+                >
+                  <div>
+                    <p style={{ color: fgMuted }} className="text-[9px] uppercase tracking-wider">Fatura deste mês</p>
+                    <p className="text-sm font-black">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(invoiceAmount)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p style={{ color: fgMuted }} className="text-[9px] uppercase tracking-wider">
+                      {invoiceAmount > 0 ? 'Vence em' : 'Sem fatura em aberto'}
+                    </p>
+                    {invoiceAmount > 0 && (
+                      <p className="text-xs font-bold">
+                        {dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      </p>
+                    )}
                   </div>
                 </div>
 

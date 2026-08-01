@@ -12,6 +12,7 @@ import {
   computeCardInvoice,
   currentInvoiceWindow,
   daysUntilDueDay,
+  nextDueDate,
 } from './finance';
 import { BankAccount, Transaction } from '../types';
 
@@ -160,6 +161,15 @@ describe('currentInvoiceWindow / computeCardInvoice', () => {
     expect(daysUntilDueDay(15, new Date(2026, 5, 15))).toBe(0);
     // vencimento daqui a 5 dias no mesmo mês
     expect(daysUntilDueDay(20, new Date(2026, 5, 15))).toBe(5);
+  });
+
+  it('nextDueDate retorna a próxima ocorrência do dia de vencimento', () => {
+    // dia ainda não passou neste mês => mesmo mês
+    expect(nextDueDate(20, new Date(2026, 5, 15)).getTime()).toBe(new Date(2026, 5, 20).getTime());
+    // dia já passou => próximo mês (atravessa virada de ano)
+    expect(nextDueDate(2, new Date(2026, 0, 29)).getTime()).toBe(new Date(2026, 1, 2).getTime());
+    // vencimento hoje => hoje
+    expect(nextDueDate(15, new Date(2026, 5, 15)).getTime()).toBe(new Date(2026, 5, 15).getTime());
   });
 
   it('soma despesas do cartão no ciclo corrente', () => {

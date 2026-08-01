@@ -47,7 +47,7 @@ import { cn } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth, isAfter, isBefore, isSameDay, isSameYear, subDays, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice, round2 } from '../lib/finance';
+import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice, round2, nextDueDate } from '../lib/finance';
 import { collectDebts, payoffSchedule } from '../lib/debts';
 import { computeSpendable, detectDuplicateLoanCommitments, suggestReserve } from '../lib/spendable';
 import { consolidate } from '../lib/crossEntity';
@@ -453,11 +453,39 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   const upcomingBills = useMemo(() => {
-    return transactions
-      .filter(t => t.status === 'pending' && isAfter(parseLocalDate(t.date), new Date().setHours(0,0,0,0)))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    type BillItem = {
+      id: string; description: string; amount: number; date: string;
+      type: 'income' | 'expense'; categoryId?: string; isCardInvoice?: boolean; tx?: Transaction;
+    };
+    const todayMs = new Date().setHours(0, 0, 0, 0);
+    const real: BillItem[] = transactions
+      .filter(t => t.status === 'pending' && isAfter(parseLocalDate(t.date), todayMs))
+      .map(t => ({
+        id: t.id, description: t.description, amount: t.amount, date: t.date,
+        type: t.type as 'income' | 'expense', categoryId: t.categoryId, tx: t,
+      }));
+    // Faturas de cartão em aberto entram como lembrete — cálculo ao vivo, SEM
+    // criar lançamento (as compras individuais já contam a dívida, criar a
+    // fatura como transação contaria em dobro).
+    const cardBills: BillItem[] = cards
+      .map(card => {
+        const amount = computeCardInvoice(card.id, card.closingDay, transactions, new Date());
+        if (amount <= 0) return null;
+        const due = nextDueDate(card.dueDay);
+        return {
+          id: `card-invoice-${card.id}`,
+          description: `Fatura ${card.name}`,
+          amount,
+          date: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`,
+          type: 'expense' as const,
+          isCardInvoice: true,
+        };
+      })
+      .filter((b): b is BillItem => b !== null);
+    return [...real, ...cardBills]
+      .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime())
       .slice(0, 5);
-  }, [transactions]);
+  }, [transactions, cards]);
 
   const toggleStatus = async (transaction: Transaction) => {
     try {
@@ -1200,7 +1228,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
               </div>
             ) : (
               upcomingBills.map(t => (
-                <div key={t.id} onClick={() => onNavigate?.('transactions')} className="flex items-center justify-between group cursor-pointer">
+                <div key={t.id} onClick={() => onNavigate?.(t.isCardInvoice ? 'cards' : 'transactions')} className="flex items-center justify-between group cursor-pointer">
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col items-center justify-center h-12 w-12 rounded-2xl bg-surface-muted border border-line group-hover:bg-primary group-hover:border-primary transition-all">
                       <span className="text-[10px] font-black text-content-subtle group-hover:text-white/70 uppercase">
@@ -1213,7 +1241,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
                     <div>
                       <p className="text-sm font-bold text-content group-hover:text-primary transition-colors">{t.description}</p>
                       <p className="text-[10px] font-bold text-content-subtle uppercase tracking-wider">
-                        {CATEGORIES.find(c => c.id === t.categoryId)?.name}
+                        {t.isCardInvoice ? 'Cartão de crédito' : CATEGORIES.find(c => c.id === t.categoryId)?.name}
                       </p>
                     </div>
                   </div>
@@ -1222,11 +1250,11 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                     </p>
                     <button
-                      onClick={(e) => { e.stopPropagation(); toggleStatus(t); }}
+                      onClick={(e) => { e.stopPropagation(); if (t.isCardInvoice) onNavigate?.('cards'); else if (t.tx) toggleStatus(t.tx); }}
                       className="flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-all hover:bg-emerald-600 hover:shadow active:scale-95"
                     >
                       <CheckCircle2 className="h-3 w-3" />
-                      {t.type === 'income' ? 'Receber' : 'Pagar'}
+                      {t.isCardInvoice ? 'Pagar fatura' : t.type === 'income' ? 'Receber' : 'Pagar'}
                     </button>
                   </div>
                 </div>

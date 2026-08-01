@@ -150,14 +150,25 @@ export function computeCardInvoice(
  * Retorna 0 se o vencimento é hoje.
  */
 export function daysUntilDueDay(dueDay: number, reference: Date = new Date()): number {
+  const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  const due = nextDueDate(dueDay, reference);
+  const MS = 24 * 60 * 60 * 1000;
+  return Math.round((due.getTime() - today.getTime()) / MS);
+}
+
+/**
+ * Data da PRÓXIMA ocorrência de um dia-do-mês (ex.: vencimento da fatura).
+ * Se o dia ainda não passou neste mês, retorna-o neste mês; senão, no próximo.
+ * Respeita o calendário real (meses de 28/30/31 dias).
+ */
+export function nextDueDate(dueDay: number, reference: Date = new Date()): Date {
   const day = Math.min(Math.max(1, Math.floor(dueDay) || 1), 31);
   const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
   let due = new Date(today.getFullYear(), today.getMonth(), day);
   if (due.getTime() < today.getTime()) {
     due = new Date(today.getFullYear(), today.getMonth() + 1, day);
   }
-  const MS = 24 * 60 * 60 * 1000;
-  return Math.round((due.getTime() - today.getTime()) / MS);
+  return due;
 }
 
 /**
