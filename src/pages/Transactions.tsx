@@ -682,7 +682,9 @@ export const Transactions: React.FC = () => {
     setDescription('');
     setAmount('');
     setDate(new Date().toISOString().split('T')[0]);
-    setTargetEntityId('');
+    // Já abre com uma entidade escolhida (na visão consolidada, a 1ª). Sem isso,
+    // os selects de conta/cartão (filtrados por entidade) ficavam vazios.
+    setTargetEntityId(entities[0]?.id || '');
     setAccountId('');
     setToAccountId('');
     setCardId('');
@@ -1231,7 +1233,7 @@ export const Transactions: React.FC = () => {
 
                     <div className="mt-3">
                       {paymentMethod === 'account' ? (
-                        <select 
+                        <select
                           value={accountId}
                           onChange={(e) => setAccountId(e.target.value)}
                           className="w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
@@ -1243,7 +1245,7 @@ export const Transactions: React.FC = () => {
                           ))}
                         </select>
                       ) : (
-                        <select 
+                        <select
                           value={cardId}
                           onChange={(e) => setCardId(e.target.value)}
                           className="w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
@@ -1254,6 +1256,12 @@ export const Transactions: React.FC = () => {
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
                         </select>
+                      )}
+                      {paymentMethod === 'account' && targetEntityId && accounts.filter(a => a.entityId === targetEntityId).length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600">Nenhuma conta cadastrada nesta entidade. Cadastre em “Contas”.</p>
+                      )}
+                      {paymentMethod === 'card' && targetEntityId && cards.filter(c => c.entityId === targetEntityId).length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600">Nenhum cartão cadastrado nesta entidade. Cadastre em “Cartões”.</p>
                       )}
                     </div>
                   </div>
