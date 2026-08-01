@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, writeBatch, setDoc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Goal, Transaction, BankAccount } from '../types';
 import { PiggyBank, Plus, Trash2, Edit2, Target, CheckCircle2, AlertCircle, TrendingUp, X } from 'lucide-react';
@@ -142,7 +142,12 @@ export const Goals: React.FC = () => {
     };
 
     try {
-      const daEntidade = goals.filter(g => g.entityId === entityId);
+      // IMPORTANTE: ler as caixinhas ATUAIS da entidade-alvo direto do Firestore.
+      // O estado `goals` pode não conter a entidade (filtro PF/PJ), e como o
+      // setDoc(merge:true) SUBSTITUI o array `items` inteiro, usar o estado
+      // filtrado apagaria silenciosamente as caixinhas existentes da outra entidade.
+      const snapAtual = await getDoc(doc(db, goalsDocPath(entityId)));
+      const daEntidade = ((snapAtual.data()?.items as Goal[]) || []);
       const registro: Goal = {
         id: editing?.id || crypto.randomUUID(),
         name: data.name,
@@ -161,7 +166,8 @@ export const Goals: React.FC = () => {
       // Se a caixinha MUDOU de entidade na edição, remove da entidade antiga —
       // senão ela passava a existir nas duas ao mesmo tempo (totais em dobro).
       if (editing && editing.entityId && editing.entityId !== entityId) {
-        const restanteNaAntiga = goals.filter(g => g.entityId === editing.entityId && g.id !== registro.id);
+        const snapAntiga = await getDoc(doc(db, goalsDocPath(editing.entityId)));
+        const restanteNaAntiga = ((snapAntiga.data()?.items as Goal[]) || []).filter(g => g.id !== registro.id);
         await setDoc(
           doc(db, goalsDocPath(editing.entityId)),
           { items: restanteNaAntiga, updatedAt: serverTimestamp() },

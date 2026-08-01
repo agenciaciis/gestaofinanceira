@@ -159,19 +159,31 @@ export const CreditCards: React.FC = () => {
         collaboratorsEmails: owner?.collaboratorsEmails || [],
         createdAt: serverTimestamp(),
       });
-      // Marca a fatura do ciclo atual como paga para liberar o limite utilizado.
-      const { start, end } = currentInvoiceWindow(payingCard.closingDay, new Date());
-      const aQuitar = (cardTransactions[payingCard.id] || []).filter(t => {
+      // Só libera o limite (marca as compras como `settled`) em pagamento INTEGRAL.
+      // Em pagamento parcial, apenas a saída do banco é registrada — o limite continua
+      // comprometido. A janela usa a DATA do pagamento (payDate), não `new Date()`.
+      const refDate = (() => {
+        const d = parseLocalDate(payDate);
+        return Number.isNaN(d.getTime()) ? new Date() : d;
+      })();
+      const invoiceTotal = computeCardInvoice(payingCard.id, payingCard.closingDay, cardTransactions[payingCard.id] || [], refDate);
+      const isFullPayment = invoiceTotal > 0 && amount >= invoiceTotal - 0.005;
+      const { start, end } = currentInvoiceWindow(payingCard.closingDay, refDate);
+      const aQuitar = isFullPayment ? (cardTransactions[payingCard.id] || []).filter(t => {
         if (!t.id || t.type !== 'expense' || t.status === 'cancelled' || t.settled) return false;
         const d = parseLocalDate(t.date);
         return !Number.isNaN(d.getTime()) && d >= start && d < end;
-      });
+      }) : [];
       if (aQuitar.length) {
         const batch = writeBatch(db);
         for (const t of aQuitar) batch.update(doc(db, `entities/${ent}/transactions/${t.id}`), { settled: true, settledAt: payDate });
         await batch.commit();
       }
-      showToast('Fatura paga! Saldo do banco atualizado e limite liberado.', 'success');
+      if (isFullPayment) {
+        showToast('Fatura paga! Saldo do banco atualizado e limite liberado.', 'success');
+      } else {
+        showToast('Pagamento parcial registrado; o limite não foi liberado.', 'info');
+      }
       setPayingCard(null);
     } catch (error) {
       console.error('Erro ao pagar fatura:', error);
@@ -245,7 +257,7 @@ export const CreditCards: React.FC = () => {
   const handleDelete = async (entityId: string, cardId: string) => {
     const confirmed = await confirm({
       title: 'Excluir Cartão',
-      message: 'Tem certeza que deseja excluir este cartão de crédito?',
+      message: 'Tem certeza que deseja excluir este cartão de crédito? Os lançamentos vinculados a ele continuarão no sistema, porém sem o vínculo com o cartão.',
       variant: 'danger'
     });
     if (!confirmed) return;
@@ -356,6 +368,18 @@ export const CreditCards: React.FC = () => {
           colunas={colunasCartoes}
           acoes={(card) => (
             <>
+              <button onClick={() => setSelectedCardForInvoices(card)} title="Ver Faturas"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <ReceiptText className="h-4 w-4" />
+              </button>
+              <button onClick={() => openPayInvoice(card)} title="Pagar fatura"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-emerald-600">
+                <CheckCircle2 className="h-4 w-4" />
+              </button>
+              <button onClick={() => { setComparingCard(card); setIsCompareModalOpen(true); }} title="Comparar"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <BarChart3 className="h-4 w-4" />
+              </button>
               <button onClick={() => handleEdit(card)} title="Editar"
                 className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
                 <Edit2 className="h-4 w-4" />

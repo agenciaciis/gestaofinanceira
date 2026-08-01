@@ -46,6 +46,8 @@ export const Transactions: React.FC = () => {
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  // Lançamento avulso: "Já foi pago/recebido?" (senão nasce pendente/a pagar).
+  const [jaEfetivado, setJaEfetivado] = useState(true);
   const [categoryId, setCategoryId] = useState('outros');
   const [targetEntityId, setTargetEntityId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'account' | 'card'>('account');
@@ -287,7 +289,7 @@ export const Transactions: React.FC = () => {
   };
 
   const exportToExcel = () => {
-    const data = transactions.map(t => ({
+    const data = filteredTransactions.map(t => ({
       Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
@@ -305,7 +307,7 @@ export const Transactions: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    const data = transactions.map(t => ({
+    const data = filteredTransactions.map(t => ({
       Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
@@ -430,6 +432,11 @@ export const Transactions: React.FC = () => {
               accountId: tmpl.accountId ?? null,
               cardId: tmpl.cardId ?? null,
               paymentType: tmpl.paymentType ?? null,
+              personalExpense: tmpl.type === 'expense' ? !!tmpl.personalExpense : false,
+              goalId: tmpl.goalId ?? null,
+              tags: tmpl.tags ?? [],
+              plannedAmount: tmpl.plannedAmount ?? null,
+              subcategory: tmpl.subcategory ?? null,
               clientId: tmpl.clientId ?? null,
               clientName: tmpl.clientName ?? null,
               status: 'pending',
@@ -552,7 +559,7 @@ export const Transactions: React.FC = () => {
           accountId,
           toAccountId,
           paymentType: paymentType || 'transferencia',
-          status: 'completed',
+          status: jaEfetivado ? 'completed' : 'pending',
           entityId: targetEntityId,
           ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
           collaboratorsEmails: entities.find(e => e.id === targetEntityId)?.collaboratorsEmails || [],
@@ -658,14 +665,14 @@ export const Transactions: React.FC = () => {
             subcategory: subcategory.trim() || null,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
-          status: 'completed',
+          status: jaEfetivado ? 'completed' : 'pending',
           entityId: targetEntityId,
           ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
           collaboratorsEmails: entities.find(e => e.id === targetEntityId)?.collaboratorsEmails || [],
           createdAt: serverTimestamp(),
         });
       }
-      
+
       setIsModalOpen(false);
       resetForm();
       showToast('Lançamento salvo com sucesso!', 'success');
@@ -681,7 +688,10 @@ export const Transactions: React.FC = () => {
     setEditingTransaction(null);
     setDescription('');
     setAmount('');
-    setDate(new Date().toISOString().split('T')[0]);
+    const hojeStr = new Date().toISOString().split('T')[0];
+    setDate(hojeStr);
+    // Nasce "já pago/recebido" quando a data é hoje ou passada; futura fica pendente.
+    setJaEfetivado(hojeStr <= new Date().toISOString().split('T')[0]);
     // Já abre com uma entidade escolhida (na visão consolidada, a 1ª). Sem isso,
     // os selects de conta/cartão (filtrados por entidade) ficavam vazios.
     setTargetEntityId(entities[0]?.id || '');
@@ -936,6 +946,9 @@ export const Transactions: React.FC = () => {
                           <span className="text-[10px] text-content-subtle uppercase tracking-wider">
                             {CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros'}
                           </span>
+                          {t.clientName && (
+                            <span className="block text-[10px] text-content-subtle">{t.clientName}</span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -965,6 +978,11 @@ export const Transactions: React.FC = () => {
                           <span className="text-xs">{accounts.find(a => a.id === t.accountId)?.bankName}</span>
                         </div>
                       ) : '-'}
+                      {t.paymentType && (
+                        <span className="mt-1 inline-block rounded-full bg-canvas px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-content-subtle">
+                          {PAYMENT_TYPES.find(p => p.id === t.paymentType)?.label || t.paymentType}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {t.status === 'completed' && (
@@ -1099,15 +1117,19 @@ export const Transactions: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-content-muted">Entidade</label>
-                  <select 
+                  <select
                     value={targetEntityId}
                     onChange={(e) => setTargetEntityId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    disabled={!!editingTransaction}
+                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
                     required
                   >
                     <option value="">Selecione...</option>
                     {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                   </select>
+                  {editingTransaction && (
+                    <p className="mt-1 text-xs text-content-subtle">não é possível trocar a entidade na edição</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-content-muted">Data</label>
@@ -1120,6 +1142,20 @@ export const Transactions: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {!editingTransaction && !isInstallment && !isRecurring && (
+                <label className="flex items-center gap-2 cursor-pointer rounded-lg bg-canvas px-4 py-2">
+                  <input
+                    type="checkbox"
+                    checked={jaEfetivado}
+                    onChange={(e) => setJaEfetivado(e.target.checked)}
+                    className="rounded text-primary"
+                  />
+                  <span className="text-sm font-medium text-content-muted">
+                    Já foi pago/recebido (senão fica pendente/a pagar)
+                  </span>
+                </label>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex-1">

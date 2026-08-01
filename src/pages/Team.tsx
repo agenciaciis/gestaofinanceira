@@ -42,7 +42,10 @@ export const Team: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await addCollaborator(targetEntityId, newMemberEmail, newMemberRole);
+      // Normaliza para casar com o e-mail do Auth: array-contains é
+      // case-sensitive, então " Fulano@X.com " nunca acharia o colaborador.
+      const email = newMemberEmail.trim().toLowerCase();
+      await addCollaborator(targetEntityId, email, newMemberRole);
       setNewMemberEmail('');
       setIsModalOpen(false);
       showToast('Convite enviado com sucesso!', 'success');

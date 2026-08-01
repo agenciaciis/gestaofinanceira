@@ -56,9 +56,21 @@ export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Sort by name or createdAt
       combined.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setEntities(combined);
-      
-      if (combined.length > 0 && !selectedEntity) {
-        setSelectedEntity(combined[0]);
+
+      // IMPORTANTE: usar update funcional. Antes, o `!selectedEntity` capturava
+      // o valor do início do efeito (null no login) por closure, então QUALQUER
+      // mudança na coleção de entidades reexecutava setSelectedEntity(combined[0])
+      // e jogava a seleção de volta para a 1ª entidade — risco de cadastrar na
+      // entidade errada. Com prev => prev ?? ..., só define quando ainda é null,
+      // e mantém a que o usuário escolheu. Também remove a entidade selecionada
+      // se ela deixou de existir.
+      if (combined.length > 0) {
+        setSelectedEntity(prev => {
+          if (prev && combined.some(e => e.id === prev.id)) return prev;
+          return prev && !combined.some(e => e.id === prev.id) ? combined[0] : (prev ?? combined[0]);
+        });
+      } else {
+        setSelectedEntity(null);
       }
       setLoading(false);
     };

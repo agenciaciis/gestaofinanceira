@@ -245,13 +245,6 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleDeleteAllData = async () => {
-    // Exclusão total é irreversível e destrutiva; não é disparada às cegas pelo
-    // app. Fica honesta: avisa que ainda não está ativa em vez de mostrar um
-    // diálogo de perigo que não apaga nada.
-    showToast('Por segurança, a exclusão total de dados ainda não está ativa neste app.', 'info');
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -345,7 +338,7 @@ export const Settings: React.FC = () => {
               className="space-y-6"
             >
               <h3 className="text-lg font-bold text-content">Preferências de Notificação</h3>
-              <p className="text-xs text-content-subtle">Estas preferências serão usadas pelos alertas no Telegram/e-mail.</p>
+              <p className="text-xs text-content-subtle">Preferências salvas neste dispositivo. A integração com os alertas será ativada no servidor (deploy).</p>
               <div className="space-y-4">
                 {[
                   { key: 'payment', title: 'Lembretes de Pagamento', desc: 'Receba avisos sobre contas a vencer.' },
@@ -648,11 +641,13 @@ export const Settings: React.FC = () => {
                 <p className="mb-4 text-sm text-red-700">
                   Ao excluir seus dados, todas as transações, contas e cartões serão removidos permanentemente. Esta ação não pode ser desfeita.
                 </p>
-                <button 
-                  onClick={handleDeleteAllData}
-                  className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-red-700 transition-all"
+                <button
+                  type="button"
+                  disabled
+                  title="A exclusão total de dados ainda não está ativa neste app."
+                  className="rounded-xl bg-red-300 px-6 py-2.5 text-sm font-bold text-white cursor-not-allowed opacity-70"
                 >
-                  Excluir Todos os Meus Dados
+                  Exclusão total (em breve)
                 </button>
               </div>
             </motion.div>

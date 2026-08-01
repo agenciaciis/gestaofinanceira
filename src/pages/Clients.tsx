@@ -800,6 +800,10 @@ export const Clients: React.FC = () => {
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-content-muted">Endereço</label>
+                    <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número, bairro, cidade" className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-content-muted">Google Drive</label>
                     <input type="url" value={drivePath} onChange={(e) => setDrivePath(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20" />
                   </div>

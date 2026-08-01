@@ -252,38 +252,41 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
 
     const prevDate = getPreviousPeriodDate(now);
 
+    // `!t.crossEntityGroupId` exclui o movimento interno PF↔PJ (pró-labore,
+    // aporte, reembolso): ele só troca dinheiro de bolso e não é receita nem
+    // despesa do grupo. Sem isso, o consolidado inflava as duas pontas.
     const incomeThisPeriod = transactions
-      .filter(t => t.type === 'income' && t.status === 'completed' && filterFn(parseLocalDate(t.date), now))
+      .filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
-    
+
     const expenseThisPeriod = transactions
-      .filter(t => t.type === 'expense' && t.status === 'completed' && filterFn(parseLocalDate(t.date), now))
+      .filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const incomeLastPeriod = transactions
-      .filter(t => t.type === 'income' && t.status === 'completed' && filterFn(parseLocalDate(t.date), prevDate))
+      .filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), prevDate))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const expenseLastPeriod = transactions
-      .filter(t => t.type === 'expense' && t.status === 'completed' && filterFn(parseLocalDate(t.date), prevDate))
+      .filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), prevDate))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Pendentes DO PERÍODO analisado. Antes somavam qualquer data, então
     // trocar de mês não mexia em "a receber", "a pagar" nem no previsto —
     // metade do painel ficava parada.
     const pendingIncome = transactions
-      .filter(t => t.type === 'income' && t.status === 'pending' && filterFn(parseLocalDate(t.date), now))
+      .filter(t => t.type === 'income' && t.status === 'pending' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const pendingExpense = transactions
-      .filter(t => t.type === 'expense' && t.status === 'pending' && filterFn(parseLocalDate(t.date), now))
+      .filter(t => t.type === 'expense' && t.status === 'pending' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Vencidas é "até hoje", não do período: uma conta vencida continua vencida
     // independente do mês que você está olhando.
     const inicioDeHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     const overdue = transactions
-      .filter(t => t.status === 'pending' && t.type === 'expense' && isBefore(parseLocalDate(t.date), inicioDeHoje))
+      .filter(t => t.status === 'pending' && t.type === 'expense' && !t.crossEntityGroupId && isBefore(parseLocalDate(t.date), inicioDeHoje))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
@@ -304,7 +307,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     const budgetProgress = CATEGORIES.filter(c => budgets[c.id]).map(cat => {
       const isIncome = cat.type === 'income';
       const realized = transactions
-        .filter(t => t.categoryId === cat.id && (isIncome ? t.type === 'income' : t.type === 'expense') && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), now))
+        .filter(t => t.categoryId === cat.id && (isIncome ? t.type === 'income' : t.type === 'expense') && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), now))
         .reduce((acc, t) => acc + t.amount, 0);
       const goal = budgets[cat.id];
       const percentage = goal > 0 ? (realized / goal) * 100 : 0;
@@ -394,12 +397,12 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     for (let i = 5; i >= 0; i--) {
       const month = subMonths(now, i);
       const monthIncome = transactions
-        .filter(t => t.type === 'income' && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), month))
+        .filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
       const monthExpense = transactions
-        .filter(t => t.type === 'expense' && t.status === 'completed' && isSameMonth(parseLocalDate(t.date), month))
+        .filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
-      
+
       data.push({
         name: format(month, 'MMM', { locale: ptBR }),
         income: monthIncome,
@@ -414,10 +417,10 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     for (let i = 1; i <= 6; i++) {
       const month = addMonths(now, i);
       const monthIncome = transactions
-        .filter(t => t.type === 'income' && isNotCancelled(t) && isSameMonth(parseLocalDate(t.date), month))
+        .filter(t => t.type === 'income' && isNotCancelled(t) && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
       const monthExpense = transactions
-        .filter(t => t.type === 'expense' && isNotCancelled(t) && isSameMonth(parseLocalDate(t.date), month))
+        .filter(t => t.type === 'expense' && isNotCancelled(t) && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
 
       data.push({
@@ -441,7 +444,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
 
     return CATEGORIES.map(cat => {
       const amount = transactions
-        .filter(t => t.categoryId === cat.id && t.type === 'expense' && t.status === 'completed' && filterFn(parseLocalDate(t.date)))
+        .filter(t => t.categoryId === cat.id && t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date)))
         .reduce((acc, t) => acc + t.amount, 0);
       return { name: cat.name, value: amount };
     }).filter(c => c.value > 0).sort((a, b) => b.value - a.value).slice(0, 6);

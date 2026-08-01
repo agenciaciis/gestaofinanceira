@@ -124,11 +124,13 @@ export const Reports: React.FC = () => {
   }, [transactions, selectedMonth, selectedYear]);
 
   const stats = useMemo(() => {
-    const realizedIncome = filteredData.filter(t => t.type === 'income' && t.status === 'completed').reduce((acc, t) => acc + t.amount, 0);
-    const realizedExpense = filteredData.filter(t => t.type === 'expense' && t.status === 'completed').reduce((acc, t) => acc + t.amount, 0);
+    // `!t.crossEntityGroupId` exclui o movimento interno PF↔PJ (pró-labore,
+    // aporte, reembolso): só troca de bolso, não é receita/despesa do grupo.
+    const realizedIncome = filteredData.filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
+    const realizedExpense = filteredData.filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
     // "Projetado" = realizado + pendente (exclui cancelados).
-    const projectedIncome = filteredData.filter(t => t.type === 'income' && isNotCancelled(t)).reduce((acc, t) => acc + t.amount, 0);
-    const projectedExpense = filteredData.filter(t => t.type === 'expense' && isNotCancelled(t)).reduce((acc, t) => acc + t.amount, 0);
+    const projectedIncome = filteredData.filter(t => t.type === 'income' && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
+    const projectedExpense = filteredData.filter(t => t.type === 'expense' && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
     
     return { 
       income: realizedIncome, 
@@ -141,7 +143,7 @@ export const Reports: React.FC = () => {
   }, [filteredData]);
 
   const expenseCategoryData = useMemo(() => {
-    const expenses = filteredData.filter(t => t.type === 'expense' && t.status === 'completed');
+    const expenses = filteredData.filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId);
     const grouped = expenses.reduce((acc, t) => {
       const cat = CATEGORIES.find(c => c.id === t.categoryId) || CATEGORIES.find(c => c.id === 'outros')!;
       acc[cat.name] = (acc[cat.name] || 0) + t.amount;
@@ -156,7 +158,7 @@ export const Reports: React.FC = () => {
   }, [filteredData]);
 
   const incomeCategoryData = useMemo(() => {
-    const incomes = filteredData.filter(t => t.type === 'income' && t.status === 'completed');
+    const incomes = filteredData.filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId);
     const grouped = incomes.reduce((acc, t) => {
       const cat = CATEGORIES.find(c => c.id === t.categoryId) || CATEGORIES.find(c => c.id === 'outros')!;
       acc[cat.name] = (acc[cat.name] || 0) + t.amount;
@@ -180,9 +182,12 @@ export const Reports: React.FC = () => {
       const m = d.getMonth();
       const y = d.getFullYear();
       
+      // Conta apenas REALIZADO (status 'completed'), batendo com o Dashboard e
+      // com o card "Saldo Realizado" — antes usava isNotCancelled e somava
+      // pendentes. Exclui também o movimento interno PF↔PJ (crossEntityGroupId).
       const monthData = transactions.filter(t => {
         const td = parseLocalDate(t.date);
-        return td.getMonth() === m && td.getFullYear() === y && isNotCancelled(t);
+        return td.getMonth() === m && td.getFullYear() === y && t.status === 'completed' && !t.crossEntityGroupId;
       });
 
       const income = monthData.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
@@ -230,8 +235,9 @@ export const Reports: React.FC = () => {
   const cashFlowProjection = useMemo(() => {
     const data = [...monthlyTrend];
 
-    // Média dos últimos meses COM movimento (evita diluir por meses vazios).
-    const meses = monthlyTrend.length || 1;
+    // Média dos últimos meses COM movimento (evita diluir por meses vazios):
+    // divide pelo nº de meses que tiveram receita ou despesa, nunca por menos de 1.
+    const meses = Math.max(1, monthlyTrend.filter(m => (m.income + m.expense) > 0).length);
     const avgIncome = monthlyTrend.reduce((acc, m) => acc + m.income, 0) / meses;
     const avgExpense = monthlyTrend.reduce((acc, m) => acc + m.expense, 0) / meses;
 

@@ -9,17 +9,21 @@ import { Transaction } from '../types';
 import { budgetProgress, BudgetLine } from '../lib/budgets';
 
 export const Budgets: React.FC = () => {
-  const { entities, filterType } = useEntity();
+  const { entities, filterType, selectedEntity } = useEntity();
   const { showToast } = useUI();
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (entities.length === 0 || filterType === 'ALL') return;
+  // Entidade-alvo = a que o usuário selecionou. Antes usava-se
+  // entities.find(e => e.type === filterType), que com DUAS entidades do mesmo
+  // tipo sempre pegava a 1ª — a 2ª nunca via nem salvava suas metas. Fallback
+  // para o filtro por tipo se ainda não há seleção.
+  const targetEntity = selectedEntity ?? entities.find(e => e.type === filterType) ?? null;
 
-    const entity = entities.find(e => e.type === filterType);
-    if (!entity) return;
+  useEffect(() => {
+    if (!targetEntity) return;
+    const entity = targetEntity;
 
     const unsubB = onSnapshot(doc(db, `entities/${entity.id}/config/budgets`), (snapshot) => {
       setBudgets(snapshot.exists() ? (snapshot.data() as Record<string, number>) : {});
@@ -31,7 +35,7 @@ export const Budgets: React.FC = () => {
     }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/transactions`));
 
     return () => { unsubB(); unsubT(); };
-  }, [entities, filterType]);
+  }, [targetEntity?.id]);
 
   // Orçado × realizado do mês corrente, pela fonte única testada (lib/budgets).
   const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
@@ -66,21 +70,17 @@ export const Budgets: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (filterType === 'ALL') {
+    if (!targetEntity) {
       showToast('Selecione uma entidade específica (PF ou PJ) para definir metas.', 'error');
       return;
     }
 
-    const entity = entities.find(e => e.type === filterType);
-    if (!entity) return;
-
     setIsSaving(true);
     try {
-      await setDoc(doc(db, `entities/${entity.id}/config/budgets`), {
-        ...budgets,
-        ownerUid: entity.ownerUid,
-        collaboratorsEmails: entity.collaboratorsEmails || [],
-      });
+      // Grava SÓ o mapa categoria→valor. ownerUid/collaboratorsEmails NÃO entram
+      // aqui: o snapshot relê o doc inteiro como Record<string, number> e esses
+      // campos poluiriam as metas (viravam "categorias" fantasma).
+      await setDoc(doc(db, `entities/${targetEntity.id}/config/budgets`), { ...budgets });
       showToast('Metas salvas com sucesso!', 'success');
     } catch (error) {
       console.error("Error saving budgets:", error);
@@ -95,13 +95,13 @@ export const Budgets: React.FC = () => {
     setBudgets(prev => ({ ...prev, [categoryId]: amount }));
   };
 
-  if (filterType === 'ALL') {
+  if (!targetEntity) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center text-center">
         <div className="mb-4 rounded-full bg-blue-50 p-4">
           <Target className="h-12 w-12 text-blue-500" />
         </div>
-        <h2 className="text-xl font-bold text-content">Metas Financeiras</h2>
+        <h2 className="text-xl font-bold text-content">Selecione uma entidade</h2>
         <p className="mt-2 max-w-md text-content-subtle">
           Para definir metas de gastos, selecione uma entidade específica (PF ou PJ) no seletor acima.
         </p>
@@ -114,7 +114,7 @@ export const Budgets: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-content">Metas Mensais</h1>
-          <p className="text-content-subtle">Defina metas de receitas e limites de gastos por categoria para {filterType}</p>
+          <p className="text-content-subtle">Defina metas de receitas e limites de gastos por categoria para {targetEntity.name}</p>
         </div>
         <button
           onClick={handleSave}

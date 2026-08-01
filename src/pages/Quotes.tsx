@@ -159,7 +159,9 @@ export const Quotes: React.FC = () => {
             const lista = item.type === 'product' ? products : services;
             const s = lista.find(serv => serv.id === updates.referenceId);
             if (s) {
-              updated.description = s.name;
+              // Anexa o escopo/observações à descrição para não se perder no PDF.
+              const extra = [s.scope, s.observations].map(x => (x || '').trim()).filter(Boolean).join(' · ');
+              updated.description = extra ? `${s.name} — ${extra}` : s.name;
               updated.unitPrice = s.basePrice;
             }
           } else {
@@ -669,8 +671,8 @@ export const Quotes: React.FC = () => {
     s === 'approved' || s === 'converted' ? 'aprovado' : s === 'rejected' ? 'reprovado' : 'aguardando';
 
   const filteredQuotes = quotes.filter(q => {
-    const matchBusca = q.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchBusca = (q.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (q.quoteNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = statusFilter === 'todos' || statusGroup(q.status) === statusFilter;
     return matchBusca && matchStatus;
   });
@@ -894,6 +896,46 @@ export const Quotes: React.FC = () => {
                 className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
                 <Trash2 className="h-4 w-4" />
               </button>
+              {/* Mudar status + Lançar em Contas a Receber — mesmo menu/handlers do grid. */}
+              <div className="relative">
+                <button
+                  onClick={() => setStatusMenuFor(prev => prev === q.id ? null : q.id)}
+                  title="Mudar status"
+                  aria-label="Mudar status do orçamento"
+                  aria-expanded={statusMenuFor === q.id}
+                  className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                  <ChevronRight className={cn('h-4 w-4 transition-transform', statusMenuFor === q.id && 'rotate-90')} />
+                </button>
+                {statusMenuFor === q.id && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setStatusMenuFor(null)} />
+                    <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-line bg-surface p-2 shadow-xl">
+                      <p className="px-3 py-1 text-[10px] font-black uppercase tracking-widest text-content-subtle">Situação</p>
+                      <button onClick={() => { updateStatus(q.id, 'sent'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40">⏳ Aguardando</button>
+                      <button onClick={() => { updateStatus(q.id, 'approved'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">✓ Aprovar (vira OS)</button>
+                      <button onClick={() => { updateStatus(q.id, 'rejected'); setStatusMenuFor(null); }} className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40">✕ Reprovar</button>
+                      {statusGroup(q.status) === 'aprovado' ? (
+                        <>
+                          <div className="my-1 border-t border-line" />
+                          {q.status === 'converted' ? (
+                            <div className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Já lançado ✓
+                            </div>
+                          ) : (
+                            <button onClick={() => { convertQuote(q); setStatusMenuFor(null); }} className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Lançar em Contas a Receber
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <p className="mt-1 border-t border-line px-3 pt-2 text-[10px] leading-snug text-content-subtle">
+                          Aprove o orçamento para lançar em Contas a Receber.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           )}
           vazio={<p className="rounded-2xl border border-dashed border-line p-10 text-center text-sm text-content-subtle">Nenhum orçamento encontrado.</p>}
@@ -1013,9 +1055,15 @@ export const Quotes: React.FC = () => {
                         {statusGroup(quote.status) === 'aprovado' ? (
                           <>
                             <div className="my-1 border-t border-line" />
-                            <button onClick={() => { convertQuote(quote); setStatusMenuFor(null); }} className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> {quote.status === 'converted' ? 'Relançar em Contas a Receber' : 'Lançar em Contas a Receber'}
-                            </button>
+                            {quote.status === 'converted' ? (
+                              <div className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Já lançado ✓
+                              </div>
+                            ) : (
+                              <button onClick={() => { convertQuote(quote); setStatusMenuFor(null); }} className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-xs font-black text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Lançar em Contas a Receber
+                              </button>
+                            )}
                           </>
                         ) : (
                           <p className="mt-1 border-t border-line px-3 pt-2 text-[10px] leading-snug text-content-subtle">
@@ -1192,7 +1240,7 @@ export const Quotes: React.FC = () => {
                             >
                               <option value="">— avulso (digitar acima) —</option>
                               {item.type === 'service' ? (
-                                services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
+                                services.filter(s => s.active !== false).map(s => <option key={s.id} value={s.id}>{s.name}</option>)
                               ) : item.type === 'product' ? (
                                 products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
                               ) : (

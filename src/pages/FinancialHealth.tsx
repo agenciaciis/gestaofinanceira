@@ -23,6 +23,7 @@ import {
   Settings2,
   Calendar,
   MessageSquare,
+  Pencil,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -81,6 +82,9 @@ export const FinancialHealth: React.FC = () => {
   const [simulationPayments, setSimulationPayments] = useState<Record<string, string>>({});
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  // Dívida (fonte 'loan') sendo editada no modal "Nova/Editar Dívida".
+  // Separado de `editingDebt` (usado só pelo modal de alertas).
+  const [editingDebtId, setEditingDebtId] = useState<string | null>(null);
 
   // Alert Config State
   const [dueDateEnabled, setDueDateEnabled] = useState(false);
@@ -323,42 +327,77 @@ export const FinancialHealth: React.FC = () => {
     }
   };
 
+  const resetDebtForm = () => {
+    setEditingDebtId(null);
+    setDebtName('');
+    setTotalAmount('');
+    setRemainingAmount('');
+    setInterestRate('');
+    setMonthlyPayment('');
+    setDueDate('10');
+    setDueDateEnabled(false);
+    setDueDateDaysBefore('3');
+    setThresholdEnabled(false);
+    setThresholdValue('');
+  };
+
+  const openNewDebt = () => {
+    resetDebtForm();
+    setIsDebtModalOpen(true);
+  };
+
+  const openEditDebt = (debt: Debt) => {
+    setEditingDebtId(debt.id);
+    setDebtName(debt.name || '');
+    setTotalAmount(debt.totalAmount != null ? String(debt.totalAmount) : '');
+    setRemainingAmount(debt.remainingAmount != null ? String(debt.remainingAmount) : '');
+    setInterestRate(debt.interestRate != null ? String(debt.interestRate) : '');
+    setMonthlyPayment(debt.monthlyPayment != null ? String(debt.monthlyPayment) : '');
+    setDueDate(debt.dueDate != null ? String(debt.dueDate) : '10');
+    setDueDateEnabled(debt.alerts?.dueDateEnabled || false);
+    setDueDateDaysBefore(debt.alerts?.dueDateDaysBefore?.toString() || '3');
+    setThresholdEnabled(debt.alerts?.thresholdEnabled || false);
+    setThresholdValue(debt.alerts?.thresholdValue?.toString() || '');
+    setIsDebtModalOpen(true);
+  };
+
   const handleAddDebt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEntity) return;
 
+    const alerts = {
+      dueDateEnabled,
+      dueDateDaysBefore: Number(dueDateDaysBefore),
+      thresholdEnabled,
+      thresholdValue: Number(thresholdValue),
+    };
+    const fields = {
+      name: debtName,
+      totalAmount: Number(totalAmount),
+      remainingAmount: Number(remainingAmount),
+      interestRate: Number(interestRate),
+      monthlyPayment: Number(monthlyPayment),
+      dueDate: Number(dueDate),
+      alerts,
+    };
+
     try {
-      await addDoc(collection(db, `entities/${selectedEntity.id}/debts`), {
-        name: debtName,
-        totalAmount: Number(totalAmount),
-        remainingAmount: Number(remainingAmount),
-        interestRate: Number(interestRate),
-        monthlyPayment: Number(monthlyPayment),
-        dueDate: Number(dueDate),
-        entityId: selectedEntity.id,
-        ownerUid: selectedEntity.ownerUid,
-        collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
-        createdAt: serverTimestamp(),
-        alerts: {
-          dueDateEnabled,
-          dueDateDaysBefore: Number(dueDateDaysBefore),
-          thresholdEnabled,
-          thresholdValue: Number(thresholdValue)
-        }
-      });
+      if (editingDebtId) {
+        // Edição: atualiza os campos, sem tocar em createdAt/ownerUid.
+        await updateDoc(doc(db, `entities/${selectedEntity.id}/debts`, editingDebtId), fields);
+      } else {
+        await addDoc(collection(db, `entities/${selectedEntity.id}/debts`), {
+          ...fields,
+          entityId: selectedEntity.id,
+          ownerUid: selectedEntity.ownerUid,
+          collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
+          createdAt: serverTimestamp(),
+        });
+      }
       setIsDebtModalOpen(false);
-      setDebtName('');
-      setTotalAmount('');
-      setRemainingAmount('');
-      setInterestRate('');
-      setMonthlyPayment('');
-      setDueDate('10');
-      setDueDateEnabled(false);
-      setDueDateDaysBefore('3');
-      setThresholdEnabled(false);
-      setThresholdValue('');
+      resetDebtForm();
     } catch (error) {
-      console.error("Error adding debt:", error);
+      console.error("Error saving debt:", error);
     }
   };
 
@@ -555,8 +594,8 @@ export const FinancialHealth: React.FC = () => {
             </h3>
             <p className="text-sm text-content-subtle font-medium">Acompanhamento detalhado e simulação de pagamentos.</p>
           </div>
-          <button 
-            onClick={() => setIsDebtModalOpen(true)}
+          <button
+            onClick={openNewDebt}
             className="flex items-center gap-2 rounded-xl bg-surface border border-line px-4 py-2 text-sm font-bold text-content-muted hover:bg-surface-muted transition-all shadow-sm"
           >
             <Plus className="h-4 w-4" />
@@ -822,7 +861,7 @@ export const FinancialHealth: React.FC = () => {
                   ? simulateOne(debtView, simPayment)
                   : { months: 0, totalInterest: 0 };
                 const payoffDate = monthsToPay === Infinity ? null : addMonths(new Date(), monthsToPay);
-                const progress = debt.totalAmount > 0 ? ((debt.totalAmount - debt.remainingAmount) / debt.totalAmount) * 100 : 0;
+                const progress = Math.max(0, Math.min(100, debt.totalAmount > 0 ? ((debt.totalAmount - debt.remainingAmount) / debt.totalAmount) * 100 : 0));
 
                 return (
                   <motion.div 
@@ -857,14 +896,21 @@ export const FinancialHealth: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button 
+                        <button
+                          onClick={() => openEditDebt(debt)}
+                          className="text-slate-300 hover:text-indigo-600 transition-colors"
+                          title="Editar Dívida"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => openAlertModal(debt)}
                           className="text-slate-300 hover:text-indigo-600 transition-colors"
                           title="Configurar Alertas"
                         >
                           <Settings2 className="h-4 w-4" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDeleteDebt(debt.id)}
                           className="text-slate-300 hover:text-rose-600 transition-colors"
                         >
@@ -1285,7 +1331,7 @@ export const FinancialHealth: React.FC = () => {
       {isDebtModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm"
-          onClick={() => setIsDebtModalOpen(false)}
+          onClick={() => { setIsDebtModalOpen(false); resetDebtForm(); }}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -1295,12 +1341,12 @@ export const FinancialHealth: React.FC = () => {
           >
             <button
               type="button"
-              onClick={() => setIsDebtModalOpen(false)}
+              onClick={() => { setIsDebtModalOpen(false); resetDebtForm(); }}
               className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content"
             >
               <X className="h-5 w-5" />
             </button>
-            <h3 className="text-2xl font-black text-content">Nova Dívida</h3>
+            <h3 className="text-2xl font-black text-content">{editingDebtId ? 'Editar Dívida' : 'Nova Dívida'}</h3>
             <p className="text-sm text-content-subtle mt-1">Registre para calcular o tempo de quitação.</p>
             
             <form onSubmit={handleAddDebt} className="mt-8 space-y-4">
@@ -1439,7 +1485,7 @@ export const FinancialHealth: React.FC = () => {
               <div className="mt-8 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsDebtModalOpen(false)}
+                  onClick={() => { setIsDebtModalOpen(false); resetDebtForm(); }}
                   className="flex-1 rounded-xl border border-line py-3 text-sm font-bold text-content-muted hover:bg-surface-muted transition-all"
                 >
                   Cancelar
@@ -1448,7 +1494,7 @@ export const FinancialHealth: React.FC = () => {
                   type="submit"
                   className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
                 >
-                  Salvar Dívida
+                  {editingDebtId ? 'Salvar Alterações' : 'Salvar Dívida'}
                 </button>
               </div>
             </form>
