@@ -53,13 +53,46 @@ describe('orders — recorrente', () => {
     quote({ total: 1500, recurrenceConfig: { enabled: true, frequency: 'monthly', startDate: '2026-07-10' } }),
     entity,
   );
-  it('gera 1 lançamento recorrente marcado corretamente', () => {
+  it('sem prazo (count 0/ausente) gera 1 lançamento recorrente que o motor renova', () => {
     expect(txs).toHaveLength(1);
     expect(txs[0].isRecurring).toBe(true);
     expect(txs[0].recurringPeriod).toBe('monthly');
     expect(txs[0].recurringGroupId).toBe('rec-q1');
     expect(txs[0].amount).toBe(1500);
     expect(txs[0].status).toBe('pending');
+  });
+
+  it('com prazo definido (count = 3) gera exatamente 3 cobranças e NÃO renova sozinho', () => {
+    const finitas = quoteToRevenueTransactions(
+      quote({ total: 1200, recurrenceConfig: { enabled: true, frequency: 'monthly', startDate: '2026-07-10', count: 3 } }),
+      entity,
+    );
+    expect(finitas).toHaveLength(3);
+    // Nenhuma é recorrente (não se auto-renova) — o motor de recorrência as ignora.
+    expect(finitas.every(t => !t.isRecurring)).toBe(true);
+    expect(finitas.every(t => t.amount === 1200)).toBe(true);
+    expect(finitas.map(t => t.date)).toEqual(['2026-07-10', '2026-08-10', '2026-09-10']);
+    expect(finitas.every(t => t.status === 'pending' && t.type === 'income')).toBe(true);
+  });
+
+  it('recorrência semanal com prazo avança 7 dias por cobrança', () => {
+    const semanais = quoteToRevenueTransactions(
+      quote({ total: 100, recurrenceConfig: { enabled: true, frequency: 'weekly', startDate: '2026-07-10', count: 2 } }),
+      entity,
+    );
+    expect(semanais.map(t => t.date)).toEqual(['2026-07-10', '2026-07-17']);
+  });
+});
+
+describe('orders — addMonths não vaza para o mês seguinte', () => {
+  it('parcela iniciada em 31/01 cai no último dia de fevereiro, não em março', () => {
+    const txs = quoteToRevenueTransactions(
+      quote({ total: 300, installments: 2, date: '2026-01-31' }),
+      entity,
+    );
+    // 2026 não é bissexto → fevereiro tem 28 dias.
+    expect(txs[0].date).toBe('2026-01-31');
+    expect(txs[1].date).toBe('2026-02-28');
   });
 });
 

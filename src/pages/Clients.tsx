@@ -280,7 +280,7 @@ export const Clients: React.FC = () => {
     }]);
   };
 
-  const updateContract = (id: string, field: string, value: string) => {
+  const updateContract = (id: string, field: string, value: string | number) => {
     setContracts(contracts.map(c => c.id === id ? { ...c, [field]: value } : c));
   };
 
@@ -919,7 +919,7 @@ export const Clients: React.FC = () => {
                               <input 
                                 type="number" 
                                 value={contract.value || ''} 
-                                onChange={(e) => updateContract(contract.id, 'value', e.target.value)}
+                                onChange={(e) => updateContract(contract.id, 'value', e.target.value === '' ? 0 : Number(e.target.value))}
                                 placeholder="Valor do Contrato"
                                 className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg border border-line"
                               />

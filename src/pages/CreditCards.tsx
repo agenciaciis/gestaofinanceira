@@ -38,6 +38,7 @@ export const CreditCards: React.FC = () => {
   const [selectedCardForInvoices, setSelectedCardForInvoices] = useState<CreditCard | null>(null);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
@@ -108,6 +109,8 @@ export const CreditCards: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetEntityId) return;
+    if (saving) return;
+    setSaving(true);
 
     const cardData = {
       name,
@@ -136,6 +139,8 @@ export const CreditCards: React.FC = () => {
     } catch (error) {
       console.error("Error saving card:", error);
       showToast('Erro ao salvar cartão.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -776,9 +781,10 @@ export const CreditCards: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90"
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {editingCard ? 'Salvar Alterações' : 'Salvar Cartão'}
+                  {saving ? 'Salvando...' : (editingCard ? 'Salvar Alterações' : 'Salvar Cartão')}
                 </button>
               </div>
             </form>

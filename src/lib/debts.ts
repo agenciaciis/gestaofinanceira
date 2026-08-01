@@ -98,8 +98,14 @@ function fromCards(
   today: Date
 ): DebtView[] {
   const views: DebtView[] = [];
+  // Compras PARCELADAS no cartão já entram inteiras (todas as parcelas) na
+  // dívida de "installments". Se também somássemos a parcela do ciclo atual na
+  // fatura, a parcela deste mês contaria DUAS vezes no total de dívidas. Por
+  // isso, para a DÍVIDA do cartão, olhamos só os gastos NÃO parcelados.
+  // (A fatura exibida no cartão continua usando computeCardInvoice normal.)
+  const semParcelamento = transactions.filter(t => !t.installmentGroupId);
   for (const c of cards) {
-    const invoice = computeCardInvoice(c.id, c.closingDay, transactions, today);
+    const invoice = computeCardInvoice(c.id, c.closingDay, semParcelamento, today);
     if (invoice <= 0) continue;
     const id = `card:${c.id}`;
     views.push({

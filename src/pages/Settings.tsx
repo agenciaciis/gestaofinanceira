@@ -27,6 +27,16 @@ export const Settings: React.FC = () => {
   const [waEnabled, setWaEnabled] = useState(selectedEntity?.whatsappConfig?.enabled || false);
   const [waStatus, setWaStatus] = useState<'connected' | 'disconnected' | 'loading' | 'disabled'>('loading');
 
+  // Re-sincroniza os campos do WhatsApp ao trocar de entidade — os states acima
+  // só rodam no mount, então sem isto os campos ficam presos na 1ª entidade.
+  useEffect(() => {
+    setWaApiUrl(selectedEntity?.whatsappConfig?.apiUrl || '');
+    setWaApiKey(selectedEntity?.whatsappConfig?.apiKey || '');
+    setWaInstance(selectedEntity?.whatsappConfig?.instanceName || '');
+    setWaPhone(selectedEntity?.whatsappConfig?.phoneNumber || '');
+    setWaEnabled(selectedEntity?.whatsappConfig?.enabled || false);
+  }, [selectedEntity]);
+
   useEffect(() => {
     const checkStatus = async () => {
       if (!selectedEntity?.id || !waEnabled) {

@@ -114,13 +114,19 @@ export const Services: React.FC = () => {
           entityId: selectedEntity.id,
           ownerUid: selectedEntity.ownerUid,
           collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
-          createdAt: serverTimestamp(),
         };
 
         if (editingItem) {
-          await updateDoc(doc(db, `entities/${selectedEntity.id}/${activeTab}/${editingItem.id}`), serviceData);
+          // createdAt é gravado SOMENTE na criação; na edição só atualizamos os campos + updatedAt.
+          await updateDoc(doc(db, `entities/${selectedEntity.id}/${activeTab}/${editingItem.id}`), {
+            ...serviceData,
+            updatedAt: serverTimestamp(),
+          });
         } else {
-          await addDoc(collection(db, `entities/${selectedEntity.id}/${activeTab}`), serviceData);
+          await addDoc(collection(db, `entities/${selectedEntity.id}/${activeTab}`), {
+            ...serviceData,
+            createdAt: serverTimestamp(),
+          });
         }
       } else {
         const planData = {
@@ -132,13 +138,19 @@ export const Services: React.FC = () => {
           entityId: selectedEntity.id,
           ownerUid: selectedEntity.ownerUid,
           collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
-          createdAt: serverTimestamp(),
         };
 
         if (editingItem) {
-          await updateDoc(doc(db, `entities/${selectedEntity.id}/plans/${editingItem.id}`), planData);
+          // createdAt é gravado SOMENTE na criação; na edição só atualizamos os campos + updatedAt.
+          await updateDoc(doc(db, `entities/${selectedEntity.id}/plans/${editingItem.id}`), {
+            ...planData,
+            updatedAt: serverTimestamp(),
+          });
         } else {
-          await addDoc(collection(db, `entities/${selectedEntity.id}/plans`), planData);
+          await addDoc(collection(db, `entities/${selectedEntity.id}/plans`), {
+            ...planData,
+            createdAt: serverTimestamp(),
+          });
         }
       }
 

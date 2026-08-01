@@ -73,7 +73,7 @@ export const EntitySelector: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           >
             <div className="w-full max-w-md rounded-2xl bg-surface p-8 shadow-2xl">
               <h3 className="text-xl font-bold text-content">Criar Nova Entidade</h3>

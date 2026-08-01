@@ -32,6 +32,7 @@ export const Debts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'overdue' | 'paid'>('pending');
+  const [saving, setSaving] = useState(false);
 
   // Edição de uma pendência (corrigir valor/data/descrição lançada errada)
   const [editingDebt, setEditingDebt] = useState<Transaction | null>(null);
@@ -49,11 +50,13 @@ export const Debts: React.FC = () => {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEntity || !editingDebt) return;
+    if (saving) return;
     const value = Number(editAmount);
     if (!Number.isFinite(value) || value <= 0) {
       showToast('Informe um valor válido.', 'error');
       return;
     }
+    setSaving(true);
     try {
       await updateDoc(doc(db, `entities/${selectedEntity.id}/transactions/${editingDebt.id}`), {
         description: editDescription.trim() || editingDebt.description,
@@ -66,6 +69,8 @@ export const Debts: React.FC = () => {
     } catch (error) {
       console.error('Error updating debt:', error);
       showToast('Erro ao atualizar pendência.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -371,8 +376,8 @@ export const Debts: React.FC = () => {
                   >
                     Cancelar
                   </button>
-                  <button type="submit" className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90">
-                    Salvar Alterações
+                  <button type="submit" disabled={saving} className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed">
+                    {saving ? 'Salvando...' : 'Salvar Alterações'}
                   </button>
                 </div>
               </form>

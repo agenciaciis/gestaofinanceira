@@ -238,3 +238,36 @@ describe('compareExtraPayment', () => {
     expect(muito.interestSaved).toBeGreaterThan(pouco.interestSaved);
   });
 });
+
+describe('collectDebts — compra parcelada NO cartão não é contada em dobro', () => {
+  const card = (): CreditCard => ({
+    id: 'card1', name: 'Nubank', brand: 'Visa', limit: 5000,
+    closingDay: 20, dueDay: 28, color: '#000', entityId: 'e',
+  } as CreditCard);
+
+  it('parcelamento no cartão entra só em installments (não soma na fatura)', () => {
+    // 3x R$400 no cartão: (1/3) paga, (2/3) e (3/3) pendentes. Uma delas cai no
+    // ciclo aberto da fatura. Não pode contar a mesma parcela em installments E na fatura.
+    const txs = [
+      tx({ id: '1', description: 'TV (1/3)', amount: 400, status: 'completed', cardId: 'card1', installmentGroupId: 'g1', date: '2026-06-10' }),
+      tx({ id: '2', description: 'TV (2/3)', amount: 400, status: 'pending', cardId: 'card1', installmentGroupId: 'g1', date: '2026-08-10' }),
+      tx({ id: '3', description: 'TV (3/3)', amount: 400, status: 'pending', cardId: 'card1', installmentGroupId: 'g1', date: '2026-09-10' }),
+    ];
+    const views = collectDebts(txs, [], [card()], {}, new Date(2026, 7, 1));
+    const total = round2(views.reduce((s, v) => s + v.balance, 0));
+    // Resta 2 parcelas de 400 = 800. Nem mais (dupla contagem), nem menos.
+    expect(total).toBe(800);
+    // E não deve existir uma dívida de fatura duplicando essas parcelas.
+    expect(views.some(v => v.source === 'card')).toBe(false);
+    const inst = views.find(v => v.source === 'installments');
+    expect(inst?.balance).toBe(800);
+  });
+
+  it('gasto avulso no cartão ainda vira dívida de fatura', () => {
+    const txs = [
+      tx({ id: '1', description: 'Mercado', amount: 250, status: 'pending', cardId: 'card1', date: '2026-08-10' }),
+    ];
+    const views = collectDebts(txs, [], [card()], {}, new Date(2026, 7, 1));
+    expect(views.some(v => v.source === 'card' && v.balance === 250)).toBe(true);
+  });
+});

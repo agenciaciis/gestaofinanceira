@@ -21,8 +21,20 @@ export type RevenueDraft = Omit<Transaction, 'id'> & {
   collaboratorsEmails?: string[];
 };
 
+// Soma meses sem "vazar" para o mês seguinte (dia 31 → último dia do mês alvo),
+// igual ao date-fns usado no caminho manual de lançamentos.
 function addMonths(base: Date, months: number): Date {
-  return new Date(base.getFullYear(), base.getMonth() + months, base.getDate());
+  const d = new Date(base.getFullYear(), base.getMonth() + months, 1);
+  const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(base.getDate(), ultimoDia));
+  return d;
+}
+
+// Avança a data conforme a frequência da recorrência.
+function stepDate(base: Date, freq: 'monthly' | 'weekly' | 'yearly' | undefined, i: number): Date {
+  if (freq === 'weekly') { const d = new Date(base); d.setDate(base.getDate() + i * 7); return d; }
+  if (freq === 'yearly') return addMonths(base, i * 12);
+  return addMonths(base, i);
 }
 
 function mapPaymentType(method?: string): Transaction['paymentType'] | undefined {
@@ -58,15 +70,36 @@ export function quoteToRevenueTransactions(quote: Quote, entity: OrderEntity): R
     paymentType: mapPaymentType(quote.paymentMethod),
   };
 
-  // Recorrente: um único lançamento; recurring.ts renova mês a mês.
+  // Recorrente.
   if (quote.recurrenceConfig?.enabled) {
+    const freq = quote.recurrenceConfig.frequency;
+    const count = Math.max(0, Math.floor(Number(quote.recurrenceConfig.count) || 0));
+    const rotulo = freq === 'weekly' ? 'semana' : freq === 'yearly' ? 'ano' : 'mês';
+
+    // Prazo DEFINIDO (count > 0): gera exatamente N cobranças, uma por período.
+    // São lançamentos comuns (sem isRecurring) — não se renovam sozinhos, batendo
+    // com o "durante N períodos" impresso na proposta.
+    if (count > 0) {
+      const groupId = `rec-${quote.id}`;
+      return Array.from({ length: count }, (_, i) => ({
+        ...common,
+        description: `${quote.clientName} — ${quote.quoteNumber} (${rotulo} ${i + 1}/${count})`,
+        amount: total,
+        date: formatLocalDate(stepDate(start, freq, i)),
+        installmentGroupId: groupId,
+        installmentNumber: i + 1,
+        totalInstallments: count,
+      }));
+    }
+
+    // Prazo INDETERMINADO (count = 0): um lançamento recorrente que o motor renova.
     return [{
       ...common,
       description: `${quote.clientName} — ${quote.quoteNumber} (recorrente)`,
       amount: total,
       date: formatLocalDate(start),
       isRecurring: true,
-      recurringPeriod: quote.recurrenceConfig.frequency,
+      recurringPeriod: freq,
       recurringGroupId: `rec-${quote.id}`,
     }];
   }

@@ -76,6 +76,7 @@ export const Transactions: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const suggestCategory = async () => {
     if (!description) return;
@@ -453,6 +454,8 @@ export const Transactions: React.FC = () => {
   }, [transactions, entities]);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    if (saving) return;
+    setSaving(true);
     // Registra etiquetas novas na lista da entidade, para sugerir depois.
     const novasTags = parseTags(tagsInput);
     if (novasTags.length > 0 && targetEntityId) {
@@ -462,7 +465,7 @@ export const Transactions: React.FC = () => {
       ).catch(err => console.error('Erro ao salvar etiquetas:', err));
     }
     e.preventDefault();
-    if (!targetEntityId) return;
+    if (!targetEntityId) { setSaving(false); return; }
 
     try {
       if (editingTransaction) {
@@ -669,6 +672,8 @@ export const Transactions: React.FC = () => {
     } catch (error) {
       console.error("Error saving transaction:", error);
       showToast('Erro ao salvar lançamento.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1017,7 +1022,7 @@ export const Transactions: React.FC = () => {
                       {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''} {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => handleEdit(t)}
                           className="rounded-lg p-1.5 text-content-subtle hover:bg-surface-muted hover:text-primary transition-all"
@@ -1481,9 +1486,10 @@ export const Transactions: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90"
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Confirmar Lançamento
+                  {saving ? 'Salvando...' : 'Confirmar Lançamento'}
                 </button>
               </div>
             </form>

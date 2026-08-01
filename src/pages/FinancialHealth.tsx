@@ -22,7 +22,8 @@ import {
   BellOff,
   Settings2,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -276,7 +277,7 @@ export const FinancialHealth: React.FC = () => {
 
   const handleSendWhatsAppAlert = async (debt: Debt) => {
     if (!selectedEntity?.whatsappConfig?.enabled) {
-      alert('Configure o WhatsApp nas Configurações para enviar alertas.');
+      showToast('Configure o WhatsApp nas Configurações para enviar alertas.', 'info');
       return;
     }
 
@@ -295,10 +296,10 @@ export const FinancialHealth: React.FC = () => {
       const { WhatsAppService } = await import('../services/WhatsAppService');
       const wa = new WhatsAppService(selectedEntity.whatsappConfig);
       await wa.sendText(message);
-      alert('Alerta enviado para o WhatsApp com sucesso!');
+      showToast('Alerta enviado para o WhatsApp com sucesso!', 'success');
     } catch (error) {
       console.error('Error sending WhatsApp alert:', error);
-      alert('Erro ao enviar alerta. Verifique as configurações do WhatsApp.');
+      showToast('Erro ao enviar alerta. Verifique as configurações do WhatsApp.', 'error');
     }
   };
 
@@ -1025,14 +1026,25 @@ export const FinancialHealth: React.FC = () => {
 
       {/* Alert Modal */}
       {isAlertModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <motion.div 
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm"
+          onClick={() => setIsAlertModalOpen(false)}
+        >
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-3xl bg-surface p-8 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl bg-surface p-6 sm:p-8 shadow-2xl"
           >
+            <button
+              type="button"
+              onClick={() => setIsAlertModalOpen(false)}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content"
+            >
+              <X className="h-5 w-5" />
+            </button>
             <div className="flex items-center gap-3 mb-6">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <div className="h-12 w-12 shrink-0 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                 <Bell className="h-6 w-6" />
               </div>
               <div>
@@ -1271,12 +1283,23 @@ export const FinancialHealth: React.FC = () => {
 
       {/* Debt Modal */}
       {isDebtModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <motion.div 
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm"
+          onClick={() => setIsDebtModalOpen(false)}
+        >
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-3xl bg-surface p-8 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl bg-surface p-6 sm:p-8 shadow-2xl"
           >
+            <button
+              type="button"
+              onClick={() => setIsDebtModalOpen(false)}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content"
+            >
+              <X className="h-5 w-5" />
+            </button>
             <h3 className="text-2xl font-black text-content">Nova Dívida</h3>
             <p className="text-sm text-content-subtle mt-1">Registre para calcular o tempo de quitação.</p>
             

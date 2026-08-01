@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
+import { useUI } from '../contexts/UIContext';
 import { collection, query, where, onSnapshot, limit, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Transaction, BankAccount, CreditCard, Debt } from '../types';
@@ -110,6 +111,7 @@ const StatCard: React.FC<{
 
 export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate }) => {
   const { entities, filterType } = useEntity();
+  const { showToast } = useUI();
   const { theme } = useTheme();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -127,7 +129,6 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
   const [isCrossEntityOpen, setIsCrossEntityOpen] = useState(false);
 
   useEffect(() => {
-    console.log('Dashboard: useEffect triggered', { entitiesCount: entities.length, filterType });
     if (entities.length === 0) {
       setLoading(false);
       return;
@@ -464,6 +465,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       });
     } catch (error) {
       console.error("Error updating status:", error);
+      showToast('Não consegui atualizar o status. Tente de novo.', 'error');
     }
   };
 

@@ -20,6 +20,7 @@ export const BankAccounts: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Form state
   const [bankName, setBankName] = useState('');
@@ -77,6 +78,8 @@ export const BankAccounts: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEntity) return;
+    if (saving) return;
+    setSaving(true);
 
     try {
       if (editingAccount) {
@@ -106,6 +109,8 @@ export const BankAccounts: React.FC = () => {
     } catch (error) {
       console.error("Error saving account:", error);
       showToast('Erro ao salvar conta bancária.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -399,9 +404,10 @@ export const BankAccounts: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90"
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {editingAccount ? 'Salvar Alterações' : 'Salvar Conta'}
+                  {saving ? 'Salvando...' : (editingAccount ? 'Salvar Alterações' : 'Salvar Conta')}
                 </button>
               </div>
             </form>
