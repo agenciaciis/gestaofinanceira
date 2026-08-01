@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, MessageSquare, Save, ExternalLink, Settings2, Users, Plus, Trash2, Send } from 'lucide-react';
+import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, MessageSquare, Save, ExternalLink, Settings2, Users, Plus, Trash2, Send, Download, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { collection, getDocs, doc, getDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import { BACKUP_VERSION, BACKUP_SUBCOLLECTIONS, encodeTimestamps, decodeTimestamps, validateBackup, countBackupItems, backupFilename, type Backup } from '../lib/backup';
 
 export const Settings: React.FC = () => {
   const { user, logout } = useAuth();
@@ -133,6 +136,102 @@ export const Settings: React.FC = () => {
       showToast('Não consegui falar com o servidor. O Telegram só funciona com o app publicado (deploy) e o TELEGRAM_BOT_TOKEN configurado.', 'error');
     } finally {
       setTgLoading(false);
+    }
+  };
+
+  // ---- Backup & Restauração (JSON) ----
+  const [backupBusy, setBackupBusy] = useState(false);
+  const isTs = (v: any) => v instanceof Timestamp;
+  const tsToMs = (v: Timestamp) => v.toMillis();
+  const msToTs = (ms: number) => Timestamp.fromMillis(ms);
+
+  const downloadBackup = async () => {
+    if (!user) return;
+    setBackupBusy(true);
+    try {
+      const owned = entities.filter(e => e.ownerUid === user.uid);
+      if (owned.length === 0) { showToast('Nenhuma entidade sua para exportar.', 'error'); return; }
+      const backupEntities = [];
+      const puladas: string[] = [];
+      for (const ent of owned) {
+        const entSnap = await getDoc(doc(db, `entities/${ent.id}`));
+        const collections: Record<string, { id: string; data: any }[]> = {};
+        for (const col of BACKUP_SUBCOLLECTIONS) {
+          try {
+            const snap = await getDocs(collection(db, `entities/${ent.id}/${col}`));
+            collections[col] = snap.docs.map(d => ({ id: d.id, data: encodeTimestamps(d.data(), isTs, tsToMs) }));
+          } catch {
+            // Coleção sem permissão de leitura (regra não publicada) — pula e segue.
+            if (!puladas.includes(col)) puladas.push(col);
+          }
+        }
+        backupEntities.push({ id: ent.id, data: encodeTimestamps(entSnap.data() || {}, isTs, tsToMs), collections });
+      }
+      const backup: Backup = { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), app: 'finanflow', entities: backupEntities };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = backupFilename(backup.exportedAt);
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      const c = countBackupItems(backup);
+      showToast(
+        `Backup gerado: ${c.entities} entidade(s), ${c.documents} registros.${puladas.length ? ` (Sem permissão para: ${puladas.join(', ')} — publique as regras do Firestore para incluí-las.)` : ''}`,
+        'success'
+      );
+    } catch (e) {
+      console.error('Erro no backup:', e);
+      showToast('Erro ao gerar o backup.', 'error');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const restoreBackup = async (file: File) => {
+    if (!user) return;
+    let obj: any;
+    try { obj = JSON.parse(await file.text()); }
+    catch { showToast('Arquivo não é um JSON válido.', 'error'); return; }
+    const check = validateBackup(obj);
+    if (!check.ok) { showToast(check.reason || 'Backup inválido.', 'error'); return; }
+    const c = countBackupItems(obj);
+    const ok = await confirm({
+      title: 'Restaurar backup',
+      message: `Isto vai gravar ${c.documents} registro(s) de ${c.entities} entidade(s), sobrescrevendo dados com o mesmo identificador. Recomendo baixar um backup atual antes. Deseja continuar?`,
+      confirmText: 'Restaurar',
+      cancelText: 'Cancelar',
+    });
+    if (!ok) return;
+    setBackupBusy(true);
+    try {
+      let restaurados = 0, ignoradas = 0;
+      for (const ent of obj.entities as Backup['entities']) {
+        // Só restaura entidades que VOCÊ possui (as regras exigem ser dono/escritor).
+        const owned = entities.find(e => e.id === ent.id && e.ownerUid === user.uid);
+        if (!owned) { ignoradas++; continue; }
+        for (const col of BACKUP_SUBCOLLECTIONS) {
+          const docs = ent.collections[col] || [];
+          try {
+            for (let i = 0; i < docs.length; i += 400) {
+              const batch = writeBatch(db);
+              for (const d of docs.slice(i, i + 400)) {
+                batch.set(doc(db, `entities/${ent.id}/${col}/${d.id}`), decodeTimestamps(d.data, msToTs));
+              }
+              await batch.commit();
+              restaurados += Math.min(400, docs.length - i);
+            }
+          } catch (err) {
+            // Sem permissão de escrita nessa coleção — pula e segue com as demais.
+            console.warn(`Restauração: pulando ${col} de ${ent.id}`, err);
+          }
+        }
+      }
+      showToast(`Restauração concluída: ${restaurados} registro(s).${ignoradas ? ` ${ignoradas} entidade(s) do arquivo não são suas e foram ignoradas.` : ''}`, 'success');
+    } catch (e) {
+      console.error('Erro na restauração:', e);
+      showToast('Erro ao restaurar o backup.', 'error');
+    } finally {
+      setBackupBusy(false);
     }
   };
 
@@ -497,6 +596,43 @@ export const Settings: React.FC = () => {
               className="space-y-6"
             >
               <h3 className="text-lg font-bold text-content">Gerenciamento de Dados</h3>
+
+              {/* Backup & Restauração */}
+              <div className="rounded-2xl border border-line bg-canvas p-6">
+                <div className="mb-1 flex items-center gap-2">
+                  <Database className="h-5 w-5 text-primary" />
+                  <h4 className="font-bold text-content">Backup & Restauração</h4>
+                </div>
+                <p className="mb-4 text-sm text-content-subtle">
+                  Baixe um arquivo com <strong>todos os seus dados</strong> (lançamentos, contas, cartões, dívidas, clientes, fornecedores, serviços, orçamentos, metas e configurações). Guarde em local seguro. Para voltar os dados, use “Restaurar”.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    onClick={downloadBackup}
+                    disabled={backupBusy}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    <Download className="h-4 w-4" />
+                    {backupBusy ? 'Processando...' : 'Baixar backup (.json)'}
+                  </button>
+                  <label className={cn(
+                    'flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-2.5 text-sm font-bold text-content hover:bg-surface-muted',
+                    backupBusy && 'pointer-events-none opacity-60'
+                  )}>
+                    <Upload className="h-4 w-4" />
+                    Restaurar de arquivo
+                    <input
+                      type="file" accept="application/json,.json" className="hidden"
+                      disabled={backupBusy}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) restoreBackup(f); e.target.value = ''; }}
+                    />
+                  </label>
+                </div>
+                <p className="mt-3 text-xs text-content-subtle">
+                  A restauração grava por cima de registros com o mesmo identificador e só afeta entidades das quais você é o dono. Backup automático agendado poderá ser ativado no servidor após o deploy na VPS.
+                </p>
+              </div>
+
               <div className="rounded-xl border border-red-100 bg-red-50 p-6">
                 <h4 className="mb-2 font-bold text-red-900">Zona de Perigo</h4>
                 <p className="mb-4 text-sm text-red-700">
