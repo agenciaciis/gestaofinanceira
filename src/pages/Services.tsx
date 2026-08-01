@@ -32,6 +32,10 @@ export const Services: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'services' | 'plans' | 'products'>('services');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Service | Plan | null>(null);
+  // A regra da subcoleção `products` é mais nova; se ainda não foi publicada no
+  // Firebase, leitura/escrita caem em permission-denied. Guardamos isso para
+  // avisar em vez de falhar em silêncio.
+  const [productsBlocked, setProductsBlocked] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useViewMode('servicos', 'grid');
 
@@ -70,9 +74,11 @@ export const Services: React.FC = () => {
     });
 
     const unsubProducts = onSnapshot(productsQ, (snapshot) => {
+      setProductsBlocked(false);
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[]);
     }, (error) => {
       console.error("Error fetching products:", error);
+      if ((error as { code?: string })?.code === 'permission-denied') setProductsBlocked(true);
       handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/products`);
     });
 
@@ -372,6 +378,18 @@ export const Services: React.FC = () => {
           />
         </div>
       </div>
+
+      {activeTab === 'products' && productsBlocked && (
+        <div className="mb-6 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/40 p-6">
+          <p className="font-bold text-amber-900 dark:text-amber-200">Catálogo de produtos bloqueado pelo banco de dados</p>
+          <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+            A regra de acesso da coleção <code className="mx-1 rounded bg-amber-900/20 px-1">products</code> ainda não foi
+            publicada no Firebase — por isso produtos não salvam nem aparecem aqui (e não podem ser puxados no orçamento).
+            Publique o arquivo <code className="mx-1 rounded bg-amber-900/20 px-1">firestore.rules</code>
+            (Console do Firebase → Firestore → Regras → Publicar, ou <code className="mx-1 rounded bg-amber-900/20 px-1">firebase deploy --only firestore:rules</code>) e isto volta a funcionar. Serviços e Planos não são afetados.
+          </p>
+        </div>
+      )}
 
       {viewMode === 'list' && (
         activeTab !== 'plans' ? (
