@@ -136,6 +136,7 @@ export function computeCardInvoice(
     if (t.cardId !== cardId) continue;
     if (t.type !== 'expense') continue;
     if (t.status === 'cancelled') continue;
+    if (t.settled) continue; // fatura já paga: não conta na fatura atual
     const d = parseLocalDate(t.date);
     if (d >= start && d < end) total = round2(total + (Number(t.amount) || 0));
   }
@@ -204,6 +205,7 @@ export function computeCardUsage(
     if (t.cardId !== cardId) continue;
     if (t.type !== 'expense') continue;
     if (t.status === 'cancelled') continue;
+    if (t.settled) continue; // fatura paga: libera o limite
     const d = parseLocalDate(t.date);
     if (Number.isNaN(d.getTime())) continue;
     // Do início do ciclo aberto para frente: inclui a fatura atual e o futuro.

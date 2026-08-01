@@ -172,6 +172,15 @@ describe('currentInvoiceWindow / computeCardInvoice', () => {
     ], ref);
     expect(total).toBe(150);
   });
+
+  it('ignora compras com fatura já paga (settled)', () => {
+    const ref = new Date(2026, 5, 5);
+    const total = computeCardInvoice('c1', 10, [
+      tx({ type: 'expense', amount: 100, cardId: 'c1', date: '2026-05-20' }),
+      tx({ type: 'expense', amount: 50, cardId: 'c1', date: '2026-06-09', settled: true }), // paga: fora
+    ], ref);
+    expect(total).toBe(100);
+  });
 });
 
 

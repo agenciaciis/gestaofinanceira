@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { CreditCard, Transaction } from '../types';
-import { Plus, CreditCard as CardIcon, Trash2, Edit2, AlertCircle, Calendar, Info, BarChart3, X, ReceiptText, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { CreditCard, Transaction, BankAccount } from '../types';
+import { Plus, CreditCard as CardIcon, Trash2, Edit2, AlertCircle, Calendar, Info, BarChart3, X, ReceiptText, ChevronRight, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
 import { ColorField } from '../components/ColorField';
-import { computeCardUsage, currentInvoiceWindow, parseLocalDate } from '../lib/finance';
+import { computeCardUsage, computeCardInvoice, currentInvoiceWindow, parseLocalDate } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -30,7 +30,13 @@ export const CreditCards: React.FC = () => {
   const { entities, filterType } = useEntity();
   const { showToast, confirm } = useUI();
   const [cards, setCards] = useState<CreditCard[]>([]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [cardTransactions, setCardTransactions] = useState<Record<string, Transaction[]>>({});
+  // Pagamento de fatura
+  const [payingCard, setPayingCard] = useState<CreditCard | null>(null);
+  const [payAccountId, setPayAccountId] = useState('');
+  const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
@@ -66,7 +72,9 @@ export const CreditCards: React.FC = () => {
     const unsubscribes: (() => void)[] = [];
     const cardsByEntity: Record<string, CreditCard[]> = {};
     const txByEntity: Record<string, Transaction[]> = {};
+    const accountsByEntity: Record<string, BankAccount[]> = {};
 
+    const publishAccounts = () => setAccounts(Object.values(accountsByEntity).flat());
     const publishCards = () => setCards(Object.values(cardsByEntity).flat());
     const publishTx = () => {
       const byCard: Record<string, Transaction[]> = {};
@@ -95,16 +103,79 @@ export const CreditCards: React.FC = () => {
 
       const txQ = query(collection(db, `entities/${entity.id}/transactions`));
       unsubscribes.push(onSnapshot(txQ, (snapshot) => {
-        txByEntity[entity.id] = snapshot.docs.map(doc => doc.data() as Transaction);
+        txByEntity[entity.id] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[];
         publishTx();
       }, (error) => {
         console.error(`Error fetching transactions for entity ${entity.id}:`, error);
         handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/transactions`);
       }));
+
+      const accQ = query(collection(db, `entities/${entity.id}/bank_accounts`));
+      unsubscribes.push(onSnapshot(accQ, (snapshot) => {
+        accountsByEntity[entity.id] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BankAccount[];
+        publishAccounts();
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/bank_accounts`)));
     });
 
     return () => unsubscribes.forEach(unsub => unsub());
   }, [entities, filterType]);
+
+  // Abre o modal de pagamento com o total da fatura atual como valor padrão.
+  const openPayInvoice = (card: CreditCard) => {
+    const total = computeCardInvoice(card.id, card.closingDay, cardTransactions[card.id] || [], new Date());
+    setPayingCard(card);
+    setPayAmount(total > 0 ? total.toFixed(2) : '');
+    setPayDate(new Date().toISOString().split('T')[0]);
+    const accs = accounts.filter(a => a.entityId === card.entityId);
+    setPayAccountId(accs[0]?.id || '');
+  };
+
+  // Paga a fatura: cria a DESPESA no banco (saldo cai) e marca as compras da
+  // fatura atual como `settled` (o limite utilizado volta).
+  const confirmPayInvoice = async () => {
+    if (!payingCard) return;
+    if (!payAccountId) { showToast('Escolha a conta de onde sai o pagamento.', 'error'); return; }
+    const amount = Number(payAmount) || 0;
+    if (amount <= 0) { showToast('Informe um valor de pagamento.', 'error'); return; }
+    if (saving) return;
+    setSaving(true);
+    const ent = payingCard.entityId;
+    const owner = entities.find(e => e.id === ent);
+    try {
+      await addDoc(collection(db, `entities/${ent}/transactions`), {
+        description: `Pagamento fatura ${payingCard.name}`,
+        amount,
+        type: 'expense',
+        status: 'completed',
+        date: payDate,
+        accountId: payAccountId,
+        categoryId: 'cartao',
+        entityId: ent,
+        ownerUid: owner?.ownerUid,
+        collaboratorsEmails: owner?.collaboratorsEmails || [],
+        createdAt: serverTimestamp(),
+      });
+      // Marca a fatura do ciclo atual como paga para liberar o limite utilizado.
+      const { start, end } = currentInvoiceWindow(payingCard.closingDay, new Date());
+      const aQuitar = (cardTransactions[payingCard.id] || []).filter(t => {
+        if (!t.id || t.type !== 'expense' || t.status === 'cancelled' || t.settled) return false;
+        const d = parseLocalDate(t.date);
+        return !Number.isNaN(d.getTime()) && d >= start && d < end;
+      });
+      if (aQuitar.length) {
+        const batch = writeBatch(db);
+        for (const t of aQuitar) batch.update(doc(db, `entities/${ent}/transactions/${t.id}`), { settled: true, settledAt: payDate });
+        await batch.commit();
+      }
+      showToast('Fatura paga! Saldo do banco atualizado e limite liberado.', 'success');
+      setPayingCard(null);
+    } catch (error) {
+      console.error('Erro ao pagar fatura:', error);
+      showToast('Erro ao registrar o pagamento da fatura.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,6 +485,13 @@ export const CreditCards: React.FC = () => {
                   >
                     <ReceiptText className="h-3 w-3" />
                     Ver Faturas
+                  </button>
+                  <button
+                    onClick={() => openPayInvoice(card)}
+                    className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-emerald-500/25 py-2 text-[10px] font-bold hover:bg-emerald-500/40 transition-all text-emerald-50"
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    Pagar fatura
                   </button>
                 </div>
               </div>
@@ -788,6 +866,64 @@ export const CreditCards: React.FC = () => {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Pagar fatura: baixa do banco + libera o limite */}
+      {payingCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setPayingCard(null)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-3xl bg-surface p-6 sm:p-8 shadow-2xl"
+          >
+            <button type="button" aria-label="Fechar" onClick={() => setPayingCard(null)}
+              className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-bold text-content pr-10">Pagar fatura — {payingCard.name}</h3>
+            <p className="mt-1 text-sm text-content-subtle">
+              Isto cria uma despesa na conta escolhida (o saldo do banco cai) e marca a fatura atual como paga, liberando o limite do cartão.
+            </p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-content-muted mb-1">Pagar com a conta</label>
+                <select value={payAccountId} onChange={e => setPayAccountId(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 outline-none focus:border-primary">
+                  <option value="">Selecione a conta...</option>
+                  {accounts.filter(a => a.entityId === payingCard.entityId).map(a => (
+                    <option key={a.id} value={a.id}>{a.bankName}</option>
+                  ))}
+                </select>
+                {accounts.filter(a => a.entityId === payingCard.entityId).length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">Nenhuma conta cadastrada nesta entidade. Cadastre em “Contas”.</p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-content-muted mb-1">Valor</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-content-subtle text-sm">R$</span>
+                    <input type="number" step="0.01" min="0" value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                      className="w-full rounded-xl border border-line bg-surface pl-9 pr-3 py-2.5 outline-none focus:border-primary" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-content-muted mb-1">Data</label>
+                  <input type="date" value={payDate} onChange={e => setPayDate(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 outline-none focus:border-primary" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-8 flex gap-3">
+              <button type="button" onClick={() => setPayingCard(null)}
+                className="flex-1 rounded-xl border border-line py-2.5 text-sm font-semibold text-content-muted hover:bg-canvas">Cancelar</button>
+              <button type="button" onClick={confirmPayInvoice} disabled={saving}
+                className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+                {saving ? 'Pagando...' : 'Confirmar pagamento'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}

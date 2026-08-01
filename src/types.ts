@@ -85,6 +85,9 @@ export interface Transaction {
   toAccountId?: string; // For transfers
   cardId?: string;
   status: 'pending' | 'completed' | 'cancelled';
+  /** Gasto de cartão cuja fatura já foi paga: sai do "utilizado"/fatura atual. */
+  settled?: boolean;
+  settledAt?: string;
   entityId: string;
   paidAt?: string; // data em que foi efetivamente pago (YYYY-MM-DD)
   // Forma de pagamento (além de conta/cartão): pix, boleto, dinheiro, transferência...
