@@ -13,7 +13,7 @@ import { computeBalances } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 
 export const BankAccounts: React.FC = () => {
-  const { selectedEntity } = useEntity();
+  const { selectedEntity, entities, filterType } = useEntity();
   const { showToast, confirm } = useUI();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -24,27 +24,42 @@ export const BankAccounts: React.FC = () => {
 
   // Form state
   const [bankName, setBankName] = useState('');
+  const [targetEntityId, setTargetEntityId] = useState('');
   const [color, setColor] = useState('');
   const [viewMode, setViewMode] = useViewMode('contas', 'grid');
   const [type, setType] = useState<'corrente' | 'poupanca' | 'investimento' | 'caixa' | 'reserva'>('corrente');
   const [initialBalance, setInitialBalance] = useState('');
 
+  // Carrega contas e transações de TODAS as entidades do filtro (Consolidado =
+  // todas; PF/PJ = as do tipo). Antes usava só a entidade selecionada e ignorava
+  // o filtro global — a tela ficava vazia/parcial mesmo em "Consolidado".
   useEffect(() => {
-    if (!selectedEntity) return;
+    if (entities.length === 0) return;
+    const filteredEntities = filterType === 'ALL' ? entities : entities.filter(e => e.type === filterType);
+    if (filteredEntities.length === 0) { setAccounts([]); setTransactions([]); setLoading(false); return; }
 
-    const qAccounts = query(collection(db, `entities/${selectedEntity.id}/bank_accounts`));
-    const unsubAccounts = onSnapshot(qAccounts, (snapshot) => {
-      setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BankAccount[]);
-      setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/bank_accounts`));
+    const unsubscribes: (() => void)[] = [];
+    const accByEntity: Record<string, BankAccount[]> = {};
+    const txByEntity: Record<string, Transaction[]> = {};
+    const publishAcc = () => setAccounts(Object.values(accByEntity).flat());
+    const publishTx = () => setTransactions(Object.values(txByEntity).flat());
 
-    const qTx = query(collection(db, `entities/${selectedEntity.id}/transactions`));
-    const unsubTx = onSnapshot(qTx, (snapshot) => {
-      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[]);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/transactions`));
+    filteredEntities.forEach(entity => {
+      unsubscribes.push(onSnapshot(query(collection(db, `entities/${entity.id}/bank_accounts`)), (snap) => {
+        accByEntity[entity.id] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BankAccount[];
+        publishAcc();
+        setLoading(false);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/bank_accounts`)));
 
-    return () => { unsubAccounts(); unsubTx(); };
-  }, [selectedEntity]);
+      unsubscribes.push(onSnapshot(query(collection(db, `entities/${entity.id}/transactions`)), (snap) => {
+        txByEntity[entity.id] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[];
+        publishTx();
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/transactions`)));
+    });
+
+    setLoading(false);
+    return () => unsubscribes.forEach(u => u());
+  }, [entities, filterType]);
 
   // Saldo é SEMPRE calculado a partir das transações concluídas (fonte da verdade).
   const balances = computeBalances(accounts, transactions);
@@ -63,6 +78,9 @@ export const BankAccounts: React.FC = () => {
     setColor('');
     setType('corrente');
     setInitialBalance('');
+    // Entidade padrão ao criar: a selecionada, senão a 1ª do filtro atual.
+    const filtered = filterType === 'ALL' ? entities : entities.filter(e => e.type === filterType);
+    setTargetEntityId(selectedEntity?.id || filtered[0]?.id || entities[0]?.id || '');
     setEditingAccount(null);
   };
 
@@ -72,18 +90,22 @@ export const BankAccounts: React.FC = () => {
     setColor(account.color || '');
     setType(account.type);
     setInitialBalance(String(account.initialBalance ?? ''));
+    setTargetEntityId(account.entityId);
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEntity) return;
     if (saving) return;
+    // Na criação usa a entidade escolhida no form; na edição, a da própria conta.
+    const entId = editingAccount ? editingAccount.entityId : targetEntityId;
+    if (!entId) { showToast('Escolha a entidade da conta.', 'error'); return; }
+    const owner = entities.find(en => en.id === entId);
     setSaving(true);
 
     try {
       if (editingAccount) {
-        await updateDoc(doc(db, `entities/${selectedEntity.id}/bank_accounts`, editingAccount.id), {
+        await updateDoc(doc(db, `entities/${entId}/bank_accounts`, editingAccount.id), {
           bankName,
           color: normalizeHex(color) || null,
           type,
@@ -91,15 +113,15 @@ export const BankAccounts: React.FC = () => {
         });
         showToast('Conta bancária atualizada com sucesso!', 'success');
       } else {
-        await addDoc(collection(db, `entities/${selectedEntity.id}/bank_accounts`), {
+        await addDoc(collection(db, `entities/${entId}/bank_accounts`), {
           bankName,
           color: normalizeHex(color) || null,
           type,
           initialBalance: Number(initialBalance),
           currentBalance: Number(initialBalance),
-          entityId: selectedEntity.id,
-          ownerUid: selectedEntity.ownerUid,
-          collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
+          entityId: entId,
+          ownerUid: owner?.ownerUid,
+          collaboratorsEmails: owner?.collaboratorsEmails || [],
           createdAt: serverTimestamp(),
         });
         showToast('Conta bancária cadastrada com sucesso!', 'success');
@@ -114,17 +136,19 @@ export const BankAccounts: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!selectedEntity) return;
+  const handleDelete = async (account: BankAccount) => {
+    const vinculadas = transactions.filter(t => t.accountId === account.id || t.toAccountId === account.id).length;
     const confirmed = await confirm({
       title: 'Excluir Conta',
-      message: 'Tem certeza que deseja excluir esta conta bancária?',
+      message: vinculadas > 0
+        ? `Tem certeza? Há ${vinculadas} lançamento(s) usando esta conta — eles continuam no sistema, mas ficam sem conta vinculada (e saem do cálculo de saldo).`
+        : 'Tem certeza que deseja excluir esta conta bancária?',
       variant: 'danger'
     });
     if (!confirmed) return;
-    
+
     try {
-      await deleteDoc(doc(db, `entities/${selectedEntity.id}/bank_accounts`, id));
+      await deleteDoc(doc(db, `entities/${account.entityId}/bank_accounts`, account.id));
       showToast('Conta bancária excluída com sucesso.', 'success');
     } catch (error) {
       console.error("Error deleting account:", error);
@@ -232,7 +256,7 @@ export const BankAccounts: React.FC = () => {
                 className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
                 <Edit2 className="h-4 w-4" />
               </button>
-              <button onClick={() => handleDelete(a.id)} title="Excluir"
+              <button onClick={() => handleDelete(a)} title="Excluir"
                 className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-rose-600">
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -284,7 +308,7 @@ export const BankAccounts: React.FC = () => {
                   <Edit2 className="h-4 w-4" />
                 </button>
                 <button 
-                  onClick={() => handleDelete(account.id)}
+                  onClick={() => handleDelete(account)}
                   className="p-2 rounded-lg hover:bg-rose-50 text-content-subtle hover:text-rose-600 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -340,6 +364,20 @@ export const BankAccounts: React.FC = () => {
             </button>
             <h3 className="text-xl font-bold text-content pr-10">{editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</h3>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-content-muted">Entidade</label>
+                <select
+                  value={targetEntityId}
+                  onChange={(e) => setTargetEntityId(e.target.value)}
+                  disabled={!!editingAccount}
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none disabled:opacity-60"
+                  required
+                >
+                  <option value="">Selecione...</option>
+                  {entities.map(en => <option key={en.id} value={en.id}>{en.name}</option>)}
+                </select>
+                {editingAccount && <p className="mt-1 text-xs text-content-subtle">Não é possível trocar a entidade na edição.</p>}
+              </div>
               <div>
                 <label className="block text-sm font-medium text-content-muted">Nome do Banco</label>
                 <input
