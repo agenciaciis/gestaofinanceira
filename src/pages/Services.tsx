@@ -32,10 +32,6 @@ export const Services: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'services' | 'plans' | 'products'>('services');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Service | Plan | null>(null);
-  // A regra da subcoleção `products` é mais nova; se ainda não foi publicada no
-  // Firebase, leitura/escrita caem em permission-denied. Guardamos isso para
-  // avisar em vez de falhar em silêncio.
-  const [productsBlocked, setProductsBlocked] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useViewMode('servicos', 'grid');
 
@@ -62,24 +58,18 @@ export const Services: React.FC = () => {
     // loading, senão a tela fica presa no spinner e nenhum botão é alcançável.
     if (!selectedEntity) { setLoading(false); return; }
 
-    const servicesQ = query(collection(db, `entities/${selectedEntity.id}/services`), orderBy('createdAt', 'desc'));
-    const productsQ = query(collection(db, `entities/${selectedEntity.id}/products`), orderBy('createdAt', 'desc'));
+    // Serviços E produtos moram na MESMA coleção `services` (regra já publicada),
+    // separados só pelo campo catalogType. Uma leitura, dois filtros.
+    const catalogQ = query(collection(db, `entities/${selectedEntity.id}/services`), orderBy('createdAt', 'desc'));
     const plansQ = query(collection(db, `entities/${selectedEntity.id}/plans`), orderBy('createdAt', 'desc'));
 
-    const unsubServices = onSnapshot(servicesQ, (snapshot) => {
-      setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[]);
+    const unsubCatalog = onSnapshot(catalogQ, (snapshot) => {
+      const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[];
+      setServices(all.filter(s => s.catalogType !== 'product'));
+      setProducts(all.filter(s => s.catalogType === 'product'));
     }, (error) => {
-      console.error("Error fetching services:", error);
+      console.error("Error fetching catalog:", error);
       handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/services`);
-    });
-
-    const unsubProducts = onSnapshot(productsQ, (snapshot) => {
-      setProductsBlocked(false);
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[]);
-    }, (error) => {
-      console.error("Error fetching products:", error);
-      if ((error as { code?: string })?.code === 'permission-denied') setProductsBlocked(true);
-      handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/products`);
     });
 
     const unsubPlans = onSnapshot(plansQ, (snapshot) => {
@@ -91,8 +81,7 @@ export const Services: React.FC = () => {
     });
 
     return () => {
-      unsubServices();
-      unsubProducts();
+      unsubCatalog();
       unsubPlans();
     };
   }, [selectedEntity]);
@@ -117,6 +106,8 @@ export const Services: React.FC = () => {
           notIncluded: notIncluded.trim() || null,
           observations: observations.trim() || null,
           active,
+          // Serviço e produto compartilham a coleção `services`; o tipo mora aqui.
+          catalogType: activeTab === 'products' ? 'product' : 'service',
           entityId: selectedEntity.id,
           ownerUid: selectedEntity.ownerUid,
           collaboratorsEmails: selectedEntity.collaboratorsEmails || [],
@@ -124,12 +115,12 @@ export const Services: React.FC = () => {
 
         if (editingItem) {
           // createdAt é gravado SOMENTE na criação; na edição só atualizamos os campos + updatedAt.
-          await updateDoc(doc(db, `entities/${selectedEntity.id}/${activeTab}/${editingItem.id}`), {
+          await updateDoc(doc(db, `entities/${selectedEntity.id}/services/${editingItem.id}`), {
             ...serviceData,
             updatedAt: serverTimestamp(),
           });
         } else {
-          await addDoc(collection(db, `entities/${selectedEntity.id}/${activeTab}`), {
+          await addDoc(collection(db, `entities/${selectedEntity.id}/services`), {
             ...serviceData,
             createdAt: serverTimestamp(),
           });
@@ -219,7 +210,9 @@ export const Services: React.FC = () => {
     if (!confirmed) return;
     
     try {
-      await deleteDoc(doc(db, `entities/${selectedEntity.id}/${activeTab}`, id));
+      // Produtos vivem em `services`; só planos têm coleção própria.
+      const coll = activeTab === 'plans' ? 'plans' : 'services';
+      await deleteDoc(doc(db, `entities/${selectedEntity.id}/${coll}`, id));
       showToast('Item excluído com sucesso.', 'success');
     } catch (error) {
       console.error("Error deleting:", error);
@@ -378,18 +371,6 @@ export const Services: React.FC = () => {
           />
         </div>
       </div>
-
-      {activeTab === 'products' && productsBlocked && (
-        <div className="mb-6 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/40 p-6">
-          <p className="font-bold text-amber-900 dark:text-amber-200">Catálogo de produtos bloqueado pelo banco de dados</p>
-          <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
-            A regra de acesso da coleção <code className="mx-1 rounded bg-amber-900/20 px-1">products</code> ainda não foi
-            publicada no Firebase — por isso produtos não salvam nem aparecem aqui (e não podem ser puxados no orçamento).
-            Publique o arquivo <code className="mx-1 rounded bg-amber-900/20 px-1">firestore.rules</code>
-            (Console do Firebase → Firestore → Regras → Publicar, ou <code className="mx-1 rounded bg-amber-900/20 px-1">firebase deploy --only firestore:rules</code>) e isto volta a funcionar. Serviços e Planos não são afetados.
-          </p>
-        </div>
-      )}
 
       {viewMode === 'list' && (
         activeTab !== 'plans' ? (

@@ -84,8 +84,8 @@ export const Quotes: React.FC = () => {
 
     const quotesQ = query(collection(db, `entities/${selectedEntity.id}/quotes`), orderBy('createdAt', 'desc'));
     const clientsQ = query(collection(db, `entities/${selectedEntity.id}/clients`), orderBy('name', 'asc'));
+    // Serviços e produtos vêm da MESMA coleção `services`, separados por catalogType.
     const servicesQ = query(collection(db, `entities/${selectedEntity.id}/services`), orderBy('name', 'asc'));
-    const productsQ = query(collection(db, `entities/${selectedEntity.id}/products`), orderBy('name', 'asc'));
     const plansQ = query(collection(db, `entities/${selectedEntity.id}/plans`), orderBy('name', 'asc'));
 
     const unsubQuotes = onSnapshot(quotesQ, (snapshot) => {
@@ -103,17 +103,12 @@ export const Quotes: React.FC = () => {
     });
 
     const unsubServices = onSnapshot(servicesQ, (snapshot) => {
-      setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[]);
+      const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[];
+      setServices(all.filter(s => s.catalogType !== 'product'));
+      setProducts(all.filter(s => s.catalogType === 'product'));
     }, (error) => {
-      console.error("Error fetching services for quotes:", error);
+      console.error("Error fetching catalog for quotes:", error);
       handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/services`);
-    });
-
-    const unsubProducts = onSnapshot(productsQ, (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[]);
-    }, (error) => {
-      console.error("Error fetching products for quotes:", error);
-      handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/products`);
     });
 
     const unsubPlans = onSnapshot(plansQ, (snapshot) => {
@@ -128,7 +123,6 @@ export const Quotes: React.FC = () => {
       unsubQuotes();
       unsubClients();
       unsubServices();
-      unsubProducts();
       unsubPlans();
     };
   }, [selectedEntity]);
@@ -227,10 +221,11 @@ export const Quotes: React.FC = () => {
         const nome = (it.description || '').trim();
         const preco = Number(it.unitPrice) || 0;
         if (!nome || preco <= 0) continue;
-        const col = it.type === 'product' ? 'products' : 'services';
-        await addDoc(collection(db, `entities/${selectedEntity.id}/${col}`), {
+        // Serviço e produto compartilham a coleção `services`; o tipo vira catalogType.
+        await addDoc(collection(db, `entities/${selectedEntity.id}/services`), {
           name: nome, description: '', basePrice: preco,
           category: it.type === 'product' ? 'Produto' : 'Serviço', active: true,
+          catalogType: it.type === 'product' ? 'product' : 'service',
           entityId: selectedEntity.id, ownerUid: selectedEntity.ownerUid,
           collaboratorsEmails: selectedEntity.collaboratorsEmails || [], createdAt: serverTimestamp(),
         });

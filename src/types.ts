@@ -262,6 +262,12 @@ export interface Service {
   /** Condições, observações, pré-requisitos do cliente. */
   observations?: string;
   active?: boolean;
+  /**
+   * Discrimina serviço x produto DENTRO da mesma coleção `services`.
+   * Produtos ficam aqui (não numa coleção `products` separada) para usar a
+   * regra de acesso já publicada. Ausente/'service' = serviço; 'product' = produto.
+   */
+  catalogType?: 'service' | 'product';
 }
 
 export interface Plan {
