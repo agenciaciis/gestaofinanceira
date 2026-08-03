@@ -5,7 +5,7 @@ import { useUI } from '../contexts/UIContext';
 import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, MessageSquare, Save, ExternalLink, Settings2, Users, Plus, Trash2, Send, Download, Upload, KeyRound, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { collection, getDocs, doc, getDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, writeBatch, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { BACKUP_VERSION, BACKUP_SUBCOLLECTIONS, encodeTimestamps, decodeTimestamps, validateBackup, countBackupItems, backupFilename, type Backup } from '../lib/backup';
 
@@ -24,6 +24,47 @@ export const Settings: React.FC = () => {
   const [intTgToken, setIntTgToken] = useState('');
   const [intTgSecret, setIntTgSecret] = useState('');
   const [intSaving, setIntSaving] = useState(false);
+
+  // Exclusão total: apaga TODAS as entidades do usuário e suas subcoleções,
+  // direto pelo navegador (SDK cliente, autenticado). Deixa o sistema zerado
+  // para começar os preenchimentos reais.
+  const [wipingData, setWipingData] = useState(false);
+  const handleWipeAllData = async () => {
+    if (!user) return;
+    const owned = entities.filter(e => e.ownerUid === user.uid);
+    if (owned.length === 0) { showToast('Não há dados seus para apagar — o sistema já está vazio.', 'info'); return; }
+    const ok = await confirm({
+      title: 'Apagar TODOS os dados?',
+      message: `Isto apaga PERMANENTEMENTE as ${owned.length} entidade(s) e tudo dentro delas (lançamentos, contas, cartões, clientes, fornecedores, serviços, orçamentos, metas, caixinhas). Não dá para desfazer. Recomendo baixar um backup antes (aba acima). Deseja zerar tudo para começar do zero?`,
+      confirmText: 'Apagar tudo',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setWipingData(true);
+    try {
+      let total = 0;
+      for (const ent of owned) {
+        for (const col of BACKUP_SUBCOLLECTIONS) {
+          const snap = await getDocs(collection(db, `entities/${ent.id}/${col}`));
+          const refs = snap.docs.map(d => d.ref);
+          for (let i = 0; i < refs.length; i += 400) {
+            const batch = writeBatch(db);
+            refs.slice(i, i + 400).forEach(r => { batch.delete(r); total++; });
+            await batch.commit();
+          }
+        }
+        await deleteDoc(doc(db, 'entities', ent.id));
+        total++;
+      }
+      showToast(`Pronto! ${total} registro(s) apagados. Sistema zerado — recarregando para você criar a primeira entidade real.`, 'success');
+      setTimeout(() => window.location.reload(), 1800);
+    } catch (e) {
+      console.error('Erro ao apagar dados:', e);
+      showToast('Erro ao apagar os dados. Tente de novo ou veja o console.', 'error');
+    } finally {
+      setWipingData(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== 'integrations' || !user) return;
@@ -751,11 +792,11 @@ export const Settings: React.FC = () => {
                 </p>
                 <button
                   type="button"
-                  disabled
-                  title="A exclusão total de dados ainda não está ativa neste app."
-                  className="rounded-xl bg-red-300 px-6 py-2.5 text-sm font-bold text-white cursor-not-allowed opacity-70"
+                  onClick={handleWipeAllData}
+                  disabled={wipingData}
+                  className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Exclusão total (em breve)
+                  {wipingData ? 'Apagando...' : 'Apagar todos os dados'}
                 </button>
               </div>
             </motion.div>
