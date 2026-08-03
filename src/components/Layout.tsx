@@ -110,7 +110,7 @@ export const Layout: React.FC<{
   };
 
   return (
-    <div className="flex min-h-screen bg-canvas dark:bg-gray-950 transition-colors duration-300">
+    <div className="flex h-screen overflow-hidden bg-canvas dark:bg-gray-950 transition-colors duration-300">
       {/* Mobile Backdrop */}
       {isSidebarOpen && (
         <div 
@@ -288,7 +288,7 @@ export const Layout: React.FC<{
 
       {/* Main Content — min-w-0 deixa o conteúdo encolher no mobile (senão uma
           tabela larga estoura a página inteira, causando scroll horizontal). */}
-      <main className="flex-1 min-w-0 bg-canvas dark:bg-gray-950">
+      <main className="flex-1 min-w-0 h-screen overflow-y-auto bg-canvas dark:bg-gray-950">
         {/* Header */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line dark:border-gray-800 bg-surface dark:bg-gray-900 px-4 lg:px-8">
           <button className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>

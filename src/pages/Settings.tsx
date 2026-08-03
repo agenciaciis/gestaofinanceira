@@ -43,20 +43,33 @@ export const Settings: React.FC = () => {
     setWipingData(true);
     try {
       let total = 0;
+      const skipped = new Set<string>();
       for (const ent of owned) {
         for (const col of BACKUP_SUBCOLLECTIONS) {
-          const snap = await getDocs(collection(db, `entities/${ent.id}/${col}`));
-          const refs = snap.docs.map(d => d.ref);
-          for (let i = 0; i < refs.length; i += 400) {
-            const batch = writeBatch(db);
-            refs.slice(i, i + 400).forEach(r => { batch.delete(r); total++; });
-            await batch.commit();
+          // Resiliente: se uma coleção travar (ex.: regra não publicada em
+          // `products`), pula e continua apagando o resto — não derruba tudo.
+          try {
+            const snap = await getDocs(collection(db, `entities/${ent.id}/${col}`));
+            const refs = snap.docs.map(d => d.ref);
+            for (let i = 0; i < refs.length; i += 400) {
+              const batch = writeBatch(db);
+              refs.slice(i, i + 400).forEach(r => { batch.delete(r); total++; });
+              await batch.commit();
+            }
+          } catch (err) {
+            console.warn(`Exclusão: ignorei "${col}" de ${ent.id} (regra não publicada?)`, err);
+            skipped.add(col);
           }
         }
-        await deleteDoc(doc(db, 'entities', ent.id));
-        total++;
+        try {
+          await deleteDoc(doc(db, 'entities', ent.id));
+          total++;
+        } catch (err) {
+          console.warn(`Exclusão: não consegui apagar a entidade ${ent.id}`, err);
+        }
       }
-      showToast(`Pronto! ${total} registro(s) apagados. Sistema zerado — recarregando para você criar a primeira entidade real.`, 'success');
+      const extra = skipped.size ? ` (Coleções ignoradas por regra não publicada: ${[...skipped].join(', ')}.)` : '';
+      showToast(`Pronto! ${total} registro(s) apagados.${extra} Recarregando o sistema limpo...`, 'success');
       setTimeout(() => window.location.reload(), 1800);
     } catch (e) {
       console.error('Erro ao apagar dados:', e);
