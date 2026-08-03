@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, MessageSquare, Save, ExternalLink, Settings2, Users, Plus, Trash2, Send, Download, Upload } from 'lucide-react';
+import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, MessageSquare, Save, ExternalLink, Settings2, Users, Plus, Trash2, Send, Download, Upload, KeyRound, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, getDocs, doc, getDoc, writeBatch, Timestamp } from 'firebase/firestore';
@@ -13,7 +13,57 @@ export const Settings: React.FC = () => {
   const { user, logout } = useAuth();
   const { entities, selectedEntity, updateEntity } = useEntity();
   const { showToast, confirm } = useUI();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'data' | 'whatsapp' | 'telegram'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'data' | 'whatsapp' | 'telegram' | 'integrations'>('profile');
+
+  // Só o dono (tem ao menos uma entidade própria) gerencia as chaves globais.
+  const isOwner = !!user && entities.some(e => e.ownerUid === user.uid);
+  // Integrações (OpenAI/Telegram) — valores nunca vêm cheios do servidor, só status.
+  type KeyStatus = { set: boolean; hint?: string };
+  const [intStatus, setIntStatus] = useState<{ openai?: KeyStatus; telegramToken?: KeyStatus; telegramSecret?: KeyStatus } | null>(null);
+  const [intOpenai, setIntOpenai] = useState('');
+  const [intTgToken, setIntTgToken] = useState('');
+  const [intTgSecret, setIntTgSecret] = useState('');
+  const [intSaving, setIntSaving] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'integrations' || !user) return;
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const r = await fetch('/api/admin/integrations', { headers: { Authorization: `Bearer ${token}` } });
+        if (r.ok) setIntStatus(await r.json());
+      } catch { /* servidor fora do ar (dev): a tela ainda funciona no deploy */ }
+    })();
+  }, [activeTab, user]);
+
+  const handleSaveIntegrations = async () => {
+    if (!user) return;
+    const body: Record<string, string> = {};
+    if (intOpenai.trim()) body.openaiApiKey = intOpenai.trim();
+    if (intTgToken.trim()) body.telegramBotToken = intTgToken.trim();
+    if (intTgSecret.trim()) body.telegramWebhookSecret = intTgSecret.trim();
+    if (Object.keys(body).length === 0) { showToast('Preencha ao menos uma chave para salvar.', 'error'); return; }
+    setIntSaving(true);
+    try {
+      const token = await user.getIdToken();
+      const r = await fetch('/api/admin/integrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Falha ao salvar.');
+      const wh = data.webhook ? (data.webhook.ok ? ' Webhook do Telegram registrado.' : ` (Telegram: ${data.webhook.detail})`) : '';
+      showToast('Chaves salvas com segurança no servidor.' + wh, 'success');
+      setIntOpenai(''); setIntTgToken(''); setIntTgSecret('');
+      const r2 = await fetch('/api/admin/integrations', { headers: { Authorization: `Bearer ${token}` } });
+      if (r2.ok) setIntStatus(await r2.json());
+    } catch (e: any) {
+      showToast(e.message || 'Erro ao salvar as chaves.', 'error');
+    } finally {
+      setIntSaving(false);
+    }
+  };
 
   const [isSaving, setIsSaving] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
@@ -60,6 +110,8 @@ export const Settings: React.FC = () => {
   const menuItems = [
     { id: 'profile', label: 'Meu Perfil', icon: User },
     { id: 'notifications', label: 'Notificações', icon: Bell },
+    // Chaves de IA/Telegram: só o dono vê e gerencia.
+    ...(isOwner ? [{ id: 'integrations', label: 'Integrações', icon: KeyRound }] : []),
     { id: 'whatsapp', label: 'WhatsApp Bot', icon: MessageSquare },
     { id: 'telegram', label: 'Telegram Bot', icon: Send },
     { id: 'data', label: 'Dados e Privacidade', icon: Database },
@@ -589,6 +641,62 @@ export const Settings: React.FC = () => {
               <p className="text-xs text-content-subtle">
                 Requer o <code>TELEGRAM_BOT_TOKEN</code> configurado no servidor (feito no deploy).
               </p>
+            </motion.div>
+          )}
+
+          {activeTab === 'integrations' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              <div>
+                <h2 className="text-xl font-black text-content flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-primary" /> Integrações & Chaves
+                </h2>
+                <p className="text-sm text-content-subtle mt-1">
+                  As chaves ficam guardadas <strong>no servidor</strong>, nunca no navegador. Aqui você só vê
+                  se estão configuradas e cola novos valores. Deixe em branco para manter a atual.
+                </p>
+              </div>
+
+              {[
+                { key: 'openai', label: 'OpenAI (ChatGPT)', hint: 'Powers a IA: sugestão de categoria, Advisor e leitura de extrato em PDF.', value: intOpenai, setValue: setIntOpenai, status: intStatus?.openai, placeholder: 'sk-...' },
+                { key: 'tgtoken', label: 'Telegram — Token do Bot', hint: 'Token do @BotFather. Liga o bot de alertas e lançamentos por mensagem.', value: intTgToken, setValue: setIntTgToken, status: intStatus?.telegramToken, placeholder: '123456:ABC-DEF...' },
+                { key: 'tgsecret', label: 'Telegram — Segredo do Webhook (opcional)', hint: 'Camada extra: só aceita updates com este segredo. Pode deixar vazio.', value: intTgSecret, setValue: setIntTgSecret, status: intStatus?.telegramSecret, placeholder: 'opcional' },
+              ].map(f => (
+                <div key={f.key} className="rounded-2xl border border-line bg-surface p-5">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <label className="text-sm font-bold text-content">{f.label}</label>
+                    {f.status?.set ? (
+                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-600">
+                        <CheckCircle2 className="h-4 w-4" /> Configurada {f.status.hint}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-content-subtle">Não configurada</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-content-subtle">{f.hint}</p>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={f.value}
+                    onChange={e => f.setValue(e.target.value)}
+                    placeholder={f.status?.set ? 'Colar novo valor para substituir' : f.placeholder}
+                    className="mt-3 w-full rounded-lg border border-line bg-canvas px-4 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              ))}
+
+              <button
+                onClick={handleSaveIntegrations}
+                disabled={intSaving}
+                className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60"
+              >
+                <Save className="h-4 w-4" /> {intSaving ? 'Salvando...' : 'Salvar chaves'}
+              </button>
+
+              <div className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/40 p-4 text-xs text-amber-800 dark:text-amber-300">
+                <strong>Segurança:</strong> o valor cheio nunca é devolvido ao navegador — só o status mascarado (••••1234).
+                As chaves ficam numa coleção que só o servidor lê. Ao salvar o token do Telegram, o webhook é registrado automaticamente
+                (precisa do <code>APP_URL</code> público configurado no servidor).
+              </div>
             </motion.div>
           )}
 

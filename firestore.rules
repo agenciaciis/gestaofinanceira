@@ -1,7 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // Chaves de integração (OpenAI/Telegram): SOMENTE o servidor (Admin SDK)
+    // pode ler/gravar. Nenhum cliente/navegador acessa — o Admin ignora regras,
+    // então o servidor continua funcionando; o cliente é barrado aqui.
+    match /server_config/{doc} {
+      allow read, write: if false;
+    }
+
     // ===============================================================
     // Assumed Data Model
     // ===============================================================

@@ -8,6 +8,7 @@ import axios from 'axios';
 import { registerAiRoutes } from './ai-routes';
 import { handleChatCommand } from './chatCommands';
 import { registerTelegramRoutes } from './telegram';
+import { loadServerSecrets, registerIntegrationRoutes } from './integrations';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +55,11 @@ async function startServer() {
   // Limite alto o bastante para o upload de extrato em PDF/imagem (base64).
   app.use(express.json({ limit: '25mb' }));
 
+  // Chaves geridas pela tela Integrações (Firestore) -> process.env, ANTES de
+  // registrar IA/Telegram, para que já subam com a chave certa e o webhook
+  // do Telegram se auto-registre no boot.
+  await loadServerSecrets(db);
+
   // API Routes
   app.get('/api/health', (req, res) => {
     console.log('Health check requested');
@@ -65,6 +71,9 @@ async function startServer() {
 
   // Telegram: webhook (comandos), vínculo do chat e alertas + agendador.
   registerTelegramRoutes(app, admin, db);
+
+  // Gestão das chaves de integração (Ajustes → Integrações), só para o dono.
+  registerIntegrationRoutes(app, admin, db);
 
   // WhatsApp Status Proxy
   app.get('/api/whatsapp/status/:entityId', async (req, res) => {
