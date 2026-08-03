@@ -39,6 +39,28 @@ async function getBotUsername(): Promise<string | null> {
   return cachedBotUsername;
 }
 
+/**
+ * Registra o webhook no Telegram apontando para APP_URL/api/telegram/webhook.
+ * Chamado no startup — sem isso o Telegram não entrega as mensagens ao servidor.
+ * Requer APP_URL público e HTTPS (o Telegram recusa http e localhost).
+ */
+export async function setTelegramWebhook(): Promise<{ ok: boolean; detail?: string }> {
+  if (!hasToken()) return { ok: false, detail: 'TELEGRAM_BOT_TOKEN ausente' };
+  const base = (process.env.APP_URL || '').replace(/\/+$/, '');
+  if (!base) return { ok: false, detail: 'APP_URL ausente' };
+  if (!base.startsWith('https://')) return { ok: false, detail: `APP_URL precisa ser https (recebi "${base}")` };
+  const url = `${base}/api/telegram/webhook`;
+  try {
+    const body: Record<string, unknown> = { url, allowed_updates: ['message', 'edited_message'] };
+    // Se houver segredo, o Telegram passa a mandá-lo no header — o webhook confere.
+    if (process.env.TELEGRAM_WEBHOOK_SECRET) body.secret_token = process.env.TELEGRAM_WEBHOOK_SECRET;
+    const r = await axios.post(api('setWebhook'), body);
+    return { ok: !!r.data?.ok, detail: r.data?.description };
+  } catch (e: any) {
+    return { ok: false, detail: e?.response?.data?.description || e?.message };
+  }
+}
+
 interface ParsedUpdate { chatId: string; text?: string; photoFileId?: string; startPayload?: string; }
 function parseUpdate(body: any): ParsedUpdate | null {
   const msg = body?.message || body?.edited_message;
@@ -213,6 +235,12 @@ export function registerTelegramRoutes(app: Express, firebaseAdmin: typeof admin
   // Agendador in-process: às 08:00 (São Paulo) dispara os alertas do dia;
   // na segunda inclui o resumo semanal. Guarda a última data para não repetir.
   if (db && hasToken()) {
+    // Auto-registra o webhook no Telegram (sem isso, nada chega ao servidor).
+    setTelegramWebhook().then(r => {
+      if (r.ok) console.log(`Telegram: webhook registrado em ${process.env.APP_URL}/api/telegram/webhook`);
+      else console.warn(`Telegram: webhook NÃO registrado (${r.detail}). Defina APP_URL público https no .env do servidor.`);
+    });
+
     let lastRunYmd = '';
     const tick = async () => {
       try {
