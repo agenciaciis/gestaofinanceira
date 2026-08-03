@@ -60,7 +60,7 @@ async function startServer() {
     res.json({ status: 'ok' });
   });
 
-  // Endpoints de IA (a chave do Gemini fica só aqui, nunca no navegador).
+  // Endpoints de IA (a chave da OpenAI fica só aqui, nunca no navegador).
   registerAiRoutes(app, admin);
 
   // Telegram: webhook (comandos), vínculo do chat e alertas + agendador.

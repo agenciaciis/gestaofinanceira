@@ -6,7 +6,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { suggestCategories, extractStatementFromPdf } from '../services/geminiService';
+import { suggestCategories, extractStatementFromPdf } from '../services/aiService';
 import { CATEGORIES } from '../constants';
 import { collection, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';

@@ -1,28 +1,29 @@
 /**
- * Endpoints de IA no SERVIDOR.
+ * Endpoints de IA no SERVIDOR (OpenAI / ChatGPT).
  *
- * Antes, o navegador falava direto com o Gemini e a chave ia junto no bundle —
- * qualquer visitante conseguia extraí-la e gastar na conta do dono. Aqui a
- * chave nunca sai do servidor.
+ * A chave (OPENAI_API_KEY) nunca sai do servidor — antes o navegador falava
+ * direto com o provedor e a chave ia no bundle, o que deixava qualquer visitante
+ * gastar na conta do dono.
  *
  * São endpoints de PROPÓSITO FIXO, não um proxy genérico: o prompt mora aqui,
  * o cliente manda só dados. Assim um usuário logado não pode transformar o
- * servidor num Gemini de graça para prompts arbitrários.
+ * servidor num ChatGPT de graça para prompts arbitrários.
  */
-import { GoogleGenAI, Type } from '@google/genai';
+import OpenAI from 'openai';
 import type { Express, NextFunction, Request, Response } from 'express';
 import type admin from 'firebase-admin';
 import { categoryNames, matchCategoryId } from './src/lib/categories';
 
-const MODEL = 'gemini-3-flash-preview';
+// Modelo único para tudo (texto, conselho e leitura de PDF/imagem).
+const MODEL = 'gpt-4o';
 
 /** Teto do PDF/imagem aceito no parse de extrato (base64), ~12 MB de arquivo. */
 const MAX_BASE64_CHARS = 16_000_000;
 
-function getAI(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY;
+function getAI(): OpenAI | null {
+  const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
-  return new GoogleGenAI({ apiKey: key });
+  return new OpenAI({ apiKey: key });
 }
 
 export function registerAiRoutes(app: Express, firebaseAdmin: typeof admin) {
@@ -41,10 +42,10 @@ export function registerAiRoutes(app: Express, firebaseAdmin: typeof admin) {
     }
   };
 
-  const requireAI = (res: Response): GoogleGenAI | null => {
+  const requireAI = (res: Response): OpenAI | null => {
     const ai = getAI();
     if (!ai) {
-      res.status(503).json({ error: 'IA indisponível: GEMINI_API_KEY não configurada no servidor.' });
+      res.status(503).json({ error: 'IA indisponível: OPENAI_API_KEY não configurada no servidor.' });
       return null;
     }
     return ai;
@@ -75,19 +76,19 @@ Tipo das transações: ${type === 'income' ? 'Receita' : 'Despesa'}
 Descrições:
 ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
 
-Responda em formato JSON, um array de strings com os NOMES das categorias sugeridas na mesma ordem das descrições.`;
+Responda em JSON no formato {"categorias": ["NomeCategoria1", "NomeCategoria2", ...]} com os NOMES das categorias na mesma ordem das descrições.`;
 
     try {
-      const response = await ai.models.generateContent({
+      const completion = await ai.chat.completions.create({
         model: MODEL,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } },
-        },
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
       });
-      const names = JSON.parse(response.text || '[]');
-      const categoryIds = descriptions.map((_: string, i: number) => matchCategoryId(names[i]));
+      const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      const names: unknown[] = Array.isArray(parsed.categorias)
+        ? parsed.categorias
+        : Array.isArray(parsed.categories) ? parsed.categories : [];
+      const categoryIds = descriptions.map((_: string, i: number) => matchCategoryId(names[i] as string));
       res.json({ categoryIds });
     } catch (error) {
       console.error('IA: erro ao sugerir categorias:', error);
@@ -126,8 +127,11 @@ Responda em formato JSON, um array de strings com os NOMES das categorias sugeri
 Dados: ${JSON.stringify(summary)}`;
 
     try {
-      const response = await ai.models.generateContent({ model: MODEL, contents: prompt });
-      res.json({ advice: response.text || '' });
+      const completion = await ai.chat.completions.create({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      res.json({ advice: completion.choices[0]?.message?.content || '' });
     } catch (error) {
       console.error('IA: erro ao gerar análise financeira:', error);
       res.status(502).json({ error: 'Não foi possível gerar a análise no momento.' });
@@ -156,29 +160,31 @@ Extraia TODAS as transações deste documento. Para cada uma retorne:
 - date: a data no formato YYYY-MM-DD
 - description: a descrição/histórico
 - amount: o valor numérico. Use NEGATIVO para saídas/despesas/débitos e POSITIVO para entradas/receitas/créditos. Use ponto como separador decimal e não inclua símbolo de moeda.
-Ignore linhas de saldo, totais e cabeçalhos. Responda apenas o JSON do array.`;
+Ignore linhas de saldo, totais e cabeçalhos.
+Responda em JSON no formato {"rows": [{"date": "YYYY-MM-DD", "description": "...", "amount": -0.00}, ...]}.`;
+
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+    // PDF entra como arquivo; imagem entra como image_url (visão do gpt-4o).
+    const filePart = mimeType.includes('pdf')
+      ? { type: 'file', file: { filename: 'extrato.pdf', file_data: dataUrl } }
+      : { type: 'image_url', image_url: { url: dataUrl } };
 
     try {
-      const response = await ai.models.generateContent({
+      const completion = await ai.chat.completions.create({
         model: MODEL,
-        contents: [{ inlineData: { data: base64, mimeType } }, { text: prompt }],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                date: { type: Type.STRING },
-                description: { type: Type.STRING },
-                amount: { type: Type.NUMBER },
-              },
-              required: ['date', 'description', 'amount'],
-            },
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: prompt }, filePart] as any,
           },
-        },
+        ],
+        response_format: { type: 'json_object' },
       });
-      res.json({ rows: JSON.parse(response.text || '[]') });
+      const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      const rows = Array.isArray(parsed.rows)
+        ? parsed.rows
+        : Array.isArray(parsed.transactions) ? parsed.transactions : (Array.isArray(parsed) ? parsed : []);
+      res.json({ rows });
     } catch (error) {
       console.error('IA: erro ao ler extrato:', error);
       res.status(502).json({ error: 'Não foi possível ler o extrato. Tente novamente.' });

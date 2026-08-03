@@ -1,7 +1,7 @@
 /**
  * Fachada de IA do cliente.
  *
- * Nada aqui fala com o Gemini diretamente: a chave mora no servidor. Este
+ * Nada aqui fala com a OpenAI diretamente: a chave mora no servidor. Este
  * módulo só envia os dados para /api/ai/* com o token do usuário logado.
  */
 import { auth } from '../firebase';

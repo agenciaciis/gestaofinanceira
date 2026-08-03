@@ -41,7 +41,7 @@ import {
 import { cn } from '../lib/utils';
 import { format, addMonths, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getFinancialAdvice } from "../services/geminiService";
+import { getFinancialAdvice } from "../services/aiService";
 import { computeBalances, daysUntilDueDay, parseLocalDate, round2, formatLocalDate } from '../lib/finance';
 import { averageMonthlyExpense, averageMonthlyIncome } from '../lib/spendable';
 import { computeHealthScore } from '../lib/health';

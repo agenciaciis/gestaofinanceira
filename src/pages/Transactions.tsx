@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
 import { addMonths, format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { suggestCategory as aiSuggestCategory } from "../services/geminiService";
+import { suggestCategory as aiSuggestCategory } from "../services/aiService";
 import { Sparkles, Loader2 } from 'lucide-react';
 
 import { CATEGORIES, MONTHS } from '../constants';

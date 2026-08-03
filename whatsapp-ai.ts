@@ -1,9 +1,11 @@
 /**
- * Extração de lançamentos por IA no SERVIDOR (não expõe a chave ao navegador).
- * Usado pelo webhook do WhatsApp para entender mensagens de texto ambíguas e,
- * principalmente, FOTOS de notas/cupons fiscais (OCR + interpretação).
+ * Extração de lançamentos por IA no SERVIDOR (OpenAI — não expõe a chave ao
+ * navegador). Usado pelos bots (WhatsApp/Telegram) para entender mensagens de
+ * texto ambíguas e, principalmente, FOTOS de notas/cupons (visão do gpt-4o).
  */
-import { GoogleGenAI, Type } from '@google/genai';
+import OpenAI from 'openai';
+
+const MODEL = 'gpt-4o';
 
 const CATEGORY_IDS = [
   'alimentacao', 'moradia', 'transporte', 'lazer', 'saude', 'educacao',
@@ -17,22 +19,16 @@ export interface ExtractedTransaction {
   categoryId: string;
 }
 
-const schema = {
-  type: Type.OBJECT,
-  properties: {
-    type: { type: Type.STRING, description: "'income' para entrada/receita, 'expense' para saída/despesa" },
-    amount: { type: Type.NUMBER, description: 'Valor total positivo' },
-    description: { type: Type.STRING, description: 'Descrição curta do gasto/recebimento (ex.: nome do estabelecimento)' },
-    categoryId: { type: Type.STRING, description: `Uma destas categorias: ${CATEGORY_IDS.join(', ')}` },
-  },
-  required: ['type', 'amount', 'description', 'categoryId'],
-};
-
-function getAI(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY;
+function getAI(): OpenAI | null {
+  const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
-  return new GoogleGenAI({ apiKey: key });
+  return new OpenAI({ apiKey: key });
 }
+
+/** Descreve o formato JSON esperado — vale para texto e imagem. */
+const SHAPE_INSTRUCTION = `Responda em JSON no formato:
+{"type": "income" ou "expense", "amount": número positivo, "description": "descrição curta (ex.: nome do estabelecimento)", "categoryId": "uma destas: ${CATEGORY_IDS.join(', ')}"}
+Use "income" para entrada/receita e "expense" para saída/despesa.`;
 
 function normalize(raw: any): ExtractedTransaction | null {
   if (!raw) return null;
@@ -49,15 +45,16 @@ export async function extractTransactionFromText(text: string): Promise<Extracte
   const ai = getAI();
   if (!ai) return null;
   try {
-    const prompt = `Você é um assistente financeiro. A pessoa enviou esta mensagem por WhatsApp descrevendo um gasto ou recebimento:
+    const prompt = `Você é um assistente financeiro. A pessoa enviou esta mensagem descrevendo um gasto ou recebimento:
 "${text}"
-Extraia o lançamento financeiro. Se não houver valor monetário claro, responda com amount 0.`;
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: { responseMimeType: 'application/json', responseSchema: schema },
+Extraia o lançamento financeiro. Se não houver valor monetário claro, responda com amount 0.
+${SHAPE_INSTRUCTION}`;
+    const completion = await ai.chat.completions.create({
+      model: MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
     });
-    return normalize(JSON.parse(response.text || '{}'));
+    return normalize(JSON.parse(completion.choices[0]?.message?.content || '{}'));
   } catch (err) {
     console.error('extractTransactionFromText error:', err);
     return null;
@@ -69,16 +66,22 @@ export async function extractTransactionFromImage(base64: string, mimeType: stri
   const ai = getAI();
   if (!ai) return null;
   try {
-    const prompt = `Esta é a foto de uma nota fiscal, cupom ou comprovante. Identifique o VALOR TOTAL pago, o nome do estabelecimento (para a descrição) e a categoria mais provável. Normalmente é uma despesa (expense).`;
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: [
-        { inlineData: { data: base64, mimeType } },
-        { text: prompt },
+    const prompt = `Esta é a foto de uma nota fiscal, cupom ou comprovante. Identifique o VALOR TOTAL pago, o nome do estabelecimento (para a descrição) e a categoria mais provável. Normalmente é uma despesa (expense).
+${SHAPE_INSTRUCTION}`;
+    const completion = await ai.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+          ] as any,
+        },
       ],
-      config: { responseMimeType: 'application/json', responseSchema: schema },
+      response_format: { type: 'json_object' },
     });
-    return normalize(JSON.parse(response.text || '{}'));
+    return normalize(JSON.parse(completion.choices[0]?.message?.content || '{}'));
   } catch (err) {
     console.error('extractTransactionFromImage error:', err);
     return null;
