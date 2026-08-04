@@ -47,6 +47,23 @@ describe('averageMonthlyExpense', () => {
   it('sem histórico devolve zero, não NaN', () => {
     expect(averageMonthlyExpense([], REF, 3)).toBe(0);
   });
+
+  it('usa o mês CORRENTE quando não há meses anteriores (1º mês de uso)', () => {
+    const txs = [
+      tx({ id: '1', amount: 1500, date: '2026-07-05' }), // mês corrente (REF em julho)
+      tx({ id: '2', amount: 500, date: '2026-07-20' }),
+    ];
+    // Sem histórico anterior → fallback soma o mês corrente: (1500 + 500) / 1 mês = 2000.
+    expect(averageMonthlyExpense(txs, REF, 3)).toBe(2000);
+  });
+
+  it('quando HÁ mês anterior, ignora o corrente (não mistura os dois)', () => {
+    const txs = [
+      tx({ id: '1', amount: 3000, date: '2026-06-10' }), // mês anterior
+      tx({ id: '2', amount: 9999, date: '2026-07-10' }), // corrente: fora
+    ];
+    expect(averageMonthlyExpense(txs, REF, 3)).toBe(3000);
+  });
 });
 
 describe('averageMonthlyIncome', () => {

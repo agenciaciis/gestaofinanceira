@@ -61,21 +61,34 @@ function averageMonthlyByType(
 ): number {
   const count = Math.max(1, Math.floor(months));
   const firstOfCurrent = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const firstOfNext = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
   const start = new Date(reference.getFullYear(), reference.getMonth() - count, 1);
 
-  let total = 0;
-  const monthsWithData = new Set<string>();
-  for (const t of transactions) {
-    if (t.type !== type || t.status !== 'completed') continue;
-    const d = parseLocalDate(t.date);
-    if (Number.isNaN(d.getTime())) continue;
-    if (d < start || d >= firstOfCurrent) continue;
-    total += Number(t.amount) || 0;
-    monthsWithData.add(`${d.getFullYear()}-${d.getMonth()}`);
-  }
+  // Soma por meses com movimento. `upper` define o limite superior: os meses
+  // COMPLETOS anteriores (firstOfCurrent) ou incluindo o mês corrente (firstOfNext).
+  const somar = (upper: Date) => {
+    let total = 0;
+    const monthsWithData = new Set<string>();
+    for (const t of transactions) {
+      if (t.type !== type || t.status !== 'completed') continue;
+      const d = parseLocalDate(t.date);
+      if (Number.isNaN(d.getTime())) continue;
+      if (d < start || d >= upper) continue;
+      total += Number(t.amount) || 0;
+      monthsWithData.add(`${d.getFullYear()}-${d.getMonth()}`);
+    }
+    return { total, meses: monthsWithData.size };
+  };
 
-  if (monthsWithData.size === 0) return 0;
-  return round2(total / monthsWithData.size);
+  // Preferência: meses completos anteriores (o mês corrente puxaria a média pra baixo).
+  const anteriores = somar(firstOfCurrent);
+  if (anteriores.meses > 0) return round2(anteriores.total / anteriores.meses);
+
+  // Sem histórico anterior (usuário no 1º mês): usa o próprio mês corrente —
+  // senão score, reserva e sugestões ficariam zerados sem motivo.
+  const comAtual = somar(firstOfNext);
+  if (comAtual.meses === 0) return 0;
+  return round2(comAtual.total / comAtual.meses);
 }
 
 /** Receita média por mês — base para medir comprometimento da renda. */
@@ -222,7 +235,9 @@ export function computeSpendable(input: SpendableInput): SpendableResult {
 
   // Gasto variável que ainda deve acontecer: a média mensal, proporcional aos
   // dias que faltam.
-  const variableOnly = input.transactions.filter(t => VARIABLE_CATEGORY_IDS.includes(t.categoryId));
+  // Exclui despesa de cartão: ela já entra por `cardInvoices`. Sem isso, a
+  // média de gasto variável a contaria de novo (dobra) quando é do mês corrente.
+  const variableOnly = input.transactions.filter(t => !t.cardId && VARIABLE_CATEGORY_IDS.includes(t.categoryId));
   const monthlyVariable = averageMonthlyExpense(variableOnly, today, 3);
   const expectedVariable = round2((monthlyVariable * daysLeft) / daysInMonth);
 
