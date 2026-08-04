@@ -15,7 +15,7 @@ import { Sparkles, Loader2 } from 'lucide-react';
 
 import { CATEGORIES, MONTHS } from '../constants';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
-import { splitInstallments, parseLocalDate } from '../lib/finance';
+import { splitInstallments, parseLocalDate, totalBalance } from '../lib/finance';
 import { planRecurringRenewals } from '../lib/recurring';
 import { tagsDocPath, readTags, parseTags, mergeTags, matchesAllTags } from '../lib/tags';
 import { readGoals, goalsDocPath } from '../lib/goalStore';
@@ -234,8 +234,11 @@ export const Transactions: React.FC = () => {
 
   // "Sobra do mês"
   const saldoRealizado = summary.received - summary.paid;                 // já recebido - já pago
-  const saldoProjetado = (summary.received + summary.toReceive) - (summary.paid + summary.toPay); // fim do mês
   const liquidoPendente = summary.toReceive - summary.toPay;              // a receber - a pagar
+  // Saldo REAL de hoje em todas as contas (inclui negativo). É a base da projeção.
+  const saldoAtualContas = totalBalance(accounts, transactions);
+  // Projeção de fim do mês: o que você TEM hoje + o que ainda entra − o que ainda sai.
+  const saldoProjetado = saldoAtualContas + liquidoPendente;
 
   const changeMonth = (delta: number) => {
     let newMonth = selectedMonth + delta;
@@ -880,8 +883,8 @@ export const Transactions: React.FC = () => {
       {/* Painel: Saldo / Sobra do Mês */}
       <div className="grid gap-4 sm:grid-cols-3 rounded-2xl border border-line bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm dark:border-gray-800 dark:from-gray-900 dark:to-gray-900">
         <div className="sm:border-r sm:border-line dark:sm:border-gray-800">
-          <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Sobra projetada do mês</p>
-          <p className="text-[10px] text-content-subtle mb-1">(recebido + a receber) − (pago + a pagar)</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">Quanto vou ter no fim do mês</p>
+          <p className="text-[10px] text-content-subtle mb-1">saldo de hoje ({new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoAtualContas)}) + a receber − a pagar</p>
           <p className={cn("text-3xl font-black tracking-tight", saldoProjetado >= 0 ? "text-emerald-600" : "text-rose-600")}>
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoProjetado)}
           </p>
