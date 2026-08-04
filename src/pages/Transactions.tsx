@@ -802,8 +802,9 @@ export const Transactions: React.FC = () => {
     setAmount('');
     const hojeStr = new Date().toISOString().split('T')[0];
     setDate(hojeStr);
-    // Nasce "já pago/recebido" quando a data é hoje ou passada; futura fica pendente.
-    setJaEfetivado(hojeStr <= new Date().toISOString().split('T')[0]);
+    // Nasce SEMPRE "A pagar/A receber" (pendente). O usuário marca "já paguei"
+    // só quando quitou na hora — fluxo profissional de contas a pagar/receber.
+    setJaEfetivado(false);
     // Já abre com uma entidade escolhida (na visão consolidada, a 1ª). Sem isso,
     // os selects de conta/cartão (filtrados por entidade) ficavam vazios.
     setTargetEntityId(entities[0]?.id || '');
