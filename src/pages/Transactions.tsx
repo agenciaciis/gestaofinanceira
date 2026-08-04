@@ -1102,87 +1102,55 @@ export const Transactions: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {isCardExpense(t) ? (
+                      {(() => {
                         // Compra no cartão: não é caixa — é paga na FATURA (tela Cartões).
-                        <span
-                          title="Compra no cartão — é paga na fatura (tela Cartões), não aqui."
-                          className="flex w-fit items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
-                        >
-                          <CardIcon className="h-3 w-3" /> Na fatura
-                        </span>
-                      ) : (
-                        <>
-                          {t.status === 'completed' && (
-                            <button
-                              onClick={() => toggleReconciled(t)}
-                              title={t.reconciled ? 'Conferido no extrato — clique para desmarcar' : 'Marcar como conferido no extrato do banco'}
-                              className={cn(
-                                'mb-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase transition-all',
-                                t.reconciled
-                                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
-                                  : 'border border-line text-content-subtle hover:border-indigo-400 hover:text-indigo-600'
-                              )}
+                        if (isCardExpense(t)) return (
+                          <span
+                            title="Compra no cartão — é paga na fatura (tela Cartões), não aqui."
+                            className="flex w-fit items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+                          >
+                            <CardIcon className="h-3 w-3" /> Na fatura
+                          </span>
+                        );
+                        if (t.type === 'transfer') return (
+                          <span className="flex w-fit items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                            <CheckCircle2 className="h-3 w-3" /> Concluído
+                          </span>
+                        );
+                        if (t.status === 'completed') return (
+                          <span className="flex w-fit items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase text-green-700 dark:bg-green-950/50 dark:text-green-300">
+                            <CheckCircle2 className="h-3 w-3" /> {t.type === 'income' ? 'Recebido' : 'Pago'}
+                            {t.reconciled && <span className="font-normal normal-case opacity-70">· conferido</span>}
+                          </span>
+                        );
+                        // Pendente: selo colorido de vencimento (SÓ a situação, sem botão).
+                        const st = dueStateOf(t);
+                        if (st === 'overdue') {
+                          const days = Math.round((todayStart.getTime() - parseLocalDate(t.date).getTime()) / 86400000);
+                          return (
+                            <span
+                              title={`Atrasada há ${days} dia(s)`}
+                              className="flex w-fit items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-black uppercase text-red-700 ring-1 ring-red-300 dark:bg-red-950/50 dark:text-red-300"
                             >
-                              {t.reconciled ? '✓ conciliado' : 'conciliar'}
-                            </button>
-                          )}
-                          {t.status === 'completed' ? (
-                            // Selo verde — pago/recebido. Clique para desfazer (volta a pendente).
-                            <button
-                              onClick={() => toggleStatus(t)}
-                              title="Pago — clique para desfazer (volta a pendente)"
-                              className="group/chip flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase text-green-700 transition-all hover:bg-green-200"
-                            >
-                              <CheckCircle2 className="h-3 w-3" />
-                              {quickActionLabel(t)}
-                            </button>
-                          ) : t.type === 'transfer' ? (
-                            <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-700">
-                              <CheckCircle2 className="h-3 w-3" /> Concluído
+                              <AlertCircle className="h-3 w-3" /> Atrasada
                             </span>
-                          ) : (
-                            // Pendente: botão que ABRE o modal de pagamento + selo colorido de vencimento.
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => openPay(t)}
-                                title={t.type === 'income' ? 'Registrar recebimento (escolher conta)' : 'Registrar pagamento (escolher conta)'}
-                                className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600 hover:shadow-md active:scale-95"
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                {quickActionLabel(t)}
-                              </button>
-                              {(() => {
-                                const st = dueStateOf(t);
-                                if (st === 'overdue') {
-                                  const days = Math.round((todayStart.getTime() - parseLocalDate(t.date).getTime()) / 86400000);
-                                  return (
-                                    <span
-                                      title={`Atrasada há ${days} dia(s)`}
-                                      className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase text-red-700 ring-1 ring-red-300 dark:bg-red-950/50 dark:text-red-300"
-                                    >
-                                      <AlertCircle className="h-2.5 w-2.5" /> Atrasada
-                                    </span>
-                                  );
-                                }
-                                if (st === 'due-soon') {
-                                  const days = Math.round((parseLocalDate(t.date).getTime() - todayStart.getTime()) / 86400000);
-                                  const label = days <= 0 ? 'Vence hoje' : days === 1 ? 'Vence amanhã' : `Vence em ${days} dias`;
-                                  return (
-                                    <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700 ring-1 ring-amber-300 dark:bg-amber-950/50 dark:text-amber-300">
-                                      <Clock className="h-2.5 w-2.5" /> {label}
-                                    </span>
-                                  );
-                                }
-                                return (
-                                  <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold uppercase text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
-                                    <Calendar className="h-2.5 w-2.5" /> A vencer
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </>
-                      )}
+                          );
+                        }
+                        if (st === 'due-soon') {
+                          const days = Math.round((parseLocalDate(t.date).getTime() - todayStart.getTime()) / 86400000);
+                          const label = days <= 0 ? 'Vence hoje' : days === 1 ? 'Vence amanhã' : `Vence em ${days} dias`;
+                          return (
+                            <span className="flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase text-amber-700 ring-1 ring-amber-300 dark:bg-amber-950/50 dark:text-amber-300">
+                              <Clock className="h-3 w-3" /> {label}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="flex w-fit items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
+                            <Calendar className="h-3 w-3" /> A vencer
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className={cn(
                       "px-6 py-4 text-right font-bold",
@@ -1191,20 +1159,56 @@ export const Transactions: React.FC = () => {
                     )}>
                       {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''} {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => handleEdit(t)}
-                          className="rounded-lg p-1.5 text-content-subtle hover:bg-surface-muted hover:text-primary transition-all"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(t)}
-                          className="rounded-lg p-1.5 text-content-subtle hover:bg-red-50 hover:text-red-600 transition-all"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        {!isCardExpense(t) && t.type !== 'transfer' && (
+                          t.status === 'completed' ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => toggleReconciled(t)}
+                                title={t.reconciled ? 'Conferido no extrato — clique para desmarcar' : 'Marcar como conferido no extrato do banco'}
+                                className={cn(
+                                  'rounded-lg border px-2 py-1 text-[10px] font-bold uppercase transition-all',
+                                  t.reconciled
+                                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300'
+                                    : 'border-line text-content-subtle hover:border-indigo-400 hover:text-indigo-600'
+                                )}
+                              >
+                                {t.reconciled ? '✓ conferido' : 'conferir'}
+                              </button>
+                              <button
+                                onClick={() => toggleStatus(t)}
+                                title="Desfazer — volta a pendente"
+                                className="rounded-lg border border-line px-2 py-1 text-[10px] font-bold uppercase text-content-subtle transition-all hover:border-amber-400 hover:text-amber-600"
+                              >
+                                Desfazer
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => openPay(t)}
+                              title={t.type === 'income' ? 'Registrar recebimento (escolher conta)' : 'Registrar pagamento (escolher conta)'}
+                              className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600 active:scale-95"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              {quickActionLabel(t)}
+                            </button>
+                          )
+                        )}
+                        <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEdit(t)}
+                            className="rounded-lg p-1.5 text-content-subtle hover:bg-surface-muted hover:text-primary transition-all"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(t)}
+                            className="rounded-lg p-1.5 text-content-subtle hover:bg-red-50 hover:text-red-600 transition-all"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </td>
                   </tr>
