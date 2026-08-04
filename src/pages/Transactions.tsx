@@ -1120,7 +1120,6 @@ export const Transactions: React.FC = () => {
                         if (t.status === 'completed') return (
                           <span className="flex w-fit items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase text-green-700 dark:bg-green-950/50 dark:text-green-300">
                             <CheckCircle2 className="h-3 w-3" /> {t.type === 'income' ? 'Recebido' : 'Pago'}
-                            {t.reconciled && <span className="font-normal normal-case opacity-70">· conferido</span>}
                           </span>
                         );
                         // Pendente: selo colorido de vencimento (SÓ a situação, sem botão).
@@ -1163,32 +1162,18 @@ export const Transactions: React.FC = () => {
                       <div className="flex items-center justify-end gap-2">
                         {!isCardExpense(t) && t.type !== 'transfer' && (
                           t.status === 'completed' ? (
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => toggleReconciled(t)}
-                                title={t.reconciled ? 'Conferido no extrato — clique para desmarcar' : 'Marcar como conferido no extrato do banco'}
-                                className={cn(
-                                  'rounded-lg border px-2 py-1 text-[10px] font-bold uppercase transition-all',
-                                  t.reconciled
-                                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300'
-                                    : 'border-line text-content-subtle hover:border-indigo-400 hover:text-indigo-600'
-                                )}
-                              >
-                                {t.reconciled ? '✓ conferido' : 'conferir'}
-                              </button>
-                              <button
-                                onClick={() => toggleStatus(t)}
-                                title="Desfazer — volta a pendente"
-                                className="rounded-lg border border-line px-2 py-1 text-[10px] font-bold uppercase text-content-subtle transition-all hover:border-amber-400 hover:text-amber-600"
-                              >
-                                Desfazer
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => toggleStatus(t)}
+                              title="Desfazer — volta para 'a pagar/a receber' e remove a baixa do banco"
+                              className="min-w-[7rem] rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-content-subtle transition-all hover:border-amber-400 hover:text-amber-600"
+                            >
+                              Desfazer
+                            </button>
                           ) : (
                             <button
                               onClick={() => openPay(t)}
                               title={t.type === 'income' ? 'Registrar recebimento (escolher conta)' : 'Registrar pagamento (escolher conta)'}
-                              className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600 active:scale-95"
+                              className="flex min-w-[7rem] items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600 active:scale-95"
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               {quickActionLabel(t)}
