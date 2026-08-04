@@ -97,6 +97,9 @@ export interface Transaction {
   // Vínculo opcional com um cliente cadastrado (para receitas/recebimentos)
   clientId?: string;
   clientName?: string;
+  // Vínculo opcional com um fornecedor cadastrado (para despesas)
+  supplierId?: string;
+  supplierName?: string;
   // Installment fields
   installmentNumber?: number;
   totalInstallments?: number;

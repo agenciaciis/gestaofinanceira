@@ -3,7 +3,7 @@ import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, where, writeBatch, doc, updateDoc, deleteDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Transaction, BankAccount, CreditCard, Client, Goal } from '../types';
+import { Transaction, BankAccount, CreditCard, Client, Goal, Supplier } from '../types';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Search, Filter, Calendar, Tag, Wallet, CreditCard as CardIcon, ArrowRightLeft, Repeat, Download, CheckCircle2, Clock, AlertCircle, ChevronLeft, ChevronRight, Edit2, Trash2, Upload, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -47,7 +47,7 @@ export const Transactions: React.FC = () => {
   const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   // Lançamento avulso: "Já foi pago/recebido?" (senão nasce pendente/a pagar).
-  const [jaEfetivado, setJaEfetivado] = useState(true);
+  const [jaEfetivado, setJaEfetivado] = useState(false);
   const [categoryId, setCategoryId] = useState('outros');
   const [targetEntityId, setTargetEntityId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'account' | 'card'>('account');
@@ -58,6 +58,8 @@ export const Transactions: React.FC = () => {
   const [personalExpense, setPersonalExpense] = useState(false);
   const [clientId, setClientId] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
+  const [supplierId, setSupplierId] = useState('');
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalId, setGoalId] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -75,6 +77,10 @@ export const Transactions: React.FC = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'overdue'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  // Modal de pagamento: ao marcar como pago/recebido, escolher de qual conta sai/entra e a data.
+  const [payingTx, setPayingTx] = useState<Transaction | null>(null);
+  const [paySelAccount, setPaySelAccount] = useState('');
+  const [paySelDate, setPaySelDate] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -128,6 +134,38 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  // Abre o modal de pagamento (pendente -> pago/recebido), escolhendo a conta e a data.
+  const openPay = (t: Transaction) => {
+    const accs = accounts.filter(a => a.entityId === t.entityId);
+    setPaySelAccount(t.accountId || accs[0]?.id || '');
+    setPaySelDate(new Date().toISOString().split('T')[0]);
+    setPayingTx(t);
+  };
+
+  // Confirma o pagamento/recebimento: dá a baixa na conta escolhida e marca como concluído.
+  const confirmPay = async () => {
+    if (!payingTx) return;
+    if (!paySelAccount) { showToast('Escolha a conta de onde sai/entra o dinheiro.', 'error'); return; }
+    const t = payingTx;
+    // Atualização otimista.
+    setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: 'completed', accountId: paySelAccount, paidAt: paySelDate } : x));
+    setPayingTx(null);
+    try {
+      await updateDoc(doc(db, `entities/${t.entityId}/transactions/${t.id}`), {
+        status: 'completed',
+        accountId: paySelAccount,
+        paidAt: paySelDate,
+        updatedAt: serverTimestamp(),
+      });
+      const verb = t.type === 'income' ? 'Recebido' : 'Pago';
+      showToast(`${t.description}: ${verb}. Baixa registrada na conta.`, 'success');
+    } catch (error) {
+      console.error('Erro ao registrar pagamento:', error);
+      setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: t.status, accountId: t.accountId, paidAt: t.paidAt } : x));
+      showToast('Erro ao registrar o pagamento.', 'error');
+    }
+  };
+
   // Rótulo do botão de ação rápida conforme tipo e estado.
   const quickActionLabel = (t: Transaction) => {
     if (t.type === 'income') return t.status === 'completed' ? 'Recebido' : 'Receber';
@@ -136,6 +174,22 @@ export const Transactions: React.FC = () => {
   };
 
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+
+  // Compra no cartão (tem cartão e não tem conta): NÃO é caixa — entra na fatura.
+  // Quem "paga" é a fatura (tela Cartões), não a compra em si.
+  const isCardExpense = (t: Transaction) => t.type === 'expense' && !!t.cardId && !t.accountId;
+
+  // Situação de um lançamento pendente perto do vencimento (para cor e rótulo).
+  type DueState = 'paid' | 'overdue' | 'due-soon' | 'open';
+  const dueStateOf = (t: Transaction): DueState => {
+    if (t.status === 'completed') return 'paid';
+    const d = parseLocalDate(t.date);
+    const days = Math.round((d.getTime() - todayStart.getTime()) / 86400000);
+    if (days < 0) return 'overdue';
+    if (days <= 3) return 'due-soon';
+    return 'open';
+  };
+
   const filteredTransactions = transactions.filter(t => {
     const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
     const isOverdue = t.status === 'pending' && parseLocalDate(t.date) < todayStart;
@@ -161,6 +215,10 @@ export const Transactions: React.FC = () => {
     if (tDate.getMonth() !== selectedMonth || tDate.getFullYear() !== selectedYear) return acc;
     if (t.status === 'cancelled') return acc;
     const isOverdue = t.status === 'pending' && tDate < todayStart;
+
+    // Compra no cartão não é caixa: fica fora de recebido/pago/a pagar.
+    // O dinheiro só sai quando a FATURA é paga (transferência, tela Cartões).
+    if (isCardExpense(t)) return acc;
 
     if (t.type === 'income') {
       if (t.status === 'completed') acc.received += t.amount;
@@ -218,6 +276,7 @@ export const Transactions: React.FC = () => {
     setPlannedAmount(t.plannedAmount != null ? String(t.plannedAmount) : '');
     setSubcategory(t.subcategory || '');
     setClientId(t.clientId || '');
+    setSupplierId(t.supplierId || '');
     setIsInstallment(!!t.installmentGroupId);
     setTotalInstallments(t.totalInstallments?.toString() || '1');
     setIsRecurring(!!t.isRecurring);
@@ -226,6 +285,37 @@ export const Transactions: React.FC = () => {
   };
 
   const handleDelete = async (t: Transaction) => {
+    // Quitação de fatura: ao excluir, devolvemos as compras à fatura (desmarca `settled`),
+    // senão o dinheiro volta pro banco mas a fatura some — o valor "desaparece".
+    if (t.cardPaymentFor) {
+      const toUnsettle = transactions.filter(x =>
+        x.entityId === t.entityId && x.cardId === t.cardPaymentFor && x.settled && x.settledAt === t.date
+      );
+      const confirmPayDelete = await confirm({
+        title: 'Excluir pagamento de fatura',
+        message: toUnsettle.length
+          ? `Ao excluir, ${toUnsettle.length} compra(s) voltam para a fatura do cartão e o limite volta a ficar comprometido. Continuar?`
+          : 'Excluir este pagamento de fatura?',
+        variant: 'danger',
+      });
+      if (!confirmPayDelete) return;
+      try {
+        if (toUnsettle.length) {
+          const batch = writeBatch(db);
+          for (const x of toUnsettle) {
+            batch.update(doc(db, `entities/${t.entityId}/transactions/${x.id}`), { settled: false, settledAt: null });
+          }
+          await batch.commit();
+        }
+        await deleteDoc(doc(db, `entities/${t.entityId}/transactions/${t.id}`));
+        showToast('Pagamento excluído. A fatura voltou para o cartão.', 'success');
+      } catch (error) {
+        console.error('Erro ao excluir pagamento de fatura:', error);
+        showToast('Erro ao excluir o pagamento.', 'error');
+      }
+      return;
+    }
+
     const groupId = t.recurringGroupId || t.installmentGroupId;
     
     if (groupId) {
@@ -342,6 +432,7 @@ export const Transactions: React.FC = () => {
     let allAccounts: BankAccount[] = [];
     let allCards: CreditCard[] = [];
     let allClients: Client[] = [];
+    let allSuppliers: Supplier[] = [];
 
     let allGoals: Goal[] = [];
 
@@ -354,6 +445,15 @@ export const Transactions: React.FC = () => {
         setClients([...allClients]);
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/clients`));
       unsubscribes.push(unsubCl);
+
+      // Fornecedores (para vincular despesas a um fornecedor)
+      const supQ = query(collection(db, `entities/${entity.id}/suppliers`));
+      const unsubSup = onSnapshot(supQ, (snapshot) => {
+        const entitySup = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Supplier[];
+        allSuppliers = [...allSuppliers.filter(s => s.entityId !== entity.id), ...entitySup];
+        setSuppliers([...allSuppliers]);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/suppliers`));
+      unsubscribes.push(unsubSup);
 
       // Caixinhas: doc único `config/goals` (mesma fonte da tela de Caixinhas).
       // Antes lia a coleção `entities/{id}/goals`, que não existe — a marcação
@@ -517,6 +617,8 @@ export const Transactions: React.FC = () => {
             subcategory: subcategory.trim() || null,
                   clientId: clientId || null,
                   clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
+                  supplierId: supplierId || null,
+                  supplierName: supplierId ? (suppliers.find(s => s.id === supplierId)?.name || null) : null,
                 });
               }
             });
@@ -545,6 +647,8 @@ export const Transactions: React.FC = () => {
             subcategory: subcategory.trim() || null,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
+          supplierId: supplierId || null,
+          supplierName: supplierId ? (suppliers.find(s => s.id === supplierId)?.name || null) : null,
           isRecurring,
           recurringPeriod: isRecurring ? recurringPeriod : null,
         });
@@ -592,7 +696,10 @@ export const Transactions: React.FC = () => {
             subcategory: subcategory.trim() || null,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
-            status: i === 1 ? 'completed' : 'pending',
+            supplierId: supplierId || null,
+            supplierName: supplierId ? (suppliers.find(s => s.id === supplierId)?.name || null) : null,
+            // Só a 1ª parcela pode nascer paga — e apenas se o usuário marcou "já paguei".
+            status: (i === 1 && jaEfetivado) ? 'completed' : 'pending',
             entityId: targetEntityId,
             ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
             collaboratorsEmails: entities.find(e => e.id === targetEntityId)?.collaboratorsEmails || [],
@@ -637,7 +744,10 @@ export const Transactions: React.FC = () => {
             subcategory: subcategory.trim() || null,
             clientId: clientId || null,
             clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
-            status: i === 0 ? 'completed' : 'pending',
+            supplierId: supplierId || null,
+            supplierName: supplierId ? (suppliers.find(s => s.id === supplierId)?.name || null) : null,
+            // Só a 1ª ocorrência pode nascer paga — e apenas se o usuário marcou "já paguei".
+            status: (i === 0 && jaEfetivado) ? 'completed' : 'pending',
             entityId: targetEntityId,
             ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
             collaboratorsEmails: entities.find(e => e.id === targetEntityId)?.collaboratorsEmails || [],
@@ -665,6 +775,8 @@ export const Transactions: React.FC = () => {
             subcategory: subcategory.trim() || null,
           clientId: clientId || null,
           clientName: clientId ? (clients.find(c => c.id === clientId)?.name || null) : null,
+          supplierId: supplierId || null,
+          supplierName: supplierId ? (suppliers.find(s => s.id === supplierId)?.name || null) : null,
           status: jaEfetivado ? 'completed' : 'pending',
           entityId: targetEntityId,
           ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
@@ -706,6 +818,7 @@ export const Transactions: React.FC = () => {
     setPlannedAmount('');
     setSubcategory('');
     setClientId('');
+    setSupplierId('');
     setIsInstallment(false);
     setTotalInstallments('1');
     setType('expense');
@@ -985,53 +1098,86 @@ export const Transactions: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {t.status === 'completed' && (
-                        <button
-                          onClick={() => toggleReconciled(t)}
-                          title={t.reconciled ? 'Conferido no extrato — clique para desmarcar' : 'Marcar como conferido no extrato do banco'}
-                          className={cn(
-                            'mb-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase transition-all',
-                            t.reconciled
-                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
-                              : 'border border-line text-content-subtle hover:border-indigo-400 hover:text-indigo-600'
-                          )}
+                      {isCardExpense(t) ? (
+                        // Compra no cartão: não é caixa — é paga na FATURA (tela Cartões).
+                        <span
+                          title="Compra no cartão — é paga na fatura (tela Cartões), não aqui."
+                          className="flex w-fit items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
                         >
-                          {t.reconciled ? '✓ conciliado' : 'conciliar'}
-                        </button>
-                      )}
-                      {t.status === 'completed' ? (
-                        // Selo discreto — clique para desfazer (volta a pendente)
-                        <button
-                          onClick={() => toggleStatus(t)}
-                          title="Clique para desfazer"
-                          className="group/chip flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase text-green-700 transition-all hover:bg-green-200"
-                        >
-                          <CheckCircle2 className="h-3 w-3" />
-                          {quickActionLabel(t)}
-                        </button>
-                      ) : t.type === 'transfer' ? (
-                        <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-700">
-                          <CheckCircle2 className="h-3 w-3" /> Concluído
+                          <CardIcon className="h-3 w-3" /> Na fatura
                         </span>
                       ) : (
-                        // Botão de AÇÃO RÁPIDA — um clique marca como pago/recebido
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => toggleStatus(t)}
-                            className={cn(
-                              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-95",
-                              t.type === 'income' ? "bg-emerald-500 hover:bg-emerald-600" : "bg-emerald-500 hover:bg-emerald-600"
-                            )}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            {quickActionLabel(t)}
-                          </button>
-                          {isOverdue && (
-                            <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold uppercase text-red-600">
-                              <AlertCircle className="h-2.5 w-2.5" /> Atrasado
-                            </span>
+                        <>
+                          {t.status === 'completed' && (
+                            <button
+                              onClick={() => toggleReconciled(t)}
+                              title={t.reconciled ? 'Conferido no extrato — clique para desmarcar' : 'Marcar como conferido no extrato do banco'}
+                              className={cn(
+                                'mb-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase transition-all',
+                                t.reconciled
+                                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
+                                  : 'border border-line text-content-subtle hover:border-indigo-400 hover:text-indigo-600'
+                              )}
+                            >
+                              {t.reconciled ? '✓ conciliado' : 'conciliar'}
+                            </button>
                           )}
-                        </div>
+                          {t.status === 'completed' ? (
+                            // Selo verde — pago/recebido. Clique para desfazer (volta a pendente).
+                            <button
+                              onClick={() => toggleStatus(t)}
+                              title="Pago — clique para desfazer (volta a pendente)"
+                              className="group/chip flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase text-green-700 transition-all hover:bg-green-200"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              {quickActionLabel(t)}
+                            </button>
+                          ) : t.type === 'transfer' ? (
+                            <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-700">
+                              <CheckCircle2 className="h-3 w-3" /> Concluído
+                            </span>
+                          ) : (
+                            // Pendente: botão que ABRE o modal de pagamento + selo colorido de vencimento.
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => openPay(t)}
+                                title={t.type === 'income' ? 'Registrar recebimento (escolher conta)' : 'Registrar pagamento (escolher conta)'}
+                                className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600 hover:shadow-md active:scale-95"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {quickActionLabel(t)}
+                              </button>
+                              {(() => {
+                                const st = dueStateOf(t);
+                                if (st === 'overdue') {
+                                  const days = Math.round((todayStart.getTime() - parseLocalDate(t.date).getTime()) / 86400000);
+                                  return (
+                                    <span
+                                      title={`Atrasada há ${days} dia(s)`}
+                                      className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase text-red-700 ring-1 ring-red-300 dark:bg-red-950/50 dark:text-red-300"
+                                    >
+                                      <AlertCircle className="h-2.5 w-2.5" /> Atrasada
+                                    </span>
+                                  );
+                                }
+                                if (st === 'due-soon') {
+                                  const days = Math.round((parseLocalDate(t.date).getTime() - todayStart.getTime()) / 86400000);
+                                  const label = days <= 0 ? 'Vence hoje' : days === 1 ? 'Vence amanhã' : `Vence em ${days} dias`;
+                                  return (
+                                    <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700 ring-1 ring-amber-300 dark:bg-amber-950/50 dark:text-amber-300">
+                                      <Clock className="h-2.5 w-2.5" /> {label}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold uppercase text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
+                                    <Calendar className="h-2.5 w-2.5" /> A vencer
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className={cn(
@@ -1317,19 +1463,37 @@ export const Transactions: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-content-muted">
-                        Cliente {type === 'income' ? '(quem pagou)' : '(opcional)'}
-                      </label>
-                      <select
-                        value={clientId}
-                        onChange={(e) => setClientId(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
-                      >
-                        <option value="">Nenhum</option>
-                        {clients.filter(c => c.entityId === targetEntityId).map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
+                      {type === 'expense' ? (
+                        <>
+                          <label className="block text-sm font-medium text-content-muted">Fornecedor (opcional)</label>
+                          <select
+                            value={supplierId}
+                            onChange={(e) => setSupplierId(e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                            <option value="">Nenhum</option>
+                            {suppliers.filter(s => s.entityId === targetEntityId).map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </>
+                      ) : (
+                        <>
+                          <label className="block text-sm font-medium text-content-muted">
+                            Cliente {type === 'income' ? '(quem pagou)' : '(opcional)'}
+                          </label>
+                          <select
+                            value={clientId}
+                            onChange={(e) => setClientId(e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                            <option value="">Nenhum</option>
+                            {clients.filter(c => c.entityId === targetEntityId).map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -1540,7 +1704,60 @@ export const Transactions: React.FC = () => {
           </motion.div>
         </div>
       )}
-      <ImportTransactionsModal 
+      {/* Modal de pagamento: escolher de qual conta sai/entra o dinheiro + a data. */}
+      {payingTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPayingTx(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-content">
+              {payingTx.type === 'income' ? 'Registrar recebimento' : 'Registrar pagamento'}
+            </h3>
+            <p className="mt-1 text-sm text-content-subtle">
+              {payingTx.description} — <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(payingTx.amount)}</strong>
+            </p>
+            <p className="mt-2 text-xs text-content-subtle">
+              {payingTx.type === 'income'
+                ? 'O dinheiro entra na conta escolhida e o saldo sobe.'
+                : 'O dinheiro sai da conta escolhida e o saldo cai.'}
+            </p>
+
+            <label className="mt-4 block text-xs font-bold uppercase tracking-wider text-content-subtle">
+              {payingTx.type === 'income' ? 'Receber na conta' : 'Pagar com a conta'}
+            </label>
+            <select
+              value={paySelAccount}
+              onChange={e => setPaySelAccount(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-content"
+            >
+              <option value="">Selecione a conta...</option>
+              {accounts.filter(a => a.entityId === payingTx.entityId).map(a => (
+                <option key={a.id} value={a.id}>{a.bankName}</option>
+              ))}
+            </select>
+
+            <label className="mt-4 block text-xs font-bold uppercase tracking-wider text-content-subtle">Data</label>
+            <input
+              type="date"
+              value={paySelDate}
+              onChange={e => setPaySelDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-content"
+            />
+
+            {accounts.filter(a => a.entityId === payingTx.entityId).length === 0 && (
+              <p className="mt-3 text-xs text-red-500">Nenhuma conta cadastrada para esta entidade. Cadastre uma em "Contas" primeiro.</p>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => setPayingTx(null)} className="flex-1 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-content-subtle hover:bg-surface-muted">
+                Cancelar
+              </button>
+              <button onClick={confirmPay} className="flex-1 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-50">
+                {payingTx.type === 'income' ? 'Confirmar recebimento' : 'Confirmar pagamento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <ImportTransactionsModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         accounts={accounts}
