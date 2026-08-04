@@ -414,51 +414,52 @@ export const CreditCards: React.FC = () => {
               /* A cor do cartão é FIXA (escolhida pelo usuário), não segue o tema.
                  Por isso o texto por cima vem de readableForeground e não de um
                  token de tema — senão no tema claro o rótulo escurece e some. */
-              style={{
-                background: `linear-gradient(135deg, ${gradient.from} 0%, ${gradient.to} 100%)`,
-                color: fg,
-              }}
-              className="group relative overflow-hidden rounded-2xl p-6 shadow-xl border border-white/10"
+              className="group relative overflow-hidden rounded-2xl border border-line bg-surface shadow-lg"
             >
-              <div className="flex items-center justify-between">
-                <CardIcon className="h-8 w-8" style={{ color: fgMuted }} />
-                <div className="flex gap-2">
-                  <button 
+              {/* Faixa de cor da marca — SÓ o topo é colorido, pra não atrapalhar a leitura embaixo. */}
+              <div
+                style={{ background: `linear-gradient(135deg, ${gradient.from} 0%, ${gradient.to} 100%)`, color: fg }}
+                className="flex items-start justify-between gap-2 p-5"
+              >
+                <div className="flex items-center gap-3">
+                  <CardIcon className="h-8 w-8 shrink-0" style={{ color: fg }} />
+                  <div>
+                    <p style={{ color: fgMuted }} className="text-[10px] font-medium uppercase tracking-widest">{card.brand || 'Cartão'}</p>
+                    <h3 className="text-lg font-bold leading-tight">{card.name}</h3>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-black/15 px-2 py-0.5 text-[8px] font-bold uppercase" style={{ color: fg }}>
+                    {entities.find(e => e.id === card.entityId)?.type}
+                  </span>
+                  <button
                     onClick={() => handleEdit(card)}
-                    className="rounded-full bg-white/10 p-1.5 hover:bg-white/20 transition-all"
+                    className="rounded-full bg-white/20 p-1.5 transition-all hover:bg-white/30"
                   >
                     <Edit2 className="h-4 w-4" />
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDelete(card.entityId, card.id)}
-                    className="rounded-full bg-white/10 p-1.5 hover:bg-red-500/20 hover:text-red-400 transition-all"
+                    className="rounded-full bg-white/20 p-1.5 transition-all hover:bg-red-500/40"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-              
-              <div className="mt-6">
-                <p style={{ color: fgMuted }} className="text-xs font-medium uppercase tracking-widest">{card.brand || 'Cartão'}</p>
-                <h3 className="text-xl font-bold">{card.name}</h3>
-              </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="space-y-4 p-5">
                 <div>
-                  <div style={{ color: fgMuted }} className="mb-1 flex justify-between text-[10px] uppercase tracking-wider">
+                  <div className="mb-1 flex justify-between text-[10px] uppercase tracking-wider text-content-subtle">
                     <span>Limite Utilizado</span>
                     <span>{usagePercentage.toFixed(1)}%</span>
                   </div>
-                  <div style={{ backgroundColor: fg === '#ffffff' ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.18)' }} className="h-1.5 w-full overflow-hidden rounded-full">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
                     <div
                       className="h-full transition-all duration-500"
-                      /* Estado normal usa a cor do TEXTO do cartão: garante
-                         contraste em qualquer cor de marca (azul fixo sumia no
-                         roxo do Nubank e no laranja do Inter). Vermelho fica
-                         reservado ao estouro, onde a cor carrega significado. */
+                      /* Barra usa a cor da marca do cartão; vermelho só no estouro (>90%). */
                       style={{
                         width: `${usagePercentage}%`,
-                        backgroundColor: usagePercentage > 90 ? '#ef4444' : fg,
+                        backgroundColor: usagePercentage > 90 ? '#ef4444' : gradient.from,
                       }}
                     />
                   </div>
@@ -466,20 +467,20 @@ export const CreditCards: React.FC = () => {
 
                 <div className="flex justify-between">
                   <div>
-                    <p style={{ color: fgMuted }} className="text-[10px] uppercase">Disponível</p>
-                    <p className="text-sm font-bold text-green-400">
+                    <p className="text-[10px] uppercase text-content-subtle">Disponível</p>
+                    <p className="text-sm font-bold text-emerald-600">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(availableLimit)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p style={{ color: fgMuted }} className="text-[10px] uppercase">Limite Total</p>
-                    <p className="text-sm font-bold">
+                    <p className="text-[10px] uppercase text-content-subtle">Limite Total</p>
+                    <p className="text-sm font-bold text-content">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.limit)}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex justify-between border-t border-white/10 pt-4">
+                <div className="flex justify-between border-t border-line pt-4">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-3 w-3 text-content-subtle" />
                     <div>
@@ -497,22 +498,19 @@ export const CreditCards: React.FC = () => {
                 </div>
 
                 {/* Fatura do mês a pagar — lembrete (cálculo ao vivo, sem lançamento duplicado) */}
-                <div
-                  style={{ backgroundColor: fg === '#ffffff' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.10)' }}
-                  className="flex items-center justify-between rounded-xl px-3 py-2"
-                >
+                <div className="flex items-center justify-between rounded-xl bg-surface-muted px-3 py-2">
                   <div>
-                    <p style={{ color: fgMuted }} className="text-[9px] uppercase tracking-wider">Fatura deste mês</p>
-                    <p className="text-sm font-black">
+                    <p className="text-[9px] uppercase tracking-wider text-content-subtle">Fatura deste mês</p>
+                    <p className="text-sm font-black text-content">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(invoiceAmount)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p style={{ color: fgMuted }} className="text-[9px] uppercase tracking-wider">
+                    <p className="text-[9px] uppercase tracking-wider text-content-subtle">
                       {invoiceAmount > 0 ? 'Vence em' : 'Sem fatura em aberto'}
                     </p>
                     {invoiceAmount > 0 && (
-                      <p className="text-xs font-bold">
+                      <p className="text-xs font-bold text-content">
                         {dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                       </p>
                     )}
@@ -525,7 +523,7 @@ export const CreditCards: React.FC = () => {
                       setComparingCard(card);
                       setIsCompareModalOpen(true);
                     }}
-                    className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-white/10 py-2 text-[10px] font-bold hover:bg-white/20 transition-all"
+                    className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-surface-muted py-2 text-[10px] font-bold text-content transition-all hover:bg-line"
                   >
                     <BarChart3 className="h-3 w-3" />
                     Comparar
@@ -534,14 +532,14 @@ export const CreditCards: React.FC = () => {
                     onClick={() => {
                       setSelectedCardForInvoices(card);
                     }}
-                    className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-primary/20 py-2 text-[10px] font-bold hover:bg-primary/30 transition-all text-primary-foreground"
+                    className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-primary/10 py-2 text-[10px] font-bold text-primary transition-all hover:bg-primary/20"
                   >
                     <ReceiptText className="h-3 w-3" />
                     Ver Faturas
                   </button>
                   <button
                     onClick={() => openPayInvoice(card)}
-                    className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-emerald-500/25 py-2 text-[10px] font-bold hover:bg-emerald-500/40 transition-all text-emerald-50"
+                    className="col-span-2 mt-2 flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 py-2 text-[10px] font-bold text-emerald-600 transition-all hover:bg-emerald-500/25"
                   >
                     <CheckCircle2 className="h-3 w-3" />
                     Pagar fatura
@@ -549,15 +547,6 @@ export const CreditCards: React.FC = () => {
                 </div>
               </div>
 
-              {/* Entity Badge */}
-              <div className="pointer-events-none absolute right-4 top-4">
-                <span className={cn(
-                  "rounded-full px-2 py-0.5 text-[8px] font-bold uppercase",
-                  entities.find(e => e.id === card.entityId)?.type === 'PF' ? "bg-blue-500/20 text-blue-300" : "bg-purple-500/20 text-purple-300"
-                )}>
-                  {entities.find(e => e.id === card.entityId)?.type}
-                </span>
-              </div>
             </motion.div>
           );
         })}
