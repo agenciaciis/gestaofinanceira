@@ -3,7 +3,7 @@ import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, where, writeBatch, doc, updateDoc, deleteDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Transaction, BankAccount, CreditCard, Client, Goal, Supplier } from '../types';
+import { Transaction, BankAccount, CreditCard, Client, Goal, Supplier, Service } from '../types';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Search, Filter, Calendar, Tag, Wallet, CreditCard as CardIcon, ArrowRightLeft, Repeat, Download, CheckCircle2, Clock, AlertCircle, ChevronLeft, ChevronRight, Edit2, Trash2, Upload, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -14,6 +14,7 @@ import { suggestCategory as aiSuggestCategory } from "../services/aiService";
 import { Sparkles, Loader2 } from 'lucide-react';
 
 import { CATEGORIES, MONTHS } from '../constants';
+import { CustomCategory, categoriesDocPath, readCustomCategories, upsertCustomCategory, mergeCustomCategories, slugifyCategory, categoryLabel } from '../lib/categoryStore';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { splitInstallments, parseLocalDate, totalBalance } from '../lib/finance';
 import { planRecurringRenewals } from '../lib/recurring';
@@ -49,6 +50,11 @@ export const Transactions: React.FC = () => {
   // Lançamento avulso: "Já foi pago/recebido?" (senão nasce pendente/a pagar).
   const [jaEfetivado, setJaEfetivado] = useState(false);
   const [categoryId, setCategoryId] = useState('outros');
+  // Categorias personalizadas (compartilhadas): mapa por entidade + união p/ exibir.
+  const [customByEntity, setCustomByEntity] = useState<Record<string, CustomCategory[]>>({});
+  const customCategories = mergeCustomCategories(...(Object.values(customByEntity) as CustomCategory[][]));
+  const [criandoCategoria, setCriandoCategoria] = useState(false);
+  const [novaCategoria, setNovaCategoria] = useState('');
   const [targetEntityId, setTargetEntityId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'account' | 'card'>('account');
   const [accountId, setAccountId] = useState('');
@@ -60,6 +66,8 @@ export const Transactions: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [supplierId, setSupplierId] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [serviceId, setServiceId] = useState('');
+  const [services, setServices] = useState<Service[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalId, setGoalId] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -163,6 +171,32 @@ export const Transactions: React.FC = () => {
       console.error('Erro ao registrar pagamento:', error);
       setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: t.status, accountId: t.accountId, paidAt: t.paidAt } : x));
       showToast('Erro ao registrar o pagamento.', 'error');
+    }
+  };
+
+  // Cria (ou reaproveita) uma categoria personalizada e a seleciona no form.
+  const criarCategoria = async () => {
+    const nome = novaCategoria.trim();
+    if (!nome) { showToast('Digite o nome da categoria.', 'error'); return; }
+    const ent = targetEntityId || entities[0]?.id;
+    if (!ent) return;
+    const id = slugifyCategory(nome);
+    if (!id) { showToast('Nome inválido para a categoria.', 'error'); return; }
+    const jaExiste = CATEGORIES.some(c => c.id === id) || customCategories.some(c => c.id === id);
+    try {
+      if (!jaExiste) {
+        const atuais = customByEntity[ent] || [];
+        await setDoc(doc(db, categoriesDocPath(ent)),
+          { items: upsertCustomCategory(atuais, { id, name: nome }), updatedAt: serverTimestamp() },
+          { merge: true });
+      }
+      setCategoryId(id);
+      setCriandoCategoria(false);
+      setNovaCategoria('');
+      showToast(jaExiste ? 'Essa categoria já existia — selecionada.' : `Categoria "${nome}" criada.`, 'success');
+    } catch (e) {
+      console.error('Erro ao criar categoria:', e);
+      showToast('Não consegui criar a categoria.', 'error');
     }
   };
 
@@ -386,7 +420,7 @@ export const Transactions: React.FC = () => {
       Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
-      Categoria: CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros',
+      Categoria: categoryLabel(t.categoryId, customCategories),
       Entidade: entities.find(e => e.id === t.entityId)?.name,
       Valor: t.amount,
       Parcela: t.installmentNumber ? `${t.installmentNumber}/${t.totalInstallments}` : '-'
@@ -404,7 +438,7 @@ export const Transactions: React.FC = () => {
       Data: parseLocalDate(t.date).toLocaleDateString('pt-BR'),
       Descrição: t.description,
       Tipo: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
-      Categoria: CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros',
+      Categoria: categoryLabel(t.categoryId, customCategories),
       Entidade: entities.find(e => e.id === t.entityId)?.name,
       Valor: t.amount,
       Parcela: t.installmentNumber ? `${t.installmentNumber}/${t.totalInstallments}` : '-'
@@ -436,6 +470,7 @@ export const Transactions: React.FC = () => {
     let allCards: CreditCard[] = [];
     let allClients: Client[] = [];
     let allSuppliers: Supplier[] = [];
+    let allServices: Service[] = [];
 
     let allGoals: Goal[] = [];
 
@@ -457,6 +492,23 @@ export const Transactions: React.FC = () => {
         setSuppliers([...allSuppliers]);
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/suppliers`));
       unsubscribes.push(unsubSup);
+
+      // Serviços do catálogo (para puxar numa receita de PJ). Produtos ficam de fora.
+      const svcQ = query(collection(db, `entities/${entity.id}/services`));
+      const unsubSvc = onSnapshot(svcQ, (snapshot) => {
+        const entitySvc = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }) as Service)
+          .filter(s => s.catalogType !== 'product');
+        allServices = [...allServices.filter(s => s.entityId !== entity.id), ...entitySvc];
+        setServices([...allServices]);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/services`));
+      unsubscribes.push(unsubSvc);
+
+      // Categorias personalizadas (compartilhadas): doc de config por entidade.
+      const unsubCat = onSnapshot(doc(db, categoriesDocPath(entity.id)), (snap) => {
+        setCustomByEntity(prev => ({ ...prev, [entity.id]: readCustomCategories(snap.data()) }));
+      }, (error) => handleFirestoreError(error, OperationType.LIST, categoriesDocPath(entity.id)));
+      unsubscribes.push(unsubCat);
 
       // Caixinhas: doc único `config/goals` (mesma fonte da tela de Caixinhas).
       // Antes lia a coleção `entities/{id}/goals`, que não existe — a marcação
@@ -823,6 +875,7 @@ export const Transactions: React.FC = () => {
     setSubcategory('');
     setClientId('');
     setSupplierId('');
+    setServiceId('');
     setIsInstallment(false);
     setTotalInstallments('1');
     setType('expense');
@@ -1061,7 +1114,7 @@ export const Transactions: React.FC = () => {
                             )}
                           </div>
                           <span className="text-[10px] text-content-subtle uppercase tracking-wider">
-                            {CATEGORIES.find(c => c.id === t.categoryId)?.name || 'Outros'}
+                            {categoryLabel(t.categoryId, customCategories)}
                           </span>
                           {t.clientName && (
                             <span className="block text-[10px] text-content-subtle">{t.clientName}</span>
@@ -1320,17 +1373,54 @@ export const Transactions: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-content-muted">Categoria</label>
-                  <select 
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
-                    required
-                  >
-                    {CATEGORIES.filter(c => type === 'transfer' ? c.id === 'transferencia' : (type === 'income' ? c.type === 'income' : !c.type)).map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-content-muted">Categoria</label>
+                    {type !== 'transfer' && !criandoCategoria && (
+                      <button
+                        type="button"
+                        onClick={() => { setCriandoCategoria(true); setNovaCategoria(''); }}
+                        className="text-[11px] font-bold text-primary hover:underline"
+                      >
+                        ➕ Nova categoria
+                      </button>
+                    )}
+                  </div>
+                  {criandoCategoria ? (
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        autoFocus
+                        value={novaCategoria}
+                        onChange={(e) => setNovaCategoria(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criarCategoria(); } }}
+                        placeholder="Nome da nova categoria"
+                        className="flex-1 rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                      <button type="button" onClick={criarCategoria}
+                        className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white hover:bg-primary/90">Salvar</button>
+                      <button type="button" onClick={() => { setCriandoCategoria(false); setNovaCategoria(''); }}
+                        className="rounded-lg border border-line px-3 py-2 text-sm text-content-subtle hover:bg-surface-muted">Cancelar</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={categoryId}
+                      onChange={(e) => setCategoryId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    >
+                      {type === 'transfer' ? (
+                        <option value="transferencia">Transferência</option>
+                      ) : (
+                        <>
+                          {CATEGORIES.filter(c => type === 'income' ? c.type === 'income' : !c.type).map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                          {customCategories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -1455,6 +1545,32 @@ export const Transactions: React.FC = () => {
                         ))}
                       </select>
                     </div>
+                    {type === 'income' && entities.find(e => e.id === targetEntityId)?.type === 'PJ' && (
+                      <div>
+                        <label className="block text-sm font-medium text-content-muted">Serviço do catálogo (opcional)</label>
+                        <select
+                          value={serviceId}
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            setServiceId(id);
+                            const s = services.find(x => x.id === id);
+                            if (s) {
+                              setDescription(s.name);
+                              setAmount(String(s.basePrice ?? ''));
+                            }
+                          }}
+                          className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                        >
+                          <option value="">Nenhum (digitar manual)</option>
+                          {services.filter(s => s.entityId === targetEntityId).map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} — {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(s.basePrice || 0)}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-[11px] text-content-subtle">Puxa do seu catálogo e preenche descrição e valor (você ainda pode ajustar).</p>
+                      </div>
+                    )}
                     <div>
                       {type === 'expense' ? (
                         <>
