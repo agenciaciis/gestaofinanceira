@@ -16,7 +16,7 @@
  * agência: quanto preciso faturar para não ter prejuízo.
  */
 import { Transaction } from '../types';
-import { parseLocalDate, round2 } from './finance';
+import { parseLocalDate, round2, isCardExpense } from './finance';
 
 export type CategoryKind = 'variable' | 'fixed' | 'investment';
 
@@ -60,6 +60,9 @@ export function computeDRE(
     if (t.type === 'transfer') continue;
     // Dinheiro andando entre PF e PJ não é receita nem despesa do grupo.
     if (t.crossEntityGroupId) continue;
+    // Compra no cartão é paga na fatura — fica de fora do caixa (consistente
+    // com Lançamentos, Dashboard e o resto do Relatório).
+    if (isCardExpense(t)) continue;
 
     const d = parseLocalDate(t.date);
     if (Number.isNaN(d.getTime()) || d < inicio || d >= fim) continue;

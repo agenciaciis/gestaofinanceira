@@ -6,7 +6,7 @@ import { Transaction } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, startOfMonth, endOfMonth, subMonths, isSameMonth } from 'date-fns';
-import { parseLocalDate, isNotCancelled } from '../lib/finance';
+import { parseLocalDate, isNotCancelled, isCardExpense } from '../lib/finance';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES, MONTHS } from '../constants';
 import { 
@@ -126,11 +126,13 @@ export const Reports: React.FC = () => {
   const stats = useMemo(() => {
     // `!t.crossEntityGroupId` exclui o movimento interno PF↔PJ (pró-labore,
     // aporte, reembolso): só troca de bolso, não é receita/despesa do grupo.
+    // Compra no cartão fica de fora do caixa (é paga na fatura) — consistente
+    // com Lançamentos e Dashboard.
     const realizedIncome = filteredData.filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
-    const realizedExpense = filteredData.filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
+    const realizedExpense = filteredData.filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
     // "Projetado" = realizado + pendente (exclui cancelados).
     const projectedIncome = filteredData.filter(t => t.type === 'income' && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
-    const projectedExpense = filteredData.filter(t => t.type === 'expense' && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
+    const projectedExpense = filteredData.filter(t => t.type === 'expense' && !isCardExpense(t) && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
     
     return { 
       income: realizedIncome, 
@@ -143,7 +145,7 @@ export const Reports: React.FC = () => {
   }, [filteredData]);
 
   const expenseCategoryData = useMemo(() => {
-    const expenses = filteredData.filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId);
+    const expenses = filteredData.filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId);
     const grouped = expenses.reduce((acc, t) => {
       const cat = CATEGORIES.find(c => c.id === t.categoryId) || CATEGORIES.find(c => c.id === 'outros')!;
       acc[cat.name] = (acc[cat.name] || 0) + t.amount;
@@ -191,7 +193,7 @@ export const Reports: React.FC = () => {
       });
 
       const income = monthData.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-      const expense = monthData.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+      const expense = monthData.filter(t => t.type === 'expense' && !isCardExpense(t)).reduce((acc, t) => acc + t.amount, 0);
 
       months.push({
         name: MONTHS[m].substring(0, 3),

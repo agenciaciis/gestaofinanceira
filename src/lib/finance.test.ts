@@ -4,6 +4,7 @@ import {
   round2,
   isRealized,
   isNotCancelled,
+  isCardExpense,
   parseLocalDate,
   formatLocalDate,
   splitInstallments,
@@ -56,6 +57,12 @@ describe('isRealized / isNotCancelled', () => {
     expect(isNotCancelled({ status: 'completed' })).toBe(true);
     expect(isNotCancelled({ status: 'pending' })).toBe(true);
     expect(isNotCancelled({ status: 'cancelled' })).toBe(false);
+  });
+  it('isCardExpense: só despesa com cartão e sem conta', () => {
+    expect(isCardExpense({ type: 'expense', cardId: 'c1' })).toBe(true);
+    expect(isCardExpense({ type: 'expense', cardId: 'c1', accountId: 'a1' })).toBe(false); // pagamento de fatura tem conta
+    expect(isCardExpense({ type: 'expense' })).toBe(false); // despesa de conta
+    expect(isCardExpense({ type: 'income', cardId: 'c1' })).toBe(false); // receita nunca é gasto de cartão
   });
 });
 

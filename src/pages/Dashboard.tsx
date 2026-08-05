@@ -47,7 +47,7 @@ import { cn } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth, isAfter, isBefore, isSameDay, isSameYear, subDays, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice, round2, nextDueDate } from '../lib/finance';
+import { computeBalances, parseLocalDate, isNotCancelled, computeCardInvoice, round2, nextDueDate, isCardExpense } from '../lib/finance';
 import { collectDebts, payoffSchedule } from '../lib/debts';
 import { computeSpendable, detectDuplicateLoanCommitments, suggestReserve } from '../lib/spendable';
 import { consolidate } from '../lib/crossEntity';
@@ -260,7 +260,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       .reduce((acc, t) => acc + t.amount, 0);
 
     const expenseThisPeriod = transactions
-      .filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
+      .filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
     const incomeLastPeriod = transactions
@@ -268,7 +268,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       .reduce((acc, t) => acc + t.amount, 0);
 
     const expenseLastPeriod = transactions
-      .filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), prevDate))
+      .filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), prevDate))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Pendentes DO PERÍODO analisado. Antes somavam qualquer data, então
@@ -279,14 +279,14 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       .reduce((acc, t) => acc + t.amount, 0);
 
     const pendingExpense = transactions
-      .filter(t => t.type === 'expense' && t.status === 'pending' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
+      .filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'pending' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Vencidas é "até hoje", não do período: uma conta vencida continua vencida
     // independente do mês que você está olhando.
     const inicioDeHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     const overdue = transactions
-      .filter(t => t.status === 'pending' && t.type === 'expense' && !t.crossEntityGroupId && isBefore(parseLocalDate(t.date), inicioDeHoje))
+      .filter(t => t.status === 'pending' && t.type === 'expense' && !isCardExpense(t) && !t.crossEntityGroupId && isBefore(parseLocalDate(t.date), inicioDeHoje))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
@@ -307,7 +307,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     const budgetProgress = CATEGORIES.filter(c => budgets[c.id]).map(cat => {
       const isIncome = cat.type === 'income';
       const realized = transactions
-        .filter(t => t.categoryId === cat.id && (isIncome ? t.type === 'income' : t.type === 'expense') && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), now))
+        .filter(t => t.categoryId === cat.id && (isIncome ? t.type === 'income' : (t.type === 'expense' && !isCardExpense(t))) && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), now))
         .reduce((acc, t) => acc + t.amount, 0);
       const goal = budgets[cat.id];
       const percentage = goal > 0 ? (realized / goal) * 100 : 0;
@@ -400,7 +400,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
         .filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
       const monthExpense = transactions
-        .filter(t => t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
+        .filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
 
       data.push({
@@ -420,7 +420,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
         .filter(t => t.type === 'income' && isNotCancelled(t) && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
       const monthExpense = transactions
-        .filter(t => t.type === 'expense' && isNotCancelled(t) && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
+        .filter(t => t.type === 'expense' && !isCardExpense(t) && isNotCancelled(t) && !t.crossEntityGroupId && isSameMonth(parseLocalDate(t.date), month))
         .reduce((acc, t) => acc + t.amount, 0);
 
       data.push({
@@ -444,7 +444,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
 
     return CATEGORIES.map(cat => {
       const amount = transactions
-        .filter(t => t.categoryId === cat.id && t.type === 'expense' && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date)))
+        .filter(t => t.categoryId === cat.id && t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date)))
         .reduce((acc, t) => acc + t.amount, 0);
       return { name: cat.name, value: amount };
     }).filter(c => c.value > 0).sort((a, b) => b.value - a.value).slice(0, 6);

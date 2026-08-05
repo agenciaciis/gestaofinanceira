@@ -5,7 +5,7 @@
  * mesma regra, sem teste. Aqui é uma só.
  */
 import { Transaction } from '../types';
-import { parseLocalDate, round2 } from './finance';
+import { parseLocalDate, round2, isCardExpense } from './finance';
 
 /** { categoriaId: limite mensal }. Também guarda 'monthly_balance_goal'. */
 export type BudgetMap = Record<string, number>;
@@ -37,6 +37,7 @@ export function budgetProgress(
   const gastoPorCategoria: Record<string, number> = {};
   for (const t of transactions) {
     if (t.type !== type || t.status !== 'completed') continue;
+    if (isCardExpense(t)) continue; // compra no cartão é paga na fatura, fora do caixa
     const d = parseLocalDate(t.date);
     if (Number.isNaN(d.getTime()) || d < inicio || d >= fim) continue;
     gastoPorCategoria[t.categoryId] = round2((gastoPorCategoria[t.categoryId] || 0) + (Number(t.amount) || 0));

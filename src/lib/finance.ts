@@ -22,6 +22,16 @@ export function isNotCancelled(t: Pick<Transaction, 'status'>): boolean {
 }
 
 /**
+ * `true` se é uma COMPRA no cartão (tem cartão e não tem conta). Não é caixa:
+ * o dinheiro só sai quando a FATURA é paga. Fica de fora de "despesa/pago" em
+ * todas as telas de caixa (Lançamentos, Dashboard, Relatórios) — aparece só na
+ * tela de Cartões (fatura/limite).
+ */
+export function isCardExpense(t: Pick<Transaction, 'type' | 'cardId' | 'accountId'>): boolean {
+  return t.type === 'expense' && !!t.cardId && !t.accountId;
+}
+
+/**
  * Converte uma string 'YYYY-MM-DD' em Date no fuso LOCAL (meia-noite local),
  * evitando o bug clássico de `new Date('2026-06-01')` ser interpretado como
  * UTC e "voltar" um dia em fusos negativos (Brasil = UTC-3).

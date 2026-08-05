@@ -7,7 +7,7 @@
  *  - AH (análise horizontal): variação de um período para o outro
  */
 import { Transaction } from '../types';
-import { parseLocalDate, round2 } from './finance';
+import { parseLocalDate, round2, isCardExpense } from './finance';
 
 /** Valor previsto do lançamento; sem previsão, o próprio real. */
 export function plannedOf(t: Transaction): number {
@@ -62,6 +62,7 @@ export function periodTotals(
     if (t.status !== 'completed') continue;
     if (t.type === 'transfer') continue;
     if (t.crossEntityGroupId) continue;  // dinheiro andando entre PF e PJ
+    if (isCardExpense(t)) continue;      // compra no cartão é paga na fatura, fora do caixa
 
     const d = parseLocalDate(t.date);
     if (Number.isNaN(d.getTime()) || d < ini || d >= fim) continue;

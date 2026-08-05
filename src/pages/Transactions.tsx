@@ -16,7 +16,7 @@ import { Sparkles, Loader2 } from 'lucide-react';
 import { CATEGORIES, MONTHS } from '../constants';
 import { CustomCategory, categoriesDocPath, readCustomCategories, upsertCustomCategory, mergeCustomCategories, slugifyCategory, categoryLabel } from '../lib/categoryStore';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
-import { splitInstallments, parseLocalDate, totalBalance } from '../lib/finance';
+import { splitInstallments, parseLocalDate, totalBalance, isCardExpense } from '../lib/finance';
 import { planRecurringRenewals } from '../lib/recurring';
 import { tagsDocPath, readTags, parseTags, mergeTags, matchesAllTags } from '../lib/tags';
 import { readGoals, goalsDocPath } from '../lib/goalStore';
@@ -208,10 +208,6 @@ export const Transactions: React.FC = () => {
   };
 
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
-
-  // Compra no cartão (tem cartão e não tem conta): NÃO é caixa — entra na fatura.
-  // Quem "paga" é a fatura (tela Cartões), não a compra em si.
-  const isCardExpense = (t: Transaction) => t.type === 'expense' && !!t.cardId && !t.accountId;
 
   // Situação de um lançamento pendente perto do vencimento (para cor e rótulo).
   type DueState = 'paid' | 'overdue' | 'due-soon' | 'open';
