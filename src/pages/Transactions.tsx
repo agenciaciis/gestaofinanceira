@@ -16,7 +16,7 @@ import { Sparkles, Loader2 } from 'lucide-react';
 import { CATEGORIES, MONTHS } from '../constants';
 import { CustomCategory, categoriesDocPath, readCustomCategories, upsertCustomCategory, mergeCustomCategories, slugifyCategory, categoryLabel } from '../lib/categoryStore';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
-import { splitInstallments, parseLocalDate, totalBalance, isCardExpense } from '../lib/finance';
+import { splitInstallments, parseLocalDate, totalBalance, isCardExpense, computeCardInvoice, round2 } from '../lib/finance';
 import { planRecurringRenewals } from '../lib/recurring';
 import { tagsDocPath, readTags, parseTags, mergeTags, matchesAllTags } from '../lib/tags';
 import { readGoals, goalsDocPath } from '../lib/goalStore';
@@ -227,14 +227,17 @@ export const Transactions: React.FC = () => {
     const tDate = parseLocalDate(t.date);
     const matchesDate = tDate.getMonth() === selectedMonth && tDate.getFullYear() === selectedYear;
 
-    if (!matchesDate) return false;
-
     if (!matchesAllTags(t.tags, tagFilter)) return false;
+
+    // "Atrasados" é TRANSVERSAL aos meses: uma conta vencida continua vencida até
+    // ser quitada, então aparece mesmo olhando outro mês (não some ao virar o mês).
+    if (statusFilter === 'overdue') return matchesSearch && isOverdue && !isCardExpense(t);
+
+    if (!matchesDate) return false;
 
     if (statusFilter === 'all') return matchesSearch;
     if (statusFilter === 'pending') return matchesSearch && t.status === 'pending' && !isOverdue;
     if (statusFilter === 'completed') return matchesSearch && t.status === 'completed';
-    if (statusFilter === 'overdue') return matchesSearch && isOverdue;
     return matchesSearch;
   });
 
@@ -264,11 +267,20 @@ export const Transactions: React.FC = () => {
 
   // "Sobra do mês"
   const saldoRealizado = summary.received - summary.paid;                 // já recebido - já pago
-  const liquidoPendente = summary.toReceive - summary.toPay;              // a receber - a pagar
+  // Fatura do cartão em aberto (ciclo atual) entra no "A pagar": é dinheiro que
+  // vai sair, mesmo não sendo um lançamento de conta.
+  const openCardInvoices = round2(cards.reduce((acc, c) => acc + computeCardInvoice(c.id, c.closingDay, transactions, new Date()), 0));
+  const totalAPagar = round2(summary.toPay + openCardInvoices);           // contas pendentes + fatura do cartão
+  const liquidoPendente = summary.toReceive - totalAPagar;                // a receber - a pagar
   // Saldo REAL de hoje em todas as contas (inclui negativo). É a base da projeção.
   const saldoAtualContas = totalBalance(accounts, transactions);
   // Projeção de fim do mês: o que você TEM hoje + o que ainda entra − o que ainda sai.
   const saldoProjetado = saldoAtualContas + liquidoPendente;
+  // "Atrasado" é TRANSVERSAL aos meses: toda pendência vencida até hoje (qualquer
+  // mês), a pagar E a receber (venda atrasada também conta). Não some ao virar o mês.
+  const overdueTotal = round2(transactions
+    .filter(t => t.status === 'pending' && !isCardExpense(t) && parseLocalDate(t.date) < todayStart)
+    .reduce((acc, t) => acc + t.amount, 0));
 
   const changeMonth = (delta: number) => {
     let newMonth = selectedMonth + delta;
@@ -977,13 +989,18 @@ export const Transactions: React.FC = () => {
         <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase tracking-wider text-content-subtle">A Pagar</p>
           <p className="mt-1 text-lg font-bold text-orange-600">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.toPay)}
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAPagar)}
           </p>
+          {openCardInvoices > 0 && (
+            <p className="mt-0.5 text-[9px] text-content-subtle">
+              inclui fatura do cartão: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(openCardInvoices)}
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-red-100 bg-red-50 p-4 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">Atrasado</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">Atrasado (todos os meses)</p>
           <p className="mt-1 text-lg font-bold text-red-700">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.overdue)}
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(overdueTotal)}
           </p>
         </div>
       </div>

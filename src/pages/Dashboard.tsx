@@ -286,7 +286,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     // independente do mês que você está olhando.
     const inicioDeHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     const overdue = transactions
-      .filter(t => t.status === 'pending' && t.type === 'expense' && !isCardExpense(t) && !t.crossEntityGroupId && isBefore(parseLocalDate(t.date), inicioDeHoje))
+      .filter(t => t.status === 'pending' && !isCardExpense(t) && !t.crossEntityGroupId && isBefore(parseLocalDate(t.date), inicioDeHoje))
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
@@ -335,7 +335,9 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       // contaria a mesma dívida duas vezes.
       // Os dois que faltavam do painel da planilha antiga.
       resultadoPeriodo: round2(incomeThisPeriod - expenseThisPeriod),
-      resultadoPrevisto: round2((incomeThisPeriod + pendingIncome) - (expenseThisPeriod + pendingExpense)),
+      // "A pagar" e "resultado previsto" incluem a fatura do cartão em aberto —
+      // é dinheiro que vai sair — batendo com o "A pagar" da tela Lançamentos.
+      resultadoPrevisto: round2((incomeThisPeriod + pendingIncome) - (expenseThisPeriod + pendingExpense + cardDebt)),
       netWorth: round2(totalBankBalance - totalOpenDebts),
       incomeTrend: calculateTrend(incomeThisPeriod, incomeLastPeriod),
       expenseTrend: calculateTrend(expenseThisPeriod, expenseLastPeriod),
@@ -615,7 +617,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
             { rotulo: 'Despesa', valor: -stats.expenseThisPeriod, cor: 'text-rose-600', nota: 'pago no período' },
             { rotulo: 'Resultado do período', valor: stats.resultadoPeriodo, cor: stats.resultadoPeriodo >= 0 ? 'text-emerald-600' : 'text-rose-600', nota: 'receita − despesa' },
             { rotulo: 'Valores a receber', valor: stats.pendingIncome, cor: 'text-blue-600', nota: 'ainda não entrou' },
-            { rotulo: 'Valores a pagar', valor: -stats.pendingExpense, cor: 'text-amber-600', nota: 'ainda não saiu' },
+            { rotulo: 'Valores a pagar', valor: -(stats.pendingExpense + stats.cardDebt), cor: 'text-amber-600', nota: 'inclui fatura do cartão' },
             { rotulo: 'Resultado previsto', valor: stats.resultadoPrevisto, cor: stats.resultadoPrevisto >= 0 ? 'text-emerald-600' : 'text-rose-600', nota: 'se tudo se confirmar' },
             { rotulo: 'Vencidas', valor: -stats.overdue, cor: 'text-rose-600', nota: 'até hoje, todo o histórico' },
           ].map(item => (
