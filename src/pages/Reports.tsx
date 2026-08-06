@@ -9,6 +9,8 @@ import { format, startOfMonth, endOfMonth, subMonths, isSameMonth } from 'date-f
 import { parseLocalDate, isNotCancelled, isCardExpense } from '../lib/finance';
 import { ptBR } from 'date-fns/locale';
 import { CATEGORIES, MONTHS } from '../constants';
+import { categoryLabel } from '../lib/categoryStore';
+import { useCustomCategories } from '../hooks/useCustomCategories';
 import { 
   PieChart as PieChartIcon, 
   BarChart3, 
@@ -45,6 +47,7 @@ import { PeriodComparePanel } from '../components/PeriodComparePanel';
 
 export const Reports: React.FC = () => {
   const { entities, filterType, selectedEntity } = useEntity();
+  const customCategories = useCustomCategories();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   /**
@@ -147,8 +150,8 @@ export const Reports: React.FC = () => {
   const expenseCategoryData = useMemo(() => {
     const expenses = filteredData.filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId);
     const grouped = expenses.reduce((acc, t) => {
-      const cat = CATEGORIES.find(c => c.id === t.categoryId) || CATEGORIES.find(c => c.id === 'outros')!;
-      acc[cat.name] = (acc[cat.name] || 0) + t.amount;
+      const name = categoryLabel(t.categoryId, customCategories);
+      acc[name] = (acc[name] || 0) + t.amount;
       return acc;
     }, {} as Record<string, number>);
 
@@ -157,13 +160,13 @@ export const Reports: React.FC = () => {
       value: value as number,
       color: CATEGORIES.find(c => c.name === name)?.color || '#9ca3af'
     })).sort((a, b) => (b.value as number) - (a.value as number));
-  }, [filteredData]);
+  }, [filteredData, customCategories]);
 
   const incomeCategoryData = useMemo(() => {
     const incomes = filteredData.filter(t => t.type === 'income' && t.status === 'completed' && !t.crossEntityGroupId);
     const grouped = incomes.reduce((acc, t) => {
-      const cat = CATEGORIES.find(c => c.id === t.categoryId) || CATEGORIES.find(c => c.id === 'outros')!;
-      acc[cat.name] = (acc[cat.name] || 0) + t.amount;
+      const name = categoryLabel(t.categoryId, customCategories);
+      acc[name] = (acc[name] || 0) + t.amount;
       return acc;
     }, {} as Record<string, number>);
 
@@ -172,7 +175,7 @@ export const Reports: React.FC = () => {
       value: value as number,
       color: CATEGORIES.find(c => c.name === name)?.color || '#9ca3af'
     })).sort((a, b) => (b.value as number) - (a.value as number));
-  }, [filteredData]);
+  }, [filteredData, customCategories]);
 
   const monthlyTrend = useMemo(() => {
     // Last 6 months trend

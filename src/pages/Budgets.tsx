@@ -4,12 +4,14 @@ import { useUI } from '../contexts/UIContext';
 import { collection, onSnapshot, setDoc, doc, query } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { CATEGORIES } from '../constants';
+import { useCustomCategories } from '../hooks/useCustomCategories';
 import { Target, Save } from 'lucide-react';
 import { Transaction } from '../types';
 import { budgetProgress, BudgetLine } from '../lib/budgets';
 
 export const Budgets: React.FC = () => {
   const { entities, filterType, selectedEntity } = useEntity();
+  const customCategories = useCustomCategories();
   const { showToast } = useUI();
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -165,10 +167,13 @@ export const Budgets: React.FC = () => {
             <h2 className="text-lg font-bold text-content">Metas de Gastos (Limites)</h2>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {CATEGORIES.filter(c => (!c.type || c.type === 'expense') && c.id !== 'transferencia').map((category) => (
+            {[
+              ...CATEGORIES.filter(c => (!c.type || c.type === 'expense') && c.id !== 'transferencia'),
+              ...customCategories.map(c => ({ id: c.id, name: c.name, color: c.color || '#6b7280' })),
+            ].map((category) => (
               <div key={category.id} className="rounded-2xl border border-line bg-surface p-6 shadow-sm transition-all hover:shadow-md">
                 <div className="mb-4 flex items-center gap-3">
-                  <div 
+                  <div
                     className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
                     style={{ backgroundColor: category.color }}
                   >
