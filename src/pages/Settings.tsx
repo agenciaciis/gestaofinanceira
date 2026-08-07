@@ -10,10 +10,46 @@ import { db } from '../firebase';
 import { BACKUP_VERSION, BACKUP_SUBCOLLECTIONS, encodeTimestamps, decodeTimestamps, validateBackup, countBackupItems, backupFilename, type Backup } from '../lib/backup';
 
 export const Settings: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, changePassword, signOutOtherDevices, hasPasswordProvider } = useAuth();
   const { entities, selectedEntity, updateEntity } = useEntity();
   const { showToast, confirm } = useUI();
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'data' | 'whatsapp' | 'telegram' | 'integrations'>('profile');
+  // Segurança: troca de senha + desconectar outros dispositivos.
+  const [curPass, setCurPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confPass, setConfPass] = useState('');
+  const [savingPass, setSavingPass] = useState(false);
+  const [alsoDisconnect, setAlsoDisconnect] = useState(true);
+
+  const handleChangePassword = async () => {
+    if (newPass.length < 6) { showToast('A nova senha precisa ter ao menos 6 caracteres.', 'error'); return; }
+    if (newPass !== confPass) { showToast('A confirmação não bate com a nova senha.', 'error'); return; }
+    setSavingPass(true);
+    try {
+      await changePassword(curPass, newPass);
+      if (alsoDisconnect) { try { await signOutOtherDevices(); } catch { /* não bloqueia a troca */ } }
+      setCurPass(''); setNewPass(''); setConfPass('');
+      showToast(alsoDisconnect ? 'Senha alterada e outros dispositivos desconectados.' : 'Senha alterada com sucesso.', 'success');
+    } catch (e: any) {
+      const code = String(e?.code || '');
+      const msg = code.includes('wrong-password') || code.includes('invalid-credential') ? 'Senha atual incorreta.'
+        : code.includes('weak-password') ? 'A nova senha é muito fraca.'
+        : code.includes('requires-recent-login') ? 'Por segurança, saia e entre de novo antes de trocar a senha.'
+        : (e?.message || 'Não consegui trocar a senha.');
+      showToast(msg, 'error');
+    } finally { setSavingPass(false); }
+  };
+
+  const handleDisconnectOthers = async () => {
+    const ok = await confirm({ title: 'Desconectar outros dispositivos', message: 'Vai encerrar a sessão em todos os outros lugares onde você está logado (este aparelho continua conectado). Continuar?', variant: 'danger' });
+    if (!ok) return;
+    try {
+      await signOutOtherDevices();
+      showToast('Pronto — os outros dispositivos foram desconectados.', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Não consegui desconectar os outros dispositivos.', 'error');
+    }
+  };
 
   // Só o dono (tem ao menos uma entidade própria) gerencia as chaves globais.
   const isOwner = !!user && entities.some(e => e.ownerUid === user.uid);
@@ -418,6 +454,45 @@ export const Settings: React.FC = () => {
                     <Shield className="h-4 w-4" />
                     <span className="text-sm truncate">{user?.uid}</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Segurança: trocar senha + desconectar outros dispositivos */}
+              <div className="rounded-2xl border border-line bg-surface p-6">
+                <div className="mb-4 flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-primary" />
+                  <h4 className="font-bold text-content">Segurança</h4>
+                </div>
+
+                {hasPasswordProvider ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <input type="password" autoComplete="current-password" placeholder="Senha atual" value={curPass} onChange={e => setCurPass(e.target.value)}
+                        className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+                      <input type="password" autoComplete="new-password" placeholder="Nova senha (mín. 6)" value={newPass} onChange={e => setNewPass(e.target.value)}
+                        className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+                      <input type="password" autoComplete="new-password" placeholder="Confirmar nova senha" value={confPass} onChange={e => setConfPass(e.target.value)}
+                        className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-content-subtle">
+                      <input type="checkbox" checked={alsoDisconnect} onChange={e => setAlsoDisconnect(e.target.checked)} />
+                      Ao trocar, desconectar os outros dispositivos (recomendado)
+                    </label>
+                    <button onClick={handleChangePassword} disabled={savingPass || !curPass || !newPass || !confPass}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white transition-all hover:bg-primary/90 disabled:opacity-50">
+                      {savingPass ? 'Salvando…' : 'Trocar senha'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-content-subtle">Sua conta entra pelo Google — a senha é gerenciada por lá, não há senha própria pra trocar aqui.</p>
+                )}
+
+                <div className="mt-6 border-t border-line pt-4">
+                  <p className="mb-2 text-sm text-content-subtle">Deixou logado em outro computador ou celular? Encerre as outras sessões — <strong>este aparelho continua conectado</strong>.</p>
+                  <button onClick={handleDisconnectOthers}
+                    className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-content transition-all hover:border-red-300 hover:text-red-600">
+                    Desconectar outros dispositivos
+                  </button>
                 </div>
               </div>
 

@@ -291,8 +291,19 @@ export const Layout: React.FC<{
       <main className="flex-1 min-w-0 h-screen overflow-y-auto bg-canvas dark:bg-gray-950">
         {/* Header */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line dark:border-gray-800 bg-surface dark:bg-gray-900 px-4 lg:px-8">
-          <button className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
-            <Menu className="h-6 w-6 text-content-muted dark:text-gray-400" />
+          {/* Botão de menu SEMPRE visível: no celular abre/fecha o drawer; no
+              desktop expande/recolhe a barra lateral. Assim nunca fica sem jeito
+              de trazer o menu de volta. */}
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsSidebarOpen(o => !o);
+              else toggleCollapsed();
+            }}
+            title="Mostrar/ocultar menu"
+            aria-label="Mostrar ou ocultar o menu"
+            className="rounded-lg p-1.5 text-content-muted hover:bg-surface-muted dark:text-gray-400 dark:hover:bg-gray-800 transition-all"
+          >
+            <Menu className="h-6 w-6" />
           </button>
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-bold text-content dark:text-gray-100 lg:text-xl">

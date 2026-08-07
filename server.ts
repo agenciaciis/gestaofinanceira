@@ -75,6 +75,23 @@ async function startServer() {
   // Gestão das chaves de integração (Ajustes → Integrações), só para o dono.
   registerIntegrationRoutes(app, admin, db);
 
+  // Segurança: encerra a sessão em TODOS os dispositivos (revoga os refresh
+  // tokens da conta). O aparelho que chamou renova o próprio token em seguida,
+  // então continua logado; os outros caem ao tentar renovar o token.
+  app.post('/api/auth/revoke-other-sessions', async (req, res) => {
+    try {
+      const header = (req.headers.authorization as string) || '';
+      const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+      if (!token) return res.status(401).json({ error: 'Não autenticado' });
+      const decoded = await admin.auth().verifyIdToken(token);
+      await admin.auth().revokeRefreshTokens(decoded.uid);
+      return res.json({ ok: true });
+    } catch (e: any) {
+      console.error('revoke-other-sessions:', e?.message);
+      return res.status(500).json({ error: 'Falha ao encerrar as outras sessões.' });
+    }
+  });
+
   // WhatsApp Status Proxy
   app.get('/api/whatsapp/status/:entityId', async (req, res) => {
     if (!db) return res.status(500).json({ error: 'Database not initialized' });
