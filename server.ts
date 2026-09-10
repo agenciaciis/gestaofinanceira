@@ -9,6 +9,7 @@ import { registerAiRoutes } from './ai-routes';
 import { handleChatCommand } from './chatCommands';
 import { registerTelegramRoutes } from './telegram';
 import { loadServerSecrets, registerIntegrationRoutes } from './integrations';
+import { registerSsoRoutes } from './sso-routes';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,6 +75,10 @@ async function startServer() {
 
   // Gestão das chaves de integração (Ajustes → Integrações), só para o dono.
   registerIntegrationRoutes(app, admin, db);
+
+  // Login único vindo do Gestor CIIS: troca o JWT do Supabase por um custom
+  // token do Firebase. Só liga contas que já existem dos dois lados.
+  registerSsoRoutes(app, admin, process.env.SUPABASE_URL ?? 'https://vrlhfkibfkcqsmkoylnr.supabase.co');
 
   // Segurança: encerra a sessão em TODOS os dispositivos (revoga os refresh
   // tokens da conta). O aparelho que chamou renova o próprio token em seguida,
