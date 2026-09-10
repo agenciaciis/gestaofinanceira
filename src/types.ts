@@ -293,6 +293,8 @@ export interface Product {
   description?: string;
   /** Nome livre da categoria (ex.: "Cartão de visita", "Peça 3D"). */
   category?: string;
+  /** Produto vendável ou insumo (matéria-prima). Ausente = 'product'. */
+  itemType?: 'product' | 'supply';
   /** Tipo de produção: gráfica rápida, impressão 3D ou outro. */
   kind?: 'grafica' | '3d' | 'outro';
   /** Unidade de venda (un, cento, m², etc.). */

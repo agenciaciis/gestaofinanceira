@@ -4,9 +4,10 @@ import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Product, ProductVariation } from '../types';
-import { Plus, Search, Package, Box, Printer, Edit2, Trash2, X, Layers, Tag } from 'lucide-react';
+import { Plus, Search, Package, Box, Printer, Edit2, Trash2, X, Layers, Tag, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
+import { isLowStock } from '../lib/stock';
 
 const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
 
@@ -38,6 +39,9 @@ export const Products: React.FC = () => {
   const [costPrice, setCostPrice] = useState('');
   const [active, setActive] = useState(true);
   const [variations, setVariations] = useState<ProductVariation[]>([]);
+  const [trackStock, setTrackStock] = useState(false);
+  const [stock, setStock] = useState('');
+  const [minStock, setMinStock] = useState('');
   const [targetEntityId, setTargetEntityId] = useState('');
 
   useEffect(() => {
@@ -48,7 +52,8 @@ export const Products: React.FC = () => {
     filteredEntities.forEach(entity => {
       const q = query(collection(db, `entities/${entity.id}/products`), orderBy('createdAt', 'desc'));
       const unsub = onSnapshot(q, (snapshot) => {
-        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Product[];
+        const list = (snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Product[])
+          .filter(p => p.itemType !== 'supply'); // insumos ficam na tela de Estoque
         all = [...all.filter(p => p.entityId !== entity.id), ...list];
         setProducts([...all]);
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/products`));
@@ -61,7 +66,7 @@ export const Products: React.FC = () => {
     setEditing(null);
     setName(''); setCategory(''); setKind('grafica'); setUnit('un');
     setDescription(''); setBasePrice(''); setCostPrice(''); setActive(true);
-    setVariations([]); setTargetEntityId('');
+    setVariations([]); setTrackStock(false); setStock(''); setMinStock(''); setTargetEntityId('');
   };
 
   const addVariation = () => setVariations(v => [...v, emptyVariation()]);
@@ -88,6 +93,10 @@ export const Products: React.FC = () => {
       costPrice: Number(costPrice) || 0,
       variations: vars,
       active,
+      itemType: 'product' as const,
+      trackStock,
+      stock: trackStock ? (Number(stock) || 0) : null,
+      minStock: trackStock ? (Number(minStock) || 0) : null,
       entityId: targetEntityId,
       ownerUid: selectedEntity?.ownerUid,
       collaboratorsEmails: selectedEntity?.collaboratorsEmails || [],
@@ -119,6 +128,9 @@ export const Products: React.FC = () => {
     setCostPrice(p.costPrice != null ? String(p.costPrice) : '');
     setActive(p.active !== false);
     setVariations((p.variations || []).map(v => ({ ...v })));
+    setTrackStock(!!p.trackStock);
+    setStock(p.stock != null ? String(p.stock) : '');
+    setMinStock(p.minStock != null ? String(p.minStock) : '');
     setTargetEntityId(p.entityId);
     setIsModalOpen(true);
   };
@@ -253,9 +265,14 @@ export const Products: React.FC = () => {
                     </div>
                   </div>
                   <div className="mt-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-violet-600 bg-violet-500/5 px-2 py-0.5 rounded-full">{kindOf(p).label}</span>
                       {p.active === false && <span className="text-[10px] font-bold uppercase text-content-subtle bg-surface-muted px-2 py-0.5 rounded-full">Inativo</span>}
+                      {p.trackStock && (
+                        isLowStock(p)
+                          ? <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-full dark:bg-red-950/50"><AlertTriangle className="h-2.5 w-2.5" /> Estoque {p.stock ?? 0}</span>
+                          : <span className="text-[10px] font-bold uppercase text-content-subtle bg-surface-muted px-2 py-0.5 rounded-full">Estoque {p.stock ?? 0}</span>
+                      )}
                     </div>
                     <h3 className="mt-2 text-lg font-bold text-content">{p.name}</h3>
                     {p.category && <p className="mt-0.5 flex items-center gap-1 text-[11px] text-content-subtle"><Tag className="h-3 w-3" /> {p.category}</p>}
@@ -377,6 +394,28 @@ export const Products: React.FC = () => {
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Estoque */}
+              <div className="rounded-xl bg-canvas p-4">
+                <label className="flex items-center gap-2 text-sm font-medium text-content">
+                  <input type="checkbox" checked={trackStock} onChange={(e) => setTrackStock(e.target.checked)} />
+                  Controlar estoque deste produto
+                </label>
+                {trackStock && (
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-content-subtle">Estoque atual</label>
+                      <input type="number" step="1" value={stock} onChange={(e) => setStock(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/20" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-content-subtle">Estoque mínimo (alerta)</label>
+                      <input type="number" step="1" value={minStock} onChange={(e) => setMinStock(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/20" placeholder="0" />
+                    </div>
                   </div>
                 )}
               </div>
