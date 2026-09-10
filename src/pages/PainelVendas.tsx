@@ -1,22 +1,30 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
-import { collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, limit, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { useUI } from '../contexts/UIContext';
 import { Product, Transaction } from '../types';
 import { parseLocalDate } from '../lib/finance';
 import { isLowStock } from '../lib/stock';
 import { MONTHS } from '../constants';
-import { ShoppingBag, TrendingUp, Package, Receipt, ChevronLeft, ChevronRight, AlertTriangle, Trophy } from 'lucide-react';
+import { ShoppingBag, TrendingUp, Package, Receipt, ChevronLeft, ChevronRight, AlertTriangle, Trophy, Target, Pencil } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+const salesGoalDocPath = (entityId: string) => `entities/${entityId}/config/sales_goal`;
 
 const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
 
 export const PainelVendas: React.FC = () => {
   const { entities, filterType } = useEntity();
+  const { showToast } = useUI();
   const [sales, setSales] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [goalByEntity, setGoalByEntity] = useState<Record<string, number>>({});
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
+  const entsInView = filterType === 'ALL' ? entities : entities.filter(e => e.type === filterType);
 
   useEffect(() => {
     if (entities.length === 0) return;
@@ -31,6 +39,10 @@ export const PainelVendas: React.FC = () => {
       unsubs.push(onSnapshot(query(collection(db, `entities/${entity.id}/products`)), (s) => {
         const list = (s.docs.map(d => ({ id: d.id, ...d.data() })) as Product[]);
         allP = [...allP.filter(p => p.entityId !== entity.id), ...list]; setProducts([...allP]);
+      }, () => {}));
+      unsubs.push(onSnapshot(doc(db, salesGoalDocPath(entity.id)), (snap) => {
+        const g = (snap.data() as { monthlyGoal?: number } | undefined)?.monthlyGoal;
+        setGoalByEntity(prev => ({ ...prev, [entity.id]: typeof g === 'number' ? g : 0 }));
       }, () => {}));
     });
     return () => unsubs.forEach(u => u());
@@ -78,6 +90,23 @@ export const PainelVendas: React.FC = () => {
 
   const maxTrend = Math.max(1, ...stats.trend.map(t => t.value));
 
+  // Meta de vendas do mês (soma das entidades em vista).
+  const goalTotal = entsInView.reduce((a, e) => a + (goalByEntity[e.id] || 0), 0);
+  const goalPrimary = entsInView[0];
+  const pctGoal = goalTotal > 0 ? Math.min(100, (stats.vendido / goalTotal) * 100) : 0;
+  const falta = Math.max(0, goalTotal - stats.vendido);
+  const isCurrentMonth = month === new Date().getMonth() && year === new Date().getFullYear();
+  const daysLeft = isCurrentMonth ? (new Date(year, month + 1, 0).getDate() - new Date().getDate() + 1) : 0;
+  const perDay = isCurrentMonth && daysLeft > 0 ? falta / daysLeft : 0;
+  const saveGoal = async () => {
+    if (!goalPrimary) return;
+    try {
+      await setDoc(doc(db, salesGoalDocPath(goalPrimary.id)), { monthlyGoal: Number(goalInput) || 0, updatedAt: serverTimestamp() }, { merge: true });
+      setEditingGoal(false);
+      showToast('Meta salva.', 'success');
+    } catch (e) { console.error(e); showToast('Erro ao salvar a meta.', 'error'); }
+  };
+
   const Kpi = ({ icon: Icon, label, value, sub, color }: { icon: React.ElementType; label: string; value: string; sub?: string; color: string }) => (
     <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex items-center gap-2 text-content-subtle"><Icon className={cn('h-4 w-4', color)} /><span className="text-[10px] font-black uppercase tracking-widest">{label}</span></div>
@@ -108,6 +137,40 @@ export const PainelVendas: React.FC = () => {
         <Kpi icon={Receipt} label="Recebido" value={brl(stats.recebido)} sub={`A receber: ${brl(stats.aReceber)}`} color="text-blue-600" />
         <Kpi icon={Package} label="Produtos vendidos" value={String(stats.nProdutos)} sub="unidades no mês" color="text-violet-600" />
         <Kpi icon={ShoppingBag} label="Ticket médio" value={brl(stats.ticket)} sub="por venda" color="text-amber-600" />
+      </div>
+
+      {/* Meta do mês */}
+      <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-content-subtle"><Target className="h-4 w-4 text-emerald-600" /> Meta do mês</h3>
+          {editingGoal ? (
+            <div className="flex items-center gap-2">
+              <input type="number" autoFocus value={goalInput} onChange={e => setGoalInput(e.target.value)} placeholder="Meta R$" className="w-32 rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+              <button onClick={saveGoal} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Salvar</button>
+              <button onClick={() => setEditingGoal(false)} className="text-xs text-content-subtle hover:text-content">Cancelar</button>
+            </div>
+          ) : (
+            <button onClick={() => { setGoalInput(goalTotal ? String(goalTotal) : ''); setEditingGoal(true); }} className="flex items-center gap-1 text-xs font-bold text-content-subtle hover:text-emerald-600"><Pencil className="h-3 w-3" /> {goalTotal > 0 ? 'Editar meta' : 'Definir meta'}</button>
+          )}
+        </div>
+        {goalTotal > 0 ? (
+          <>
+            <div className="flex items-end justify-between">
+              <p className="text-2xl font-black text-content">{brl(stats.vendido)} <span className="text-sm font-medium text-content-subtle">de {brl(goalTotal)}</span></p>
+              <p className="text-lg font-black text-emerald-600">{pctGoal.toFixed(0)}%</p>
+            </div>
+            <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-surface-muted">
+              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pctGoal}%` }} />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-content-subtle">
+              <span>Falta: <strong className="text-content">{brl(falta)}</strong></span>
+              {isCurrentMonth && daysLeft > 0 && <span>Faltam {daysLeft} dia(s) · <strong className="text-content">{brl(perDay)}/dia</strong> pra bater</span>}
+            </div>
+            {entsInView.length > 1 && goalPrimary && <p className="mt-1 text-[11px] text-content-subtle">Meta editada na entidade {goalPrimary.name}.</p>}
+          </>
+        ) : (
+          <p className="text-sm text-content-subtle">Defina uma meta de vendas pro mês pra acompanhar o progresso.</p>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
