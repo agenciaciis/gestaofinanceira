@@ -27,6 +27,7 @@ import {
   Package,
   Box,
   Boxes,
+  ShoppingCart,
   FileText,
   PiggyBank,
   ChevronLeft,
@@ -248,6 +249,8 @@ export const Layout: React.FC<{
               active={currentPage === 'products'} onClick={() => onNavigate('products')} />
             <NavItem icon={Boxes} label="Estoque" collapsed={isCollapsed}
               active={currentPage === 'estoque'} onClick={() => onNavigate('estoque')} />
+            <NavItem icon={ShoppingCart} label="Vendas" collapsed={isCollapsed}
+              active={currentPage === 'vendas'} onClick={() => onNavigate('vendas')} />
             <NavItem icon={FileText} label="Orçamentos" collapsed={isCollapsed}
               active={currentPage === 'quotes'} onClick={() => onNavigate('quotes')} />
             <NavItem icon={Truck} label="Fornecedores" collapsed={isCollapsed}
@@ -324,6 +327,7 @@ export const Layout: React.FC<{
                currentPage === 'services' ? 'Serviços e Planos' :
                currentPage === 'products' ? 'Produtos' :
                currentPage === 'estoque' ? 'Estoque' :
+               currentPage === 'vendas' ? 'Vendas' :
                currentPage === 'quotes' ? 'Orçamentos' :
                currentPage === 'suppliers' ? 'Fornecedores e Locais' :
                currentPage === 'health' ? 'Saúde Financeira' :

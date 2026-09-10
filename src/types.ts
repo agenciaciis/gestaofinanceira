@@ -74,6 +74,15 @@ export interface CreditCard {
   color?: string;
 }
 
+/** Linha de uma venda: produto (e variação), quantidade e preço unitário. */
+export interface SaleItem {
+  productId: string;
+  name: string;
+  variationName?: string;
+  qty: number;
+  unitPrice: number;
+}
+
 export interface Transaction {
   id: string;
   description: string;
@@ -100,6 +109,10 @@ export interface Transaction {
   // Vínculo opcional com um fornecedor cadastrado (para despesas)
   supplierId?: string;
   supplierName?: string;
+  /** Marca que este lançamento nasceu de uma VENDA de produto (Fase 3). */
+  isSale?: boolean;
+  /** Itens vendidos (produto/variação/qtd/preço), quando isSale. */
+  saleItems?: SaleItem[];
   // Installment fields
   installmentNumber?: number;
   totalInstallments?: number;
