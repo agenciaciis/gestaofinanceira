@@ -27,6 +27,7 @@ const FinancialHealth = lazy(() => import('./pages/FinancialHealth').then(m => (
 const Services = lazy(() => import('./pages/Services').then(m => ({ default: m.Services })));
 const Products = lazy(() => import('./pages/Products').then(m => ({ default: m.Products })));
 const Categorias = lazy(() => import('./pages/Categorias').then(m => ({ default: m.Categorias })));
+const Precificacao = lazy(() => import('./pages/Precificacao').then(m => ({ default: m.Precificacao })));
 const Estoque = lazy(() => import('./pages/Estoque').then(m => ({ default: m.Estoque })));
 const Vendas = lazy(() => import('./pages/Vendas').then(m => ({ default: m.Vendas })));
 const PainelVendas = lazy(() => import('./pages/PainelVendas').then(m => ({ default: m.PainelVendas })));
@@ -45,7 +46,7 @@ console.log('App component rendering');
 const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedEntity, entities, loading: entityLoading } = useEntity();
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'products' | 'categorias' | 'estoque' | 'vendas' | 'painel-vendas' | 'quotes' | 'team'>('dashboard');
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'products' | 'categorias' | 'precificacao' | 'estoque' | 'vendas' | 'painel-vendas' | 'quotes' | 'team'>('dashboard');
   const [showTimeout, setShowTimeout] = useState(false);
 
   useEffect(() => {
@@ -101,6 +102,7 @@ const AppContent: React.FC = () => {
          currentPage === 'services' ? <Services /> :
          currentPage === 'products' ? <Products /> :
          currentPage === 'categorias' ? <Categorias /> :
+         currentPage === 'precificacao' ? <Precificacao /> :
          currentPage === 'estoque' ? <Estoque /> :
          currentPage === 'vendas' ? <Vendas /> :
          currentPage === 'painel-vendas' ? <PainelVendas /> :
