@@ -273,6 +273,46 @@ export interface Service {
   catalogType?: 'service' | 'product';
 }
 
+/** Variação de um produto (ex.: tamanho/material), com preço e custo próprios. */
+export interface ProductVariation {
+  id: string;
+  name: string;
+  price: number;
+  cost?: number;
+  sku?: string;
+}
+
+/**
+ * Produto físico (gráfica rápida, impressão 3D, etc.) — módulo dedicado, mais
+ * rico que o item de catálogo em `services` (tem variações e, adiante, estoque).
+ * Mora em `entities/{id}/products` (regra de acesso já publicada).
+ */
+export interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  /** Nome livre da categoria (ex.: "Cartão de visita", "Peça 3D"). */
+  category?: string;
+  /** Tipo de produção: gráfica rápida, impressão 3D ou outro. */
+  kind?: 'grafica' | '3d' | 'outro';
+  /** Unidade de venda (un, cento, m², etc.). */
+  unit?: string;
+  /** Preço quando não há variação (ou "a partir de" quando há). */
+  basePrice: number;
+  costPrice?: number;
+  variations?: ProductVariation[];
+  imageURL?: string;
+  active?: boolean;
+  // Estoque (Fase 2) — campos previstos, usados adiante.
+  trackStock?: boolean;
+  stock?: number;
+  minStock?: number;
+  entityId: string;
+  ownerUid?: string;
+  collaboratorsEmails?: string[];
+  createdAt?: any;
+}
+
 export interface Plan {
   id: string;
   name: string;
