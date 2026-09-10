@@ -8,6 +8,7 @@ import { Plus, Search, Package, Box, Printer, Edit2, Trash2, X, Layers, Tag, Ale
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
 import { isLowStock } from '../lib/stock';
+import { readProductCategories, productCategoriesDocPath } from '../lib/productCategoryStore';
 
 const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
 
@@ -27,6 +28,7 @@ export const Products: React.FC = () => {
   const [editing, setEditing] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [managedCats, setManagedCats] = useState<Record<string, string[]>>({});
   const [viewMode, setViewMode] = useViewMode('produtos', 'grid');
 
   // Form
@@ -58,6 +60,12 @@ export const Products: React.FC = () => {
         setProducts([...all]);
       }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${entity.id}/products`));
       unsubscribes.push(unsub);
+
+      // Categorias gerenciadas (tela Categorias) — pra aparecerem no formulário.
+      const unsubCat = onSnapshot(doc(db, productCategoriesDocPath(entity.id)), (snap) => {
+        setManagedCats(prev => ({ ...prev, [entity.id]: readProductCategories(snap.data()).map(c => c.name) }));
+      }, () => { /* doc pode não existir */ });
+      unsubscribes.push(unsubCat);
     });
     return () => unsubscribes.forEach(u => u());
   }, [entities, filterType]);
@@ -147,7 +155,10 @@ export const Products: React.FC = () => {
     }
   };
 
-  const categories = [...new Set(products.map(p => p.category).filter(Boolean))] as string[];
+  const categories = [...new Set([
+    ...products.map(p => p.category),
+    ...Object.values(managedCats).flat(),
+  ].filter(Boolean))] as string[];
 
   const filtered = products.filter(p => {
     const s = searchTerm.toLowerCase();
