@@ -223,6 +223,8 @@ export const Layout: React.FC<{
               active={currentPage === 'dashboard'} onClick={() => onNavigate('dashboard')} />
             <NavItem icon={PieChart} label="Relatórios" collapsed={isCollapsed}
               active={currentPage === 'reports'} onClick={() => onNavigate('reports')} />
+            <NavItem icon={ShoppingCart} label="Painel de Vendas" collapsed={isCollapsed}
+              active={currentPage === 'painel-vendas'} onClick={() => onNavigate('painel-vendas')} />
 
             <NavGroup label="Dia a dia" collapsed={isCollapsed} />
             <NavItem icon={ArrowUpCircle} label="Lançamentos" collapsed={isCollapsed}
@@ -320,7 +322,8 @@ export const Layout: React.FC<{
                currentPage === 'accounts' ? 'Contas Bancárias' : 
                currentPage === 'cards' ? 'Cartões de Crédito' :
                currentPage === 'transactions' ? 'Lançamentos' : 
-               currentPage === 'reports' ? 'Relatórios' : 
+               currentPage === 'reports' ? 'Relatórios' :
+               currentPage === 'painel-vendas' ? 'Painel de Vendas' : 
                currentPage === 'budgets' ? 'Metas Financeiras' :
                currentPage === 'goals' ? 'Caixinhas & Objetivos' :
                currentPage === 'clients' ? 'Gestão de Clientes' :
