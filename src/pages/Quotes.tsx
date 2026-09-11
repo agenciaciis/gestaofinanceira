@@ -89,7 +89,8 @@ export const Quotes: React.FC = () => {
     const plansQ = query(collection(db, `entities/${selectedEntity.id}/plans`), orderBy('name', 'asc'));
 
     const unsubQuotes = onSnapshot(quotesQ, (snapshot) => {
-      setQuotes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Quote[]);
+      // Pedidos moram na mesma coleção `quotes` (docType='pedido') — ficam fora dos Orçamentos.
+      setQuotes((snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Quote[]).filter(q => (q as any).docType !== 'pedido'));
     }, (error) => {
       console.error("Error fetching quotes:", error);
       handleFirestoreError(error, OperationType.LIST, `entities/${selectedEntity.id}/quotes`);

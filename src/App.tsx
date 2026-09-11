@@ -30,6 +30,7 @@ const Categorias = lazy(() => import('./pages/Categorias').then(m => ({ default:
 const Precificacao = lazy(() => import('./pages/Precificacao').then(m => ({ default: m.Precificacao })));
 const Estoque = lazy(() => import('./pages/Estoque').then(m => ({ default: m.Estoque })));
 const Vendas = lazy(() => import('./pages/Vendas').then(m => ({ default: m.Vendas })));
+const Pedidos = lazy(() => import('./pages/Pedidos').then(m => ({ default: m.Pedidos })));
 const PainelVendas = lazy(() => import('./pages/PainelVendas').then(m => ({ default: m.PainelVendas })));
 const Quotes = lazy(() => import('./pages/Quotes').then(m => ({ default: m.Quotes })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
@@ -46,7 +47,7 @@ console.log('App component rendering');
 const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedEntity, entities, loading: entityLoading } = useEntity();
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'products' | 'categorias' | 'precificacao' | 'estoque' | 'vendas' | 'painel-vendas' | 'quotes' | 'team'>('dashboard');
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'products' | 'categorias' | 'precificacao' | 'estoque' | 'vendas' | 'pedidos' | 'painel-vendas' | 'quotes' | 'team'>('dashboard');
   const [showTimeout, setShowTimeout] = useState(false);
 
   useEffect(() => {
@@ -105,6 +106,7 @@ const AppContent: React.FC = () => {
          currentPage === 'precificacao' ? <Precificacao /> :
          currentPage === 'estoque' ? <Estoque /> :
          currentPage === 'vendas' ? <Vendas /> :
+         currentPage === 'pedidos' ? <Pedidos /> :
          currentPage === 'painel-vendas' ? <PainelVendas /> :
          currentPage === 'quotes' ? <Quotes /> :
          currentPage === 'team' ? <Team /> :
