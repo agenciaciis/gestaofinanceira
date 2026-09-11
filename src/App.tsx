@@ -14,6 +14,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { UIProvider } from './contexts/UIContext';
 
 // Páginas carregadas sob demanda (code-splitting) para acelerar o carregamento inicial.
+const Inicio = lazy(() => import('./pages/Inicio').then(m => ({ default: m.Inicio })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const BankAccounts = lazy(() => import('./pages/BankAccounts').then(m => ({ default: m.BankAccounts })));
 const CreditCards = lazy(() => import('./pages/CreditCards').then(m => ({ default: m.CreditCards })));
@@ -47,7 +48,7 @@ console.log('App component rendering');
 const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedEntity, entities, loading: entityLoading } = useEntity();
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'products' | 'categorias' | 'precificacao' | 'estoque' | 'vendas' | 'pedidos' | 'painel-vendas' | 'quotes' | 'team'>('dashboard');
+  const [currentPage, setCurrentPage] = useState<'inicio' | 'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'products' | 'categorias' | 'precificacao' | 'estoque' | 'vendas' | 'pedidos' | 'painel-vendas' | 'quotes' | 'team'>('inicio');
   const [showTimeout, setShowTimeout] = useState(false);
 
   useEffect(() => {
@@ -90,7 +91,8 @@ const AppContent: React.FC = () => {
   return (
     <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
       <Suspense fallback={<PageLoader />}>
-        {currentPage === 'dashboard' ? <Dashboard onNavigate={setCurrentPage} /> :
+        {currentPage === 'inicio' ? <Inicio onNavigate={setCurrentPage} /> :
+         currentPage === 'dashboard' ? <Dashboard onNavigate={setCurrentPage} /> :
          currentPage === 'accounts' ? <BankAccounts /> :
          currentPage === 'cards' ? <CreditCards /> :
          currentPage === 'transactions' ? <Transactions /> :

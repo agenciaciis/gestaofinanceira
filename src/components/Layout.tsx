@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useEntity, FilterType } from '../contexts/EntityContext';
 import { 
   LayoutDashboard, 
+  Home, 
   CreditCard, 
   ArrowUpCircle, 
   ArrowDownCircle, 
@@ -222,6 +223,8 @@ export const Layout: React.FC<{
 
           <nav className="flex-1 space-y-1 overflow-y-auto">
             <NavGroup label="Visão" collapsed={isCollapsed} />
+            <NavItem icon={Home} label="Início" collapsed={isCollapsed}
+              active={currentPage === 'inicio'} onClick={() => onNavigate('inicio')} />
             <NavItem icon={LayoutDashboard} label="Dashboard" collapsed={isCollapsed}
               active={currentPage === 'dashboard'} onClick={() => onNavigate('dashboard')} />
             <NavItem icon={PieChart} label="Relatórios" collapsed={isCollapsed}
