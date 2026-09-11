@@ -190,29 +190,23 @@ export const Products: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[2.5rem] bg-violet-50 dark:bg-gradient-to-br dark:from-violet-900 dark:to-indigo-950 p-8 text-violet-900 dark:text-white shadow-xl shadow-violet-100 dark:shadow-none relative overflow-hidden border border-violet-100 dark:border-violet-900/30">
-        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-surface dark:bg-white/10 border border-violet-200 dark:border-white/30 shadow-inner">
-              <Package className="h-10 w-10 text-violet-600 dark:text-white" />
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-violet-500 dark:text-white/60">Catálogo</span>
-              <h2 className="text-4xl font-black tracking-tighter">Produtos</h2>
-              <p className="text-sm font-medium text-violet-700 dark:text-white/80 mt-1">Gráfica rápida, impressão 3D e mais — com variações e preço.</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <ViewToggle mode={viewMode} onChange={setViewMode} />
-            <button
-              onClick={() => { resetForm(); setIsModalOpen(true); }}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-8 py-4 text-sm font-black text-white shadow-xl hover:bg-violet-700 transition-all transform hover:scale-105 active:scale-95"
-            >
-              <Plus className="h-5 w-5" /> Novo Produto
-            </button>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-950/50"><Package className="h-7 w-7" /></div>
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-content">Produtos</h2>
+            <p className="text-sm text-content-subtle">Gráfica rápida, impressão 3D e mais — com variações e preço.</p>
           </div>
         </div>
-        <div className="pointer-events-none absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="flex flex-wrap items-center gap-3">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition-all active:scale-95"
+          >
+            <Plus className="h-5 w-5" /> Novo Produto
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
