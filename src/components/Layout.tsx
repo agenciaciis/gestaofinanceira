@@ -135,13 +135,23 @@ export const Layout: React.FC<{
         <div className="flex h-full flex-col p-4">
           <div className={cn("mb-6 flex items-center px-2", isCollapsed ? "justify-center" : "justify-between")}>
             <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
-                <Briefcase className="h-6 w-6" />
+              <div className="shrink-0 rounded-xl shadow-lg shadow-primary/20">
+                <svg viewBox="0 0 40 40" className="h-10 w-10" role="img" aria-label="Gestor Financeiro CIIS">
+                  <defs>
+                    <linearGradient id="gfLogoGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" />
+                      <stop offset="100%" stopColor="#4338ca" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="0" y="0" width="40" height="40" rx="11" fill="url(#gfLogoGrad)" />
+                  <path d="M9 27 L17 19 L22 23 L31 13" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M25.5 13 H31 V18.5" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-xl font-black text-content dark:text-gray-100 tracking-tighter">AGÊNCIA CIIS</span>
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">FinanFlow</span>
+                  <span className="text-lg font-black text-content dark:text-gray-100 tracking-tight leading-none">Gestor Financeiro</span>
+                  <span className="mt-0.5 text-[10px] font-bold text-primary uppercase tracking-[0.3em]">CIIS</span>
                 </div>
               )}
             </div>

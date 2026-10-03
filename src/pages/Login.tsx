@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Wallet, LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export const Login: React.FC = () => {
@@ -69,11 +69,21 @@ export const Login: React.FC = () => {
         className="w-full max-w-md space-y-8 rounded-2xl bg-surface p-8 shadow-xl"
       >
         <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Wallet className="h-8 w-8 text-primary" />
+          <div className="mx-auto shadow-lg shadow-primary/20 rounded-2xl w-16 h-16">
+            <svg viewBox="0 0 40 40" className="h-16 w-16" role="img" aria-label="Gestor Financeiro CIIS">
+              <defs>
+                <linearGradient id="gfLoginGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#4338ca" />
+                </linearGradient>
+              </defs>
+              <rect x="0" y="0" width="40" height="40" rx="11" fill="url(#gfLoginGrad)" />
+              <path d="M9 27 L17 19 L22 23 L31 13" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M25.5 13 H31 V18.5" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-content">
-            FinanFlow
+            Gestor Financeiro <span className="text-primary">CIIS</span>
           </h2>
           <p className="mt-2 text-sm text-content-muted">
             Gestão financeira inteligente para PF e PJ
