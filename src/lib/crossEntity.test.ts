@@ -119,6 +119,19 @@ describe('consolidate', () => {
     expect(r.consolidated.expense).toBe(0);
   });
 
+  it('compra no cartão fica FORA do caixa (igual a DRE/Relatórios)', () => {
+    const txs = [
+      // compra no cartão (cardId, sem conta) => paga na fatura, não é caixa
+      tx({ id: '1', entityId: 'pj', type: 'expense', amount: 1200, date: '2026-07-03', cardId: 'c1' }),
+      // despesa normal em conta => conta
+      tx({ id: '2', entityId: 'pj', type: 'expense', amount: 300, date: '2026-07-04', accountId: 'a1' }),
+    ];
+    const r = consolidate(txs, [PF, PJ], REF);
+    expect(r.byEntity.pj.expense).toBe(300);
+    expect(r.consolidated.expense).toBe(300);
+    expect(r.byType.PJ.expense).toBe(300);
+  });
+
   it('lançamento de entidade desconhecida não quebra o cálculo', () => {
     const txs = [tx({ id: '1', entityId: 'fantasma', type: 'income', amount: 700, date: '2026-07-02' })];
     const r = consolidate(txs, [PF, PJ], REF);

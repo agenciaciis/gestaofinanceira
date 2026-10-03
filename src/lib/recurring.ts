@@ -14,15 +14,19 @@ export type RecurringPeriod = 'monthly' | 'weekly' | 'yearly';
 
 /** Próxima data a partir de `date` somando um período. */
 export function addPeriod(date: Date, period: RecurringPeriod): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   if (period === 'weekly') {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     d.setDate(d.getDate() + 7);
-  } else if (period === 'yearly') {
-    d.setFullYear(d.getFullYear() + 1);
-  } else {
-    d.setMonth(d.getMonth() + 1);
+    return d;
   }
-  return d;
+  // Mensal/anual: soma o intervalo SEM "vazar" para o mês seguinte quando o dia
+  // não existe no mês alvo (ex.: 31/jan + 1 mês = 28/fev, não 03/mar; 29/fev + 1
+  // ano = 28/fev). Mesma regra do addMonths de orders.ts.
+  const monthsToAdd = period === 'yearly' ? 12 : 1;
+  const target = new Date(date.getFullYear(), date.getMonth() + monthsToAdd, 1);
+  const ultimoDia = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(date.getDate(), ultimoDia));
+  return target;
 }
 
 export interface RenewalPlanItem {

@@ -179,6 +179,20 @@ describe('currentInvoiceWindow / computeCardInvoice', () => {
     expect(nextDueDate(15, new Date(2026, 5, 15)).getTime()).toBe(new Date(2026, 5, 15).getTime());
   });
 
+  it('nextDueDate trava vencimento 29-31 no último dia de meses curtos', () => {
+    // vencimento dia 31, hoje 15/fev/2026 (fev tem 28) => 28/fev, não 03/mar
+    expect(nextDueDate(31, new Date(2026, 1, 15)).getTime()).toBe(new Date(2026, 1, 28).getTime());
+    // vencimento dia 31, hoje 10/abr (abr tem 30) => 30/abr
+    expect(nextDueDate(31, new Date(2026, 3, 10)).getTime()).toBe(new Date(2026, 3, 30).getTime());
+    // dia 30 já passou em janeiro => próximo é 28/fev (clampado), não 30/fev
+    expect(nextDueDate(30, new Date(2026, 0, 31)).getTime()).toBe(new Date(2026, 1, 28).getTime());
+  });
+
+  it('daysUntilDueDay acerta a contagem para vencimento dia 31 em mês curto', () => {
+    // hoje 20/fev/2026, vence "dia 31" => cai em 28/fev => faltam 8 dias (não ~11)
+    expect(daysUntilDueDay(31, new Date(2026, 1, 20))).toBe(8);
+  });
+
   it('soma despesas do cartão no ciclo corrente', () => {
     const ref = new Date(2026, 5, 5);
     const total = computeCardInvoice('c1', 10, [

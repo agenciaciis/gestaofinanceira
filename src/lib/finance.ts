@@ -174,9 +174,15 @@ export function daysUntilDueDay(dueDay: number, reference: Date = new Date()): n
 export function nextDueDate(dueDay: number, reference: Date = new Date()): Date {
   const day = Math.min(Math.max(1, Math.floor(dueDay) || 1), 31);
   const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
-  let due = new Date(today.getFullYear(), today.getMonth(), day);
+  // Trava o dia no último dia do mês alvo: vencimento 31 em fevereiro cai no
+  // dia 28, não "vaza" para março (new Date(y, 1, 31) viraria 03/mar).
+  const noMes = (y: number, m: number) => {
+    const ultimoDia = new Date(y, m + 1, 0).getDate();
+    return new Date(y, m, Math.min(day, ultimoDia));
+  };
+  let due = noMes(today.getFullYear(), today.getMonth());
   if (due.getTime() < today.getTime()) {
-    due = new Date(today.getFullYear(), today.getMonth() + 1, day);
+    due = noMes(today.getFullYear(), today.getMonth() + 1);
   }
   return due;
 }

@@ -12,7 +12,7 @@
  * contador e o dono precisam ver, respectivamente.
  */
 import { CrossEntityKind, Entity, EntityType, Transaction } from '../types';
-import { parseLocalDate, round2 } from './finance';
+import { parseLocalDate, round2, isCardExpense } from './finance';
 
 export interface EntityTotals {
   income: number;
@@ -125,6 +125,10 @@ export function consolidate(
     if (t.status !== 'completed') continue;
     // Transferência entre contas da mesma entidade não é receita nem despesa.
     if (t.type === 'transfer') continue;
+    // Compra no cartão é paga na fatura — fica fora do caixa, igual a DRE,
+    // Relatórios e Dashboard. Sem isso o consolidado contaria uma despesa que
+    // os demais painéis não contam, e os totais divergiriam.
+    if (isCardExpense(t)) continue;
 
     const d = parseLocalDate(t.date);
     if (Number.isNaN(d.getTime())) continue;

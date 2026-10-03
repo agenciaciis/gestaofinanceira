@@ -23,6 +23,24 @@ describe('addPeriod', () => {
     expect(addPeriod(new Date(2026, 0, 1), 'weekly').getDate()).toBe(8);
     expect(addPeriod(new Date(2026, 0, 1), 'yearly').getFullYear()).toBe(2027);
   });
+
+  it('mensal não "vaza" de mês quando o dia não existe no mês alvo', () => {
+    // 31/jan + 1 mês = 28/fev (2026 não é bissexto), NUNCA 03/mar.
+    const r1 = addPeriod(new Date(2026, 0, 31), 'monthly');
+    expect([r1.getMonth(), r1.getDate()]).toEqual([1, 28]);
+    // 31/mar + 1 mês = 30/abr (abril tem 30 dias).
+    const r2 = addPeriod(new Date(2026, 2, 31), 'monthly');
+    expect([r2.getMonth(), r2.getDate()]).toEqual([3, 30]);
+    // 30/nov + 1 mês = 30/dez (dia existe, preserva).
+    const r3 = addPeriod(new Date(2026, 10, 30), 'monthly');
+    expect([r3.getMonth(), r3.getDate()]).toEqual([11, 30]);
+  });
+
+  it('anual trava 29/fev no último dia quando o ano alvo não é bissexto', () => {
+    // 29/fev/2028 (bissexto) + 1 ano = 28/fev/2029 (não bissexto).
+    const r = addPeriod(new Date(2028, 1, 29), 'yearly');
+    expect([r.getFullYear(), r.getMonth(), r.getDate()]).toEqual([2029, 1, 28]);
+  });
 });
 
 describe('planRecurringRenewals', () => {
