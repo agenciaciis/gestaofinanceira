@@ -157,7 +157,8 @@ export const CreditCards: React.FC = () => {
     // Prioridade: valor de uma fatura já lançada (para ATUALIZAR); senão a soma das
     // compras itemizadas em aberto; senão em branco (você digita o total do mês).
     setLaunchAmount(bill ? (Number(bill.amount) || 0).toFixed(2) : (total > 0 ? total.toFixed(2) : ''));
-    setLaunchDueDate(bill?.date || formatLocalDate(due));
+    // O vencimento SEMPRE segue o dia cadastrado no cartão (não editável).
+    setLaunchDueDate(formatLocalDate(due));
     setLaunchDescription(bill?.description || `Fatura ${card.name}`);
   };
 
@@ -1305,9 +1306,13 @@ export const CreditCards: React.FC = () => {
                 <input
                   type="date"
                   value={launchDueDate}
-                  onChange={(e) => setLaunchDueDate(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 outline-none focus:border-primary"
+                  readOnly
+                  disabled
+                  className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2.5 text-content-muted outline-none cursor-not-allowed"
                 />
+                <p className="mt-1 text-[11px] text-content-subtle">
+                  Fixo no dia de vencimento cadastrado do cartão{launchingCard ? ` (dia ${launchingCard.dueDay})` : ''}.
+                </p>
               </div>
             </div>
             <div className="mt-8 flex gap-3">
