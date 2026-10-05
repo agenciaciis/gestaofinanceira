@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
@@ -9,9 +9,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { cardGradient, readableForeground, mutedForeground, BANK_PRESETS, normalizeHex } from '../lib/brandColors';
 import { ColorField } from '../components/ColorField';
-import { computeCardUsage, computeCardInvoice, currentInvoiceWindow, parseLocalDate, nextDueDate } from '../lib/finance';
+import { computeCardUsage, computeCardInvoice, currentInvoiceWindow, parseLocalDate, nextDueDate, round2, formatLocalDate } from '../lib/finance';
 import { ViewToggle, useViewMode, DataTable, Column } from '../components/ViewToggle';
-import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, addMonths, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   BarChart, 
@@ -32,6 +32,8 @@ export const CreditCards: React.FC = () => {
   const [cards, setCards] = useState<CreditCard[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [cardTransactions, setCardTransactions] = useState<Record<string, Transaction[]>>({});
+  // Todas as transações (inclui as faturas consolidadas, que não têm cardId).
+  const [allTx, setAllTx] = useState<Transaction[]>([]);
   // Pagamento de fatura
   const [payingCard, setPayingCard] = useState<CreditCard | null>(null);
   const [payAccountId, setPayAccountId] = useState('');
@@ -43,6 +45,8 @@ export const CreditCards: React.FC = () => {
   const [comparingCard, setComparingCard] = useState<CreditCard | null>(null);
   const [selectedCardForInvoices, setSelectedCardForInvoices] = useState<CreditCard | null>(null);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
+  const [payingScopeIds, setPayingScopeIds] = useState<string[] | null>(null);
+  const [payingScopeLabel, setPayingScopeLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +58,7 @@ export const CreditCards: React.FC = () => {
   const [closingDay, setClosingDay] = useState('');
   const [targetEntityId, setTargetEntityId] = useState('');
   const [color, setColor] = useState('');
+  const [manualUsage, setManualUsage] = useState('');
   const [viewMode, setViewMode] = useViewMode('cartoes', 'grid');
 
   useEffect(() => {
@@ -85,6 +90,7 @@ export const CreditCards: React.FC = () => {
         }
       }
       setCardTransactions(byCard);
+      setAllTx(Object.values(txByEntity).flat());
     };
 
     // Uma assinatura por entidade para cartões e OUTRA para transações — antes,
@@ -121,13 +127,129 @@ export const CreditCards: React.FC = () => {
   }, [entities, filterType]);
 
   // Abre o modal de pagamento com o total da fatura atual como valor padrão.
+  // ---- Lancar fatura do mes (fatura consolidada avulsa) ----
+  const [launchingCard, setLaunchingCard] = useState<CreditCard | null>(null);
+  const [launchAmount, setLaunchAmount] = useState('');
+  const [launchDueDate, setLaunchDueDate] = useState('');
+  const [launchDescription, setLaunchDescription] = useState('');
+
+  // Compras nao pagas e ainda NAO cobertas por fatura consolidada.
+  const openPurchasesFor = (cardId: string) =>
+    (cardTransactions[cardId] || []).filter(
+      (t) =>
+        t.type === 'expense' &&
+        t.cardId === cardId &&
+        t.status !== 'cancelled' &&
+        !t.settled &&
+        !t.coveredByInvoiceId
+    );
+
+  // Fatura consolidada deste cartão já lançada e ainda NÃO paga (para atualizar).
+  const openInvoiceBillFor = (cardId: string) =>
+    allTx.find(t => t.invoiceForCardId === cardId && t.status !== 'completed' && t.status !== 'cancelled');
+
+  const openLaunchInvoice = (card: CreditCard) => {
+    const bill = openInvoiceBillFor(card.id);
+    const open = openPurchasesFor(card.id);
+    const total = round2(open.reduce((acc, t) => acc + (Number(t.amount) || 0), 0));
+    const due = nextDueDate(card.dueDay);
+    setLaunchingCard(card);
+    // Prioridade: valor de uma fatura já lançada (para ATUALIZAR); senão a soma das
+    // compras itemizadas em aberto; senão em branco (você digita o total do mês).
+    setLaunchAmount(bill ? (Number(bill.amount) || 0).toFixed(2) : (total > 0 ? total.toFixed(2) : ''));
+    setLaunchDueDate(bill?.date || formatLocalDate(due));
+    setLaunchDescription(bill?.description || `Fatura ${card.name}`);
+  };
+
+  const confirmLaunchInvoice = async () => {
+    if (!launchingCard) return;
+    if (saving) return;
+    const card = launchingCard;
+    const open = openPurchasesFor(card.id);
+    const amount = round2(Number(launchAmount) || 0);
+    if (amount <= 0) { showToast('Informe o valor da fatura do mês.', 'error'); return; }
+    if (!launchDueDate) { showToast('Informe a data de vencimento da fatura.', 'error'); return; }
+    setSaving(true);
+    const ent = card.entityId;
+    const owner = entities.find((e) => e.id === ent);
+    try {
+      const existing = openInvoiceBillFor(card.id);
+      if (existing && existing.id) {
+        // ATUALIZA a fatura do mês já lançada (novo valor / vencimento / descrição).
+        await updateDoc(doc(db, `entities/${ent}/transactions/${existing.id}`), {
+          amount,
+          date: launchDueDate,
+          description: launchDescription || `Fatura ${card.name}`,
+        });
+      } else {
+        // CRIA a fatura consolidada como DESPESA a pagar (aparece em Lançamentos,
+        // com vencimento). NÃO leva cardId, então não infla o uso do cartão nem
+        // conta em dobro nas somas de fatura do cartão.
+        const billRef = await addDoc(collection(db, `entities/${ent}/transactions`), {
+          description: launchDescription || `Fatura ${card.name}`,
+          amount,
+          type: 'expense',
+          status: 'pending',
+          date: launchDueDate,
+          categoryId: 'cartao',
+          invoiceForCardId: card.id,
+          entityId: ent,
+          ownerUid: owner?.ownerUid,
+          collaboratorsEmails: owner?.collaboratorsEmails || [],
+          createdAt: serverTimestamp(),
+        });
+        // Se houver compras itemizadas em aberto, marca como "cobertas" pela fatura
+        // (saem do "A Pagar" para não duplicar). Sem compras, a fatura digitada vale sozinha.
+        if (open.length > 0) {
+          const batch = writeBatch(db);
+          for (const t of open) {
+            batch.update(doc(db, `entities/${ent}/transactions/${t.id}`), {
+              coveredByInvoiceId: billRef.id,
+            });
+          }
+          await batch.commit();
+        }
+      }
+      showToast(existing ? 'Valor da fatura do mês atualizado.' : 'Fatura do mês lançada em Lançamentos.', 'success');
+      setLaunchingCard(null);
+    } catch (error) {
+      console.error('Erro ao lancar fatura:', error);
+      showToast('Erro ao lancar a fatura do mes.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openPayInvoice = (card: CreditCard) => {
-    const total = computeCardInvoice(card.id, card.closingDay, cardTransactions[card.id] || [], new Date());
+    const total = round2(
+      (cardTransactions[card.id] || []).reduce((acc, t) => {
+        if (t.type !== 'expense' || t.cardId !== card.id) return acc;
+        if (t.status === 'cancelled' || t.settled) return acc;
+        return acc + (Number(t.amount) || 0);
+      }, 0)
+    );
     setPayingCard(card);
     setPayAmount(total > 0 ? total.toFixed(2) : '');
     setPayDate(new Date().toISOString().split('T')[0]);
     const accs = accounts.filter(a => a.entityId === card.entityId);
     setPayAccountId(accs[0]?.id || '');
+  };
+
+  const openPayInvoiceForMonth = (card: CreditCard, monthTxs: Transaction[], label: string) => {
+    const scopeIds = monthTxs.filter(t => t.id && t.status !== 'cancelled' && !t.settled).map(t => t.id);
+    const total = round2(
+      monthTxs.reduce((acc, t) => {
+        if (t.status === 'cancelled' || t.settled) return acc;
+        return acc + (Number(t.amount) || 0);
+      }, 0)
+    );
+    setPayingCard(card);
+    setPayAmount(total > 0 ? total.toFixed(2) : '');
+    setPayDate(new Date().toISOString().split('T')[0]);
+    const accs = accounts.filter(a => a.entityId === card.entityId);
+    setPayAccountId(accs[0]?.id || '');
+    setPayingScopeIds(scopeIds);
+    setPayingScopeLabel(label);
   };
 
   // Paga a fatura: cria a DESPESA no banco (saldo cai) e marca as compras da
@@ -166,17 +288,26 @@ export const CreditCards: React.FC = () => {
         const d = parseLocalDate(payDate);
         return Number.isNaN(d.getTime()) ? new Date() : d;
       })();
-      const invoiceTotal = computeCardInvoice(payingCard.id, payingCard.closingDay, cardTransactions[payingCard.id] || [], refDate);
+      // Fatura em aberto = TODAS as compras nao pagas do cartao (cobertas por fatura
+      // consolidada ou nao), consistente com a tela e com o "A Pagar".
+      const openTx = payingScopeIds
+      ? (cardTransactions[payingCard.id] || []).filter(t => t.id && payingScopeIds.includes(t.id))
+      : (cardTransactions[payingCard.id] || []).filter(t =>
+          t.id && t.type === 'expense' && t.status !== 'cancelled' && !t.settled
+        );
+      const invoiceTotal = round2(openTx.reduce((acc, t) => acc + (Number(t.amount) || 0), 0));
       const isFullPayment = invoiceTotal > 0 && amount >= invoiceTotal - 0.005;
-      const { start, end } = currentInvoiceWindow(payingCard.closingDay, refDate);
-      const aQuitar = isFullPayment ? (cardTransactions[payingCard.id] || []).filter(t => {
-        if (!t.id || t.type !== 'expense' || t.status === 'cancelled' || t.settled) return false;
-        const d = parseLocalDate(t.date);
-        return !Number.isNaN(d.getTime()) && d >= start && d < end;
-      }) : [];
+      // No pagamento INTEGRAL liberamos o limite (marca as compras como `settled`)
+      // e quitamos qualquer fatura consolidada em aberto deste cartao.
+      const aQuitar = isFullPayment ? openTx : [];
       if (aQuitar.length) {
         const batch = writeBatch(db);
         for (const t of aQuitar) batch.update(doc(db, `entities/${ent}/transactions/${t.id}`), { settled: true, settledAt: payDate });
+        // Marca a(s) fatura(s) consolidada(s) em aberto como paga(s).
+        const bills = (cardTransactions[payingCard.id] || []).filter(t =>
+          t.id && t.invoiceForCardId === payingCard.id && t.status !== 'completed' && t.status !== 'cancelled'
+        );
+        for (const b of bills) batch.update(doc(db, `entities/${ent}/transactions/${b.id}`), { status: 'completed', paidAt: payDate });
         await batch.commit();
       }
       if (isFullPayment) {
@@ -185,6 +316,8 @@ export const CreditCards: React.FC = () => {
         showToast('Pagamento parcial registrado; o limite não foi liberado.', 'info');
       }
       setPayingCard(null);
+      setPayingScopeIds(null);
+      setPayingScopeLabel(null);
     } catch (error) {
       console.error('Erro ao pagar fatura:', error);
       showToast('Erro ao registrar o pagamento da fatura.', 'error');
@@ -207,6 +340,7 @@ export const CreditCards: React.FC = () => {
       closingDay: Number(closingDay),
       entityId: targetEntityId,
       color: normalizeHex(color) || null,
+      manualUsage: Number(manualUsage) || 0,
       ownerUid: entities.find(e => e.id === targetEntityId)?.ownerUid,
       collaboratorsEmails: entities.find(e => e.id === targetEntityId)?.collaboratorsEmails || [],
     };
@@ -240,6 +374,7 @@ export const CreditCards: React.FC = () => {
     setClosingDay(card.closingDay.toString());
     setTargetEntityId(card.entityId);
     setColor(card.color || '');
+    setManualUsage((card.manualUsage || 0).toString());
     setIsModalOpen(true);
   };
 
@@ -252,6 +387,7 @@ export const CreditCards: React.FC = () => {
     setClosingDay('');
     setTargetEntityId('');
     setColor('');
+    setManualUsage('');
   };
 
   const handleDelete = async (entityId: string, cardId: string) => {
@@ -279,7 +415,11 @@ export const CreditCards: React.FC = () => {
   const calculateUsage = (cardId: string) => {
     const card = cards.find(c => c.id === cardId);
     if (!card) return 0;
-    return computeCardUsage(cardId, card.closingDay, cardTransactions[cardId] || []);
+    // Uso real = o MAIOR entre o saldo inicial informado e o que ja foi lancado no sistema.
+    // Assim as faturas lancadas vao ocupando o lugar do saldo inicial, sem NUNCA duplicar.
+    const lancado = computeCardUsage(cardId, card.closingDay, cardTransactions[cardId] || []);
+    const inicial = Number(card.manualUsage) || 0;
+    return round2(Math.max(lancado, inicial));
   };
 
   const getComparisonData = (card: CreditCard) => {
@@ -309,6 +449,34 @@ export const CreditCards: React.FC = () => {
 
   const brl = (n: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
+
+  // Gasto no cartão por mês (últimos 6 meses), somando TODOS os cartões.
+  // Conta: compras no cartão ainda não cobertas por fatura consolidada
+  // (cardId, sem coveredByInvoiceId) + as faturas consolidadas lançadas
+  // (invoiceForCardId). Assim não duplica: quando uma fatura cobre as compras,
+  // só a fatura conta; compras avulsas contam sozinhas.
+  const monthlyCardSpending = useMemo(() => {
+    const base = startOfMonth(new Date());
+    const meses = Array.from({ length: 6 }, (_, i) => {
+      const d = subMonths(base, 5 - i);
+      return { key: `${d.getFullYear()}-${d.getMonth()}`, label: format(d, 'MMM/yy', { locale: ptBR }), total: 0 };
+    });
+    const idx = new Map(meses.map((m, i) => [m.key, i]));
+    for (const t of allTx) {
+      if (t.status === 'cancelled') continue;
+      const isCompra = t.type === 'expense' && !!t.cardId && !t.coveredByInvoiceId;
+      const isFatura = !!t.invoiceForCardId;
+      if (!isCompra && !isFatura) continue;
+      const d = parseLocalDate(t.date);
+      if (Number.isNaN(d.getTime())) continue;
+      const i = idx.get(`${d.getFullYear()}-${d.getMonth()}`);
+      if (i === undefined) continue;
+      meses[i].total = round2(meses[i].total + (Number(t.amount) || 0));
+    }
+    return meses;
+  }, [allTx]);
+
+  const cardSpendThisMonth = monthlyCardSpending.length ? monthlyCardSpending[monthlyCardSpending.length - 1].total : 0;
 
   const colunasCartoes: Column<CreditCard>[] = [
     {
@@ -362,6 +530,79 @@ export const CreditCards: React.FC = () => {
         </div>
       </div>
 
+      {/* Barra consolidada: limite total e uso somado de TODOS os cartoes */}
+      {cards.length > 0 && (() => {
+        const totalLimit = cards.reduce((acc, c) => acc + (Number(c.limit) || 0), 0);
+        const totalUsed = round2(cards.reduce((acc, c) => acc + calculateUsage(c.id), 0));
+        const totalAvailable = round2(totalLimit - totalUsed);
+        const usedPct = totalLimit > 0 ? Math.min((totalUsed / totalLimit) * 100, 100) : 0;
+        return (
+          <div className="mb-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-content-subtle">
+              <CardIcon className="h-4 w-4" />
+              Todos os cartoes
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-content-subtle">Limite total</p>
+                <p className="mt-1 text-2xl font-bold text-content">{brl(totalLimit)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-content-subtle">Limite utilizado</p>
+                <p className="mt-1 text-2xl font-bold text-rose-600">{brl(totalUsed)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-content-subtle">Disponivel</p>
+                <p className="mt-1 text-2xl font-bold text-emerald-600">{brl(totalAvailable)}</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="mb-1 flex justify-between text-[11px] text-content-subtle">
+                <span>Uso consolidado</span>
+                <span>{usedPct.toFixed(0)}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${usedPct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Gasto no cartão por mês (todos os cartões) + KPI do mês atual */}
+      {cards.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-content-subtle">
+              <BarChart3 className="h-4 w-4" />
+              Gasto no cartão por mês
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-content-subtle">Neste mês</p>
+              <p className="text-2xl font-black text-rose-600">{brl(cardSpendThisMonth)}</p>
+            </div>
+          </div>
+          <div className="h-52 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyCardSpending}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} width={72}
+                  tickFormatter={(v) => new Intl.NumberFormat('pt-BR', { notation: 'compact', style: 'currency', currency: 'BRL' }).format(Number(v) || 0)} />
+                <Tooltip
+                  formatter={(v: number) => brl(v)}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="total" fill="#6366f1" radius={[6, 6, 0, 0]} name="Gasto no cartão" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {viewMode === 'list' && (
         <DataTable
           itens={cards}
@@ -399,7 +640,15 @@ export const CreditCards: React.FC = () => {
           const usedLimit = calculateUsage(card.id);
           const availableLimit = card.limit - usedLimit;
           const usagePercentage = card.limit > 0 ? Math.min((usedLimit / card.limit) * 100, 100) : 0;
-          const invoiceAmount = computeCardInvoice(card.id, card.closingDay, cardTransactions[card.id] || [], new Date());
+          // Fatura em aberto = TODA compra no cartao ainda nao paga (settled),
+          // independente do ciclo de fatura. Consistente com Dashboard/A Pagar.
+          const invoiceAmount = round2(
+            (cardTransactions[card.id] || []).reduce((acc, t) => {
+              if (t.type !== 'expense' || t.cardId !== card.id) return acc;
+              if (t.status === 'cancelled' || t.settled) return acc;
+              return acc + (Number(t.amount) || 0);
+            }, 0)
+          );
           const dueDate = nextDueDate(card.dueDay);
 
           const gradient = cardGradient(card.color);
@@ -464,6 +713,9 @@ export const CreditCards: React.FC = () => {
                     />
                   </div>
                 </div>
+                {(Number(card.manualUsage) || 0) > 0 && (
+                  <p className="mt-1 text-[10px] text-amber-500">Saldo inicial de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(card.manualUsage) || 0)} aplicado (uso fora do sistema). As faturas que voce lancar vao ocupando esse valor automaticamente ate substitui-lo.</p>
+                )}
 
                 <div className="flex justify-between">
                   <div>
@@ -538,6 +790,13 @@ export const CreditCards: React.FC = () => {
                     Ver Faturas
                   </button>
                   <button
+                    onClick={() => openLaunchInvoice(card)}
+                    className="col-span-2 mt-2 flex items-center justify-center gap-2 rounded-xl bg-primary/10 py-2 text-[10px] font-bold text-primary transition-all hover:bg-primary/20"
+                  >
+                    <Calendar className="h-3 w-3" />
+                    Lancar fatura do mes
+                  </button>
+                  <button
                     onClick={() => openPayInvoice(card)}
                     className="col-span-2 mt-2 flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 py-2 text-[10px] font-bold text-emerald-600 transition-all hover:bg-emerald-500/25"
                   >
@@ -609,18 +868,20 @@ export const CreditCards: React.FC = () => {
                     );
                   }
 
-                  return sortedMonths.map(monthKey => {
+                  const cardForModal = selectedCardForInvoices;
+          return sortedMonths.map(monthKey => {
                     const monthTransactions = groupedByMonth[monthKey].sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
                     const totalAmount = monthTransactions.reduce((acc, t) => acc + t.amount, 0);
                     const isExpanded = expandedInvoice === monthKey;
                     const [year, month] = monthKey.split('-');
                     const date = new Date(parseInt(year), parseInt(month) - 1);
+      const groupSettled = monthTransactions.every(t => t.status === 'cancelled' || t.settled);
 
                     return (
                       <div key={monthKey} className="rounded-2xl border border-line overflow-hidden">
-                        <button 
+                        <div
                           onClick={() => setExpandedInvoice(isExpanded ? null : monthKey)}
-                          className="w-full flex items-center justify-between p-4 bg-canvas hover:bg-surface-muted transition-all"
+                          className="w-full flex items-center justify-between p-4 bg-canvas hover:bg-surface-muted transition-all cursor-pointer"
                         >
                           <div className="flex items-center gap-4">
                             <div className="h-10 w-10 rounded-xl bg-surface flex flex-col items-center justify-center shadow-sm">
@@ -639,9 +900,18 @@ export const CreditCards: React.FC = () => {
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
                               </p>
                             </div>
-                            {isExpanded ? <ChevronUp className="h-5 w-5 text-content-subtle" /> : <ChevronDown className="h-5 w-5 text-content-subtle" />}
+                            {!groupSettled && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); openPayInvoiceForMonth(cardForModal, monthTransactions, 'Fatura de ' + format(date, "MMMM 'de' yyyy", { locale: ptBR })); }}
+                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600"
+                >
+                  Pagar
+                </button>
+              )}
+              {isExpanded ? <ChevronUp className="h-5 w-5 text-content-subtle" /> : <ChevronDown className="h-5 w-5 text-content-subtle" />}
                           </div>
-                        </button>
+                        </div>
 
                         <AnimatePresence>
                           {isExpanded && (
@@ -679,9 +949,9 @@ export const CreditCards: React.FC = () => {
                                         <td className="py-3">
                                           <span className={cn(
                                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                                            t.status === 'completed' ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
+                                            (t.status === 'completed' || t.settled) ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
                                           )}>
-                                            {t.status === 'completed' ? 'Pago' : 'Pendente'}
+                                            {(t.status === 'completed' || t.settled) ? 'Pago' : 'Pendente'}
                                           </span>
                                         </td>
                                         <td className="py-3 text-right pr-2 font-black text-content">
@@ -839,6 +1109,17 @@ export const CreditCards: React.FC = () => {
                   />
                 </div>
               </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-content-muted">Limite ja em uso (saldo inicial)</label>
+                <input
+                  type="number"
+                  value={manualUsage}
+                  onChange={(e) => setManualUsage(e.target.value)}
+                  placeholder="0.00"
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="mt-1 text-[11px] text-content-subtle leading-snug">Uso que ja existe fora do sistema (compras antigas/parcelas ainda nao lancadas). O sistema usa o MAIOR entre este valor e o que voce ja lancou, entao as faturas que voce lancar vao ocupando este valor sozinhas, sem duplicar. Nao entra em "A Pagar".</p>
+              </div>
 
               {/* Cor do cartão */}
               <div>
@@ -891,6 +1172,17 @@ export const CreditCards: React.FC = () => {
                   />
                 </div>
               </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-content-muted">Limite ja em uso (saldo inicial)</label>
+                <input
+                  type="number"
+                  value={manualUsage}
+                  onChange={(e) => setManualUsage(e.target.value)}
+                  placeholder="0.00"
+                  className="mt-1 w-full rounded-lg border border-line px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="mt-1 text-[11px] text-content-subtle leading-snug">Uso que ja existe fora do sistema (compras antigas/parcelas ainda nao lancadas). O sistema usa o MAIOR entre este valor e o que voce ja lancou, entao as faturas que voce lancar vao ocupando este valor sozinhas, sem duplicar. Nao entra em "A Pagar".</p>
+              </div>
               <div className="mt-8 flex gap-3">
                 <button
                   type="button"
@@ -914,17 +1206,17 @@ export const CreditCards: React.FC = () => {
 
       {/* Pagar fatura: baixa do banco + libera o limite */}
       {payingCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setPayingCard(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => { setPayingCard(null); setPayingScopeIds(null); setPayingScopeLabel(null); }}>
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
             onClick={e => e.stopPropagation()}
             className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-3xl bg-surface p-6 sm:p-8 shadow-2xl"
           >
-            <button type="button" aria-label="Fechar" onClick={() => setPayingCard(null)}
+            <button type="button" aria-label="Fechar" onClick={() => { setPayingCard(null); setPayingScopeIds(null); setPayingScopeLabel(null); }}
               className="absolute right-4 top-4 z-10 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
               <X className="h-5 w-5" />
             </button>
-            <h3 className="text-xl font-bold text-content pr-10">Pagar fatura — {payingCard.name}</h3>
+            <h3 className="text-xl font-bold text-content pr-10">Pagar fatura — {payingCard.name}{payingScopeLabel ? ' · ' + payingScopeLabel : ''}</h3>
             <p className="mt-1 text-sm text-content-subtle">
               Registra a saída do dinheiro da conta (quitação da fatura) — o saldo do banco cai e o limite do cartão é liberado. Não conta como nova despesa: as compras no cartão já foram contadas quando feitas.
             </p>
@@ -959,7 +1251,7 @@ export const CreditCards: React.FC = () => {
               </div>
             </div>
             <div className="mt-8 flex gap-3">
-              <button type="button" onClick={() => setPayingCard(null)}
+              <button type="button" onClick={() => { setPayingCard(null); setPayingScopeIds(null); setPayingScopeLabel(null); }}
                 className="flex-1 rounded-xl border border-line py-2.5 text-sm font-semibold text-content-muted hover:bg-canvas">Cancelar</button>
               <button type="button" onClick={confirmPayInvoice} disabled={saving}
                 className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
@@ -969,6 +1261,65 @@ export const CreditCards: React.FC = () => {
           </motion.div>
         </div>
       )}
+
+      {/* Modal: Lancar fatura do mes */}
+      {launchingCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setLaunchingCard(null)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-content pr-10">Lancar fatura do mes &mdash; {launchingCard.name}</h3>
+              <button type="button" aria-label="Fechar" onClick={() => setLaunchingCard(null)} className="rounded-full p-1 text-content-subtle hover:bg-surface-muted">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-content-subtle">
+              A fatura sera lancada em Lancamentos como uma despesa a pagar com a data de vencimento. As compras do cartao saem do &quot;A Pagar&quot; para nao duplicar, e o limite so e liberado quando voce pagar a fatura por aqui.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-content-muted mb-1">Descricao</label>
+                <input
+                  type="text"
+                  value={launchDescription}
+                  onChange={(e) => setLaunchDescription(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-content-muted mb-1">Valor da fatura</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={launchAmount}
+                  onChange={(e) => setLaunchAmount(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-content-muted mb-1">Vencimento</label>
+                <input
+                  type="date"
+                  value={launchDueDate}
+                  onChange={(e) => setLaunchDueDate(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+            <div className="mt-8 flex gap-3">
+              <button type="button" onClick={() => setLaunchingCard(null)} className="flex-1 rounded-xl border border-line py-2.5 text-sm font-semibold text-content-muted hover:bg-canvas">Cancelar</button>
+              <button type="button" onClick={confirmLaunchInvoice} disabled={saving} className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60">
+                {saving ? 'Lancando...' : 'Lancar fatura'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
     </div>
   );
 };

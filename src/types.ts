@@ -72,6 +72,8 @@ export interface CreditCard {
   entityId: string;
   /** Cor da marca (hex). Sem valor = visual escuro padrão. */
   color?: string;
+  /** Uso já existente fora do sistema (saldo inicial do limite). */
+  manualUsage?: number;
 }
 
 /** Linha de uma venda: produto (e variação), quantidade e preço unitário. */
@@ -99,6 +101,10 @@ export interface Transaction {
   settledAt?: string;
   /** Transferência que é quitação de fatura: id do cartão pago (rastreio). */
   cardPaymentFor?: string;
+  /** Lançamento que É a fatura consolidada de um cartão (id do cartão). */
+  invoiceForCardId?: string;
+  /** Compra de cartão já incluída numa fatura consolidada (id da fatura). */
+  coveredByInvoiceId?: string;
   entityId: string;
   paidAt?: string; // data em que foi efetivamente pago (YYYY-MM-DD)
   // Forma de pagamento (além de conta/cartão): pix, boleto, dinheiro, transferência...
