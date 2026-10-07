@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useEntity } from '../contexts/EntityContext';
 import { useUI } from '../contexts/UIContext';
-import { collection, query, where, onSnapshot, limit, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Transaction, BankAccount, CreditCard, Debt } from '../types';
 import { CATEGORIES, MONTHS } from '../constants';
@@ -25,7 +25,9 @@ import {
   Activity,
   ChevronRight,
   Target,
-  ShieldCheck
+  ShieldCheck,
+  X,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -111,7 +113,8 @@ const StatCard: React.FC<{
 
 export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate }) => {
   const { entities, filterType } = useEntity();
-  const { showToast } = useUI();
+  const { showToast, confirm } = useUI();
+  const [overdueOpen, setOverdueOpen] = useState(false);
   const { theme } = useTheme();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -285,9 +288,10 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     // Vencidas é "até hoje", não do período: uma conta vencida continua vencida
     // independente do mês que você está olhando.
     const inicioDeHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-    const overdue = transactions
+    const overdueTxs = transactions
       .filter(t => t.status === 'pending' && !isCardExpense(t) && !t.crossEntityGroupId && isBefore(parseLocalDate(t.date), inicioDeHoje))
-      .reduce((acc, t) => acc + t.amount, 0);
+      .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
+    const overdue = overdueTxs.reduce((acc, t) => acc + t.amount, 0);
 
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
     const cardDebt = transactions
@@ -330,6 +334,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       pendingIncome,
       pendingExpense,
       overdue,
+      overdueList: overdueTxs,
       cardDebt,
       totalOpenDebts,
       totalEstimatedInterest,
@@ -504,6 +509,22 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     }
   };
 
+  const deleteTx = async (transaction: Transaction) => {
+    const ok = await confirm({
+      title: 'Excluir lançamento',
+      message: `Excluir "${transaction.description || 'lançamento'}" de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(transaction.amount)}? Essa ação não pode ser desfeita.`,
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, `entities/${transaction.entityId}/transactions/${transaction.id}`));
+      showToast('Lançamento excluído.', 'success');
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      showToast('Não consegui excluir. Tente de novo.', 'error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -613,7 +634,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
+          {([
             { rotulo: 'Saldo geral', valor: stats.totalBankBalance, cor: 'text-content', nota: 'todas as contas, hoje' },
             { rotulo: 'Receita', valor: stats.incomeThisPeriod, cor: 'text-emerald-600', nota: 'recebido no período' },
             { rotulo: 'Despesa', valor: -stats.expenseThisPeriod, cor: 'text-rose-600', nota: 'pago no período' },
@@ -621,14 +642,18 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
             { rotulo: 'Valores a receber', valor: stats.pendingIncome, cor: 'text-blue-600', nota: 'ainda não entrou' },
             { rotulo: 'Valores a pagar', valor: -(stats.pendingExpense + stats.cardDebt), cor: 'text-amber-600', nota: 'inclui fatura do cartão' },
             { rotulo: 'Resultado previsto', valor: stats.resultadoPrevisto, cor: stats.resultadoPrevisto >= 0 ? 'text-emerald-600' : 'text-rose-600', nota: 'se tudo se confirmar' },
-            { rotulo: 'Vencidas', valor: -stats.overdue, cor: 'text-rose-600', nota: 'até hoje, todo o histórico' },
-          ].map(item => (
-            <div key={item.rotulo} className="rounded-2xl border border-line p-4">
+            { rotulo: 'Vencidas', valor: -stats.overdue, cor: 'text-rose-600', nota: 'clique para ver e resolver', onClick: stats.overdue > 0 ? () => setOverdueOpen(true) : undefined },
+          ] as { rotulo: string; valor: number; cor: string; nota: string; onClick?: () => void }[]).map(item => (
+            <div
+              key={item.rotulo}
+              onClick={item.onClick}
+              className={cn('rounded-2xl border border-line p-4', item.onClick && 'cursor-pointer hover:border-rose-300 hover:shadow-md transition-all')}
+            >
               <p className="text-[10px] font-black uppercase tracking-widest text-content-subtle">{item.rotulo}</p>
               <p className={cn('mt-1 text-xl font-black tracking-tight tabular-nums', item.cor)}>
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor)}
               </p>
-              <p className="mt-0.5 text-[10px] text-content-subtle">{item.nota}</p>
+              <p className={cn('mt-0.5 text-[10px]', item.onClick ? 'font-bold text-rose-500' : 'text-content-subtle')}>{item.nota}</p>
             </div>
           ))}
         </div>
@@ -810,6 +835,86 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       )}
 
       {isCrossEntityOpen && <CrossEntityTransferModal onClose={() => setIsCrossEntityOpen(false)} />}
+
+      {/* Lista de contas vencidas — abrir, resolver (pagar) ou excluir */}
+      {overdueOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setOverdueOpen(false)}>
+          <div onClick={e => e.stopPropagation()} className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-surface p-6 sm:p-8 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-content">Contas vencidas</h3>
+                  <p className="text-sm text-content-subtle">
+                    {stats.overdueList.length} em aberto · total {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.overdue)}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setOverdueOpen(false)} className="rounded-full p-2 text-content-subtle hover:bg-surface-muted">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1">
+              {stats.overdueList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-content-subtle">
+                  <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500 opacity-60" />
+                  <p>Nenhuma conta vencida. 🎉</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-line">
+                  {stats.overdueList.map(t => {
+                    const ent = entities.find(e => e.id === t.entityId);
+                    const diasAtraso = Math.max(0, Math.round((Date.now() - parseLocalDate(t.date).getTime()) / 86400000));
+                    return (
+                      <div key={t.id} className="flex items-center justify-between gap-3 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-content">{t.description || 'Lançamento'}</p>
+                          <p className="text-[11px] text-content-subtle">
+                            venc. {t.date.slice(8, 10)}/{t.date.slice(5, 7)}/{t.date.slice(0, 4)}
+                            <span className="ml-2 rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose-600">{diasAtraso} dia{diasAtraso === 1 ? '' : 's'} em atraso</span>
+                            {ent ? <span className="ml-2 text-content-subtle">· {ent.name}</span> : null}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <p className={cn('text-sm font-black tabular-nums', t.type === 'income' ? 'text-emerald-600' : 'text-rose-600')}>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
+                          </p>
+                          <button
+                            onClick={() => toggleStatus(t)}
+                            title={t.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
+                            className="rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-[11px] font-bold text-emerald-600 hover:bg-emerald-500/25"
+                          >
+                            {t.type === 'income' ? 'Recebi' : 'Pagar'}
+                          </button>
+                          <button
+                            onClick={() => deleteTx(t)}
+                            title="Excluir"
+                            className="rounded-lg p-1.5 text-content-subtle hover:bg-rose-50 hover:text-rose-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-between gap-3">
+              <button onClick={() => { setOverdueOpen(false); onNavigate?.('transactions'); }} className="rounded-xl bg-surface-muted px-4 py-2 text-sm font-bold text-content-muted hover:bg-line">
+                Ver em Lançamentos
+              </button>
+              <button onClick={() => setOverdueOpen(false)} className="rounded-xl bg-primary px-6 py-2 text-sm font-bold text-white hover:bg-primary/90">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Primary Stats */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
