@@ -4,7 +4,7 @@ import { useUI } from '../contexts/UIContext';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { BankAccount, Transaction } from '../types';
-import { Plus, Landmark, Trash2, Edit2, Wallet, X } from 'lucide-react';
+import { Plus, Landmark, Trash2, Edit2, Wallet, X, ReceiptText } from 'lucide-react';
 import { ColorField } from '../components/ColorField';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -19,6 +19,7 @@ export const BankAccounts: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
+  const [historyAccount, setHistoryAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -75,6 +76,30 @@ export const BankAccounts: React.FC = () => {
     if (!t) return null;
     const sinal = t.type === 'income' ? 1 : t.type === 'expense' ? -1 : (t.toAccountId === account.id ? 1 : -1);
     return { date: t.date, desc: t.description || (t.type === 'transfer' ? 'Transferência' : 'Lançamento'), value: sinal * (Number(t.amount) || 0) };
+  };
+
+  // Extrato de UMA conta: todos os lançamentos (não cancelados) que a afetam,
+  // com o sinal certo para ela, do mais recente para o mais antigo, e o saldo
+  // acumulado após cada movimento concluído (parte do saldo inicial).
+  const movimentosDe = (account: BankAccount) => {
+    const afetam = transactions
+      .filter(t => t.status !== 'cancelled' && (t.accountId === account.id || t.toAccountId === account.id))
+      .map(t => {
+        let value = 0;
+        if (t.type === 'income' && t.accountId === account.id) value = Number(t.amount) || 0;
+        else if (t.type === 'expense' && t.accountId === account.id) value = -(Number(t.amount) || 0);
+        else if (t.type === 'transfer') value = t.toAccountId === account.id ? (Number(t.amount) || 0) : -(Number(t.amount) || 0);
+        const entrada = t.toAccountId === account.id && t.type === 'transfer';
+        return { tx: t, value, entrada };
+      });
+    // Ordena crescente para somar o saldo acumulado, depois inverte para exibir.
+    const asc = [...afetam].sort((a, b) => parseLocalDate(a.tx.date).getTime() - parseLocalDate(b.tx.date).getTime());
+    let running = Number(account.initialBalance) || 0;
+    const comSaldo = asc.map(m => {
+      if (m.tx.status === 'completed') running = Math.round((running + m.value + Number.EPSILON) * 100) / 100;
+      return { ...m, saldo: m.tx.status === 'completed' ? running : null };
+    });
+    return comSaldo.reverse();
   };
 
   const summary = accounts.reduce((acc, curr) => {
@@ -263,6 +288,10 @@ export const BankAccounts: React.FC = () => {
           colunas={colunasContas}
           acoes={(a) => (
             <>
+              <button onClick={() => setHistoryAccount(a)} title="Ver extrato"
+                className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
+                <ReceiptText className="h-4 w-4" />
+              </button>
               <button onClick={() => handleEdit(a)} title="Editar"
                 className="rounded-lg p-2 text-content-subtle hover:bg-surface-muted hover:text-primary">
                 <Edit2 className="h-4 w-4" />
@@ -279,11 +308,13 @@ export const BankAccounts: React.FC = () => {
 
       {viewMode === 'grid' && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {accounts.map((account) => (
-          <motion.div 
+          <motion.div
             key={account.id}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="group relative overflow-hidden rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-xl hover:border-primary/20 transition-all"
+            onClick={() => setHistoryAccount(account)}
+            title="Ver extrato desta conta"
+            className="group relative cursor-pointer overflow-hidden rounded-3xl bg-surface p-6 shadow-sm border border-line hover:shadow-xl hover:border-primary/20 transition-all"
           >
             {/* Faixa com a cor do banco. A conta segue o tema (fundo claro ou
                 escuro), então a cor entra como acento — pintar o card inteiro
@@ -313,13 +344,13 @@ export const BankAccounts: React.FC = () => {
               </div>
               <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button
-                  onClick={() => handleEdit(account)}
+                  onClick={(e) => { e.stopPropagation(); handleEdit(account); }}
                   className="p-2 rounded-lg hover:bg-surface-muted text-content-subtle hover:text-primary transition-colors"
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
-                <button 
-                  onClick={() => handleDelete(account)}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(account); }}
                   className="p-2 rounded-lg hover:bg-rose-50 text-content-subtle hover:text-rose-600 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -353,6 +384,10 @@ export const BankAccounts: React.FC = () => {
                   </p>
                 );
               })()}
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-[11px] font-bold text-primary opacity-80">
+              <ReceiptText className="h-3 w-3" />
+              Ver extrato
             </div>
           </motion.div>
         ))}
@@ -476,6 +511,94 @@ export const BankAccounts: React.FC = () => {
           </motion.div>
         </div>
       )}
+
+      {/* Extrato individual da conta */}
+      {historyAccount && (() => {
+        const movs = movimentosDe(historyAccount);
+        const entradas = movs.filter(m => m.tx.status === 'completed' && m.value > 0).reduce((a, m) => a + m.value, 0);
+        const saidas = movs.filter(m => m.tx.status === 'completed' && m.value < 0).reduce((a, m) => a + m.value, 0);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setHistoryAccount(null)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={e => e.stopPropagation()}
+              className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-surface p-6 sm:p-8 shadow-2xl"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                    style={normalizeHex(historyAccount.color) ? { backgroundColor: normalizeHex(historyAccount.color)!, color: readableForeground(normalizeHex(historyAccount.color)!) } : undefined}>
+                    <Landmark className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-content">{historyAccount.bankName}</h3>
+                    <p className="text-sm text-content-subtle">Extrato · {getTypeLabel(historyAccount.type)}</p>
+                  </div>
+                </div>
+                <button onClick={() => setHistoryAccount(null)} className="rounded-full p-2 text-content-subtle hover:bg-surface-muted">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="mb-4 grid grid-cols-3 gap-3">
+                <div className="rounded-xl bg-surface-muted p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-content-subtle">Saldo atual</p>
+                  <p className={cn('text-lg font-black', getBalance(historyAccount) < 0 ? 'text-rose-600' : 'text-content')}>{brl(getBalance(historyAccount))}</p>
+                </div>
+                <div className="rounded-xl bg-surface-muted p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-content-subtle">Entradas</p>
+                  <p className="text-lg font-black text-emerald-600">{brl(entradas)}</p>
+                </div>
+                <div className="rounded-xl bg-surface-muted p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-content-subtle">Saídas</p>
+                  <p className="text-lg font-black text-rose-600">{brl(Math.abs(saidas))}</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-1">
+                {movs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-content-subtle">
+                    <ReceiptText className="mb-3 h-10 w-10 opacity-20" />
+                    <p>Nenhuma movimentação nesta conta ainda.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-line">
+                    {movs.map(({ tx, value, saldo }) => (
+                      <div key={tx.id} className="flex items-center justify-between gap-3 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-content">
+                            {tx.description || (tx.type === 'transfer' ? 'Transferência' : 'Lançamento')}
+                          </p>
+                          <p className="text-[11px] text-content-subtle">
+                            {tx.date.slice(8, 10)}/{tx.date.slice(5, 7)}/{tx.date.slice(0, 4)}
+                            {tx.type === 'transfer' ? ' · Transferência' : ''}
+                            {tx.status !== 'completed' && (
+                              <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-600">Pendente</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={cn('text-sm font-black', value < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                            {value < 0 ? '−' : '+'}{brl(Math.abs(value))}
+                          </p>
+                          {saldo !== null && (
+                            <p className="text-[10px] text-content-subtle">saldo {brl(saldo)}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button onClick={() => setHistoryAccount(null)} className="rounded-xl bg-surface-muted px-6 py-2 text-sm font-bold text-content-muted hover:bg-line">Fechar</button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
