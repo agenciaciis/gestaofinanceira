@@ -170,22 +170,52 @@ export const Transactions: React.FC = () => {
     if (!payingTx) return;
     if (!paySelAccount) { showToast('Escolha a conta de onde sai/entra o dinheiro.', 'error'); return; }
     const t = payingTx;
-    // Atualização otimista.
-    setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: 'completed', accountId: paySelAccount, paidAt: paySelDate } : x));
+    const destAcc = accounts.find(a => a.id === paySelAccount);
+    const destEntityId = destAcc?.entityId || t.entityId;
+    const mover = destEntityId !== t.entityId; // recebeu/pagou numa conta de OUTRA entidade
     setPayingTx(null);
+
+    if (!mover) {
+      // Mesma entidade: baixa na conta, no lugar (com atualização otimista).
+      setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: 'completed', accountId: paySelAccount, paidAt: paySelDate } : x));
+      try {
+        await updateDoc(doc(db, `entities/${t.entityId}/transactions/${t.id}`), {
+          status: 'completed', accountId: paySelAccount, paidAt: paySelDate, updatedAt: serverTimestamp(),
+        });
+        const verb = t.type === 'income' ? 'Recebido' : 'Pago';
+        showToast(`${t.description}: ${verb}. Baixa registrada na conta.`, 'success');
+      } catch (error) {
+        console.error('Erro ao registrar pagamento:', error);
+        setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: t.status, accountId: t.accountId, paidAt: t.paidAt } : x));
+        showToast('Erro ao registrar o pagamento.', 'error');
+      }
+      return;
+    }
+
+    // Outra entidade: MOVE o lançamento para a entidade que recebeu/pagou.
     try {
-      await updateDoc(doc(db, `entities/${t.entityId}/transactions/${t.id}`), {
-        status: 'completed',
+      const owner = entities.find(e => e.id === destEntityId);
+      const rest: Record<string, any> = { ...(t as any) };
+      delete rest.id;
+      const novo: Record<string, any> = {
+        ...rest,
+        entityId: destEntityId,
         accountId: paySelAccount,
+        status: 'completed',
         paidAt: paySelDate,
+        ownerUid: owner?.ownerUid,
+        collaboratorsEmails: owner?.collaboratorsEmails || [],
         updatedAt: serverTimestamp(),
-      });
-      const verb = t.type === 'income' ? 'Recebido' : 'Pago';
-      showToast(`${t.description}: ${verb}. Baixa registrada na conta.`, 'success');
+      };
+      // Firestore não aceita `undefined`: remove chaves vazias.
+      Object.keys(novo).forEach(k => novo[k] === undefined && delete novo[k]);
+      await addDoc(collection(db, `entities/${destEntityId}/transactions`), novo);
+      await deleteDoc(doc(db, `entities/${t.entityId}/transactions/${t.id}`));
+      const destName = owner?.name || 'outra entidade';
+      showToast(`${t.description}: movido para ${destName} e marcado como ${t.type === 'income' ? 'recebido' : 'pago'}.`, 'success');
     } catch (error) {
-      console.error('Erro ao registrar pagamento:', error);
-      setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: t.status, accountId: t.accountId, paidAt: t.paidAt } : x));
-      showToast('Erro ao registrar o pagamento.', 'error');
+      console.error('Erro ao mover lançamento:', error);
+      showToast('Erro ao mover o lançamento para a outra entidade.', 'error');
     }
   };
 
@@ -1985,10 +2015,30 @@ export const Transactions: React.FC = () => {
               className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-content"
             >
               <option value="">Selecione a conta...</option>
-              {accounts.filter(a => a.entityId === payingTx.entityId).map(a => (
-                <option key={a.id} value={a.id}>{a.bankName}</option>
-              ))}
+              {entities.map(en => {
+                const accs = accounts.filter(a => a.entityId === en.id);
+                if (accs.length === 0) return null;
+                return (
+                  <optgroup key={en.id} label={en.name}>
+                    {accs.map(a => (
+                      <option key={a.id} value={a.id}>{a.bankName}{en.id !== payingTx.entityId ? ` · ${en.name}` : ''}</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
             </select>
+            {(() => {
+              const destAcc = accounts.find(a => a.id === paySelAccount);
+              if (destAcc && destAcc.entityId !== payingTx.entityId) {
+                const destName = entities.find(e => e.id === destAcc.entityId)?.name || 'outra entidade';
+                return (
+                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
+                    Essa conta é da <strong>{destName}</strong>. Como o dinheiro entrou nela, este lançamento será <strong>movido para {destName}</strong>.
+                  </p>
+                );
+              }
+              return null;
+            })()}
 
             <label className="mt-4 block text-xs font-bold uppercase tracking-wider text-content-subtle">Data</label>
             <input
@@ -1998,8 +2048,8 @@ export const Transactions: React.FC = () => {
               className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-content"
             />
 
-            {accounts.filter(a => a.entityId === payingTx.entityId).length === 0 && (
-              <p className="mt-3 text-xs text-red-500">Nenhuma conta cadastrada para esta entidade. Cadastre uma em "Contas" primeiro.</p>
+            {accounts.length === 0 && (
+              <p className="mt-3 text-xs text-red-500">Nenhuma conta cadastrada. Cadastre uma em "Contas" primeiro.</p>
             )}
 
             <div className="mt-6 flex gap-3">
