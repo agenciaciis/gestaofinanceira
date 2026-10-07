@@ -12,7 +12,7 @@
  *   3. fatura de cartão aberta  (`computeCardInvoice`)
  */
 import { CreditCard, Debt, Transaction } from '../types';
-import { parseLocalDate, round2 } from './finance';
+import { computeCardInvoice, parseLocalDate, round2 } from './finance';
 
 export type DebtSource = 'installments' | 'loan' | 'card';
 
@@ -105,16 +105,7 @@ function fromCards(
   // (A fatura exibida no cartão continua usando computeCardInvoice normal.)
   const semParcelamento = transactions.filter(t => !t.installmentGroupId);
   for (const c of cards) {
-    // Divida do cartao: TODA compra nao parcelada ainda nao paga (settled),
-    // independente do ciclo de fatura. As parceladas entram pelo caminho
-    // de installments, por isso ficam de fora aqui (evita contar em dobro).
-    const invoice = round2(
-      semParcelamento.reduce((acc, t) => {
-        if (t.type !== 'expense' || t.cardId !== c.id) return acc;
-        if (t.status === 'cancelled' || t.settled || t.coveredByInvoiceId) return acc;
-        return acc + (Number(t.amount) || 0);
-      }, 0)
-    );
+    const invoice = computeCardInvoice(c.id, c.closingDay, semParcelamento, today);
     if (invoice <= 0) continue;
     const id = `card:${c.id}`;
     views.push({

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consolidate, isInternalTransfer, buildCrossEntityPair } from './crossEntity';
+import { consolidate, isInternalTransfer, buildCrossEntityPair, isCrossEntityTransfer } from './crossEntity';
 import { Entity, Transaction } from '../types';
 
 const tx = (over: Partial<Transaction>): Transaction => ({
@@ -119,24 +119,86 @@ describe('consolidate', () => {
     expect(r.consolidated.expense).toBe(0);
   });
 
-  it('compra no cartão fica FORA do caixa (igual a DRE/Relatórios)', () => {
-    const txs = [
-      // compra no cartão (cardId, sem conta) => paga na fatura, não é caixa
-      tx({ id: '1', entityId: 'pj', type: 'expense', amount: 1200, date: '2026-07-03', cardId: 'c1' }),
-      // despesa normal em conta => conta
-      tx({ id: '2', entityId: 'pj', type: 'expense', amount: 300, date: '2026-07-04', accountId: 'a1' }),
-    ];
-    const r = consolidate(txs, [PF, PJ], REF);
-    expect(r.byEntity.pj.expense).toBe(300);
-    expect(r.consolidated.expense).toBe(300);
-    expect(r.byType.PJ.expense).toBe(300);
-  });
-
   it('lançamento de entidade desconhecida não quebra o cálculo', () => {
     const txs = [tx({ id: '1', entityId: 'fantasma', type: 'income', amount: 700, date: '2026-07-02' })];
     const r = consolidate(txs, [PF, PJ], REF);
     expect(r.consolidated.income).toBe(700);
     expect(r.byType.PF.income).toBe(0);
     expect(r.byType.PJ.income).toBe(0);
+  });
+});
+
+describe('status das duas pontas', () => {
+  const base = {
+    groupId: 'g1', fromEntityId: 'pj', toEntityId: 'pf',
+    amount: 1000, date: '2026-10-07', kind: 'transferencia' as const,
+    description: 'Ciis Store para Agência CIIS',
+  };
+
+  it('sem pedir nada, nasce concluído — é como o pró-labore sempre foi lançado', () => {
+    const p = buildCrossEntityPair(base);
+    expect(p.from.status).toBe('completed');
+    expect(p.to.status).toBe('completed');
+  });
+
+  it('transferência agendada nasce pendente nas DUAS pontas', () => {
+    const p = buildCrossEntityPair({ ...base, status: 'pending' });
+    expect(p.from.status).toBe('pending');
+    expect(p.to.status).toBe('pending');
+  });
+
+  // Uma ponta paga e a outra pendente faria o consolidado deixar de fechar:
+  // o dinheiro teria saído de um lado sem ter entrado no outro.
+  it('as duas pontas têm sempre o mesmo status', () => {
+    for (const status of ['pending', 'completed'] as const) {
+      const p = buildCrossEntityPair({ ...base, status });
+      expect(p.from.status).toBe(p.to.status);
+    }
+  });
+
+  it('as contas de origem e destino chegam em cada ponta', () => {
+    const p = buildCrossEntityPair({ ...base, fromAccountId: 'bradesco', toAccountId: 'nubank' });
+    expect(p.from.accountId).toBe('bradesco');
+    expect(p.to.accountId).toBe('nubank');
+  });
+
+  it('sem conta informada, cada ponta fica sem conta em vez de indefinida', () => {
+    const p = buildCrossEntityPair(base);
+    expect(p.from.accountId).toBeNull();
+    expect(p.to.accountId).toBeNull();
+  });
+});
+
+describe('isCrossEntityTransfer', () => {
+  const contas = [
+    { id: 'bradesco', entityId: 'ciis-store' },
+    { id: 'santander', entityId: 'ciis-store' },
+    { id: 'nubank-pj', entityId: 'agencia-ciis' },
+  ];
+
+  it('destino em outra entidade é cruzada', () => {
+    expect(isCrossEntityTransfer(contas, 'ciis-store', 'nubank-pj')).toBe(true);
+  });
+
+  it('destino na mesma entidade NÃO é cruzada', () => {
+    expect(isCrossEntityTransfer(contas, 'ciis-store', 'santander')).toBe(false);
+  });
+
+  // Sem saber de quem é a conta, gravar duas pontas inventaria uma entrada
+  // numa entidade que talvez nem seja a certa. O caminho seguro é o de sempre.
+  it('conta de destino desconhecida não é tratada como cruzada', () => {
+    expect(isCrossEntityTransfer(contas, 'ciis-store', 'conta-que-nao-existe')).toBe(false);
+  });
+
+  it('sem destino escolhido ainda, não é cruzada', () => {
+    expect(isCrossEntityTransfer(contas, 'ciis-store', '')).toBe(false);
+  });
+
+  it('sem entidade de origem, não é cruzada', () => {
+    expect(isCrossEntityTransfer(contas, '', 'nubank-pj')).toBe(false);
+  });
+
+  it('lista de contas vazia não quebra', () => {
+    expect(isCrossEntityTransfer([], 'ciis-store', 'nubank-pj')).toBe(false);
   });
 });

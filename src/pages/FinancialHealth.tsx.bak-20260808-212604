@@ -178,13 +178,7 @@ export const FinancialHealth: React.FC = () => {
   const health = useMemo(() => {
     const monthlyIncome = averageMonthlyIncome(transactions, new Date(), 3);
     const monthlyExpense = averageMonthlyExpense(transactions, new Date(), 3);
-    // Comprometimento = so o que e PARCELA fixa recorrente (parcelamentos + emprestimos).
-    // A fatura do cartao paga integralmente no vencimento NAO e renda comprometida de longo
-    // prazo (ela ja entra no totalDebt/endividamento). Contar a fatura inteira aqui inflava
-    // o comprometimento para >100% so por usar o cartao normalmente.
-    const monthlyDebtPayment = debtViews
-      .filter(v => v.source !== 'card')
-      .reduce((a, v) => a + v.monthlyPayment, 0);
+    const monthlyDebtPayment = debtViews.reduce((a, v) => a + v.monthlyPayment, 0);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const overdueAmount = transactions
       .filter(t => t.type === 'expense' && t.status === 'pending' && parseLocalDate(t.date) < today)

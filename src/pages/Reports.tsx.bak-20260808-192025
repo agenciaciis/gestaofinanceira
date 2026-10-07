@@ -135,7 +135,7 @@ export const Reports: React.FC = () => {
     const realizedExpense = filteredData.filter(t => t.type === 'expense' && !isCardExpense(t) && t.status === 'completed' && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
     // "Projetado" = realizado + pendente (exclui cancelados).
     const projectedIncome = filteredData.filter(t => t.type === 'income' && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
-    const projectedExpense = filteredData.filter(t => t.type === 'expense' && (!isCardExpense(t) || (!t.settled && !t.coveredByInvoiceId)) && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
+    const projectedExpense = filteredData.filter(t => t.type === 'expense' && !isCardExpense(t) && isNotCancelled(t) && !t.crossEntityGroupId).reduce((acc, t) => acc + t.amount, 0);
     
     return { 
       income: realizedIncome, 

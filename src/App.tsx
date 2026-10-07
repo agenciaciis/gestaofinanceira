@@ -14,7 +14,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { UIProvider } from './contexts/UIContext';
 
 // Páginas carregadas sob demanda (code-splitting) para acelerar o carregamento inicial.
-const Inicio = lazy(() => import('./pages/Inicio').then(m => ({ default: m.Inicio })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const BankAccounts = lazy(() => import('./pages/BankAccounts').then(m => ({ default: m.BankAccounts })));
 const CreditCards = lazy(() => import('./pages/CreditCards').then(m => ({ default: m.CreditCards })));
@@ -26,13 +25,6 @@ const Clients = lazy(() => import('./pages/Clients').then(m => ({ default: m.Cli
 const Suppliers = lazy(() => import('./pages/Suppliers').then(m => ({ default: m.Suppliers })));
 const FinancialHealth = lazy(() => import('./pages/FinancialHealth').then(m => ({ default: m.FinancialHealth })));
 const Services = lazy(() => import('./pages/Services').then(m => ({ default: m.Services })));
-const Products = lazy(() => import('./pages/Products').then(m => ({ default: m.Products })));
-const Categorias = lazy(() => import('./pages/Categorias').then(m => ({ default: m.Categorias })));
-const Precificacao = lazy(() => import('./pages/Precificacao').then(m => ({ default: m.Precificacao })));
-const Estoque = lazy(() => import('./pages/Estoque').then(m => ({ default: m.Estoque })));
-const Vendas = lazy(() => import('./pages/Vendas').then(m => ({ default: m.Vendas })));
-const Pedidos = lazy(() => import('./pages/Pedidos').then(m => ({ default: m.Pedidos })));
-const PainelVendas = lazy(() => import('./pages/PainelVendas').then(m => ({ default: m.PainelVendas })));
 const Quotes = lazy(() => import('./pages/Quotes').then(m => ({ default: m.Quotes })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const Team = lazy(() => import('./pages/Team').then(m => ({ default: m.Team })));
@@ -48,7 +40,7 @@ console.log('App component rendering');
 const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedEntity, entities, loading: entityLoading } = useEntity();
-  const [currentPage, setCurrentPage] = useState<'inicio' | 'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'products' | 'categorias' | 'precificacao' | 'estoque' | 'vendas' | 'pedidos' | 'painel-vendas' | 'quotes' | 'team'>('inicio');
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'accounts' | 'cards' | 'transactions' | 'reports' | 'budgets' | 'goals' | 'clients' | 'suppliers' | 'health' | 'settings' | 'entities' | 'services' | 'quotes' | 'team'>('dashboard');
   const [showTimeout, setShowTimeout] = useState(false);
 
   useEffect(() => {
@@ -91,8 +83,7 @@ const AppContent: React.FC = () => {
   return (
     <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
       <Suspense fallback={<PageLoader />}>
-        {currentPage === 'inicio' ? <Inicio onNavigate={setCurrentPage} /> :
-         currentPage === 'dashboard' ? <Dashboard onNavigate={setCurrentPage} /> :
+        {currentPage === 'dashboard' ? <Dashboard onNavigate={setCurrentPage} /> :
          currentPage === 'accounts' ? <BankAccounts /> :
          currentPage === 'cards' ? <CreditCards /> :
          currentPage === 'transactions' ? <Transactions /> :
@@ -103,13 +94,6 @@ const AppContent: React.FC = () => {
          currentPage === 'suppliers' ? <Suppliers /> :
          currentPage === 'health' ? <FinancialHealth /> :
          currentPage === 'services' ? <Services /> :
-         currentPage === 'products' ? <Products /> :
-         currentPage === 'categorias' ? <Categorias /> :
-         currentPage === 'precificacao' ? <Precificacao /> :
-         currentPage === 'estoque' ? <Estoque /> :
-         currentPage === 'vendas' ? <Vendas /> :
-         currentPage === 'pedidos' ? <Pedidos /> :
-         currentPage === 'painel-vendas' ? <PainelVendas /> :
          currentPage === 'quotes' ? <Quotes /> :
          currentPage === 'team' ? <Team /> :
          currentPage === 'settings' ? <Settings /> :

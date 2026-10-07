@@ -24,7 +24,7 @@ const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 
 const SUBCOLLECTIONS = [
   'bank_accounts', 'credit_cards', 'transactions', 'debts',
-  'clients', 'suppliers', 'services', 'plans', 'products', 'quotes', 'config',
+  'clients', 'suppliers', 'services', 'plans', 'quotes', 'config',
 ];
 
 async function deleteSub(entityId: string, sub: string): Promise<number> {

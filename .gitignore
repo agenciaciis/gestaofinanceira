@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+dist.bak-*/
+logs/
+backups/
+data/
+
+# Credencial do Firebase Admin — NUNCA versionar (fica só no servidor)
+serviceAccount.json
+service-account.json

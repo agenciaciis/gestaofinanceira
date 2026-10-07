@@ -290,9 +290,7 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       .reduce((acc, t) => acc + t.amount, 0);
 
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
-    const cardDebt = transactions
-    .filter(t => isCardExpense(t) && !t.settled && !t.coveredByInvoiceId && isNotCancelled(t) && !t.crossEntityGroupId && filterFn(parseLocalDate(t.date), now))
-    .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const cardDebt = cards.reduce((acc, card) => acc + computeCardInvoice(card.id, card.closingDay, transactions, now), 0);
 
     // Mesma fonte de verdade da tela de Saúde Financeira: parcelamentos em
     // aberto + dívidas com juros + fatura de cartão. Os dois números batem.

@@ -10,7 +10,7 @@
  * pelas contas a pagar.
  */
 import { BankAccount, CreditCard, Transaction } from '../types';
-import { computeBalances, parseLocalDate, round2 } from './finance';
+import { computeBalances, computeCardInvoice, parseLocalDate, round2 } from './finance';
 
 /**
  * Categorias que oscilam mês a mês — é o que dá para "não gastar".
@@ -218,19 +218,12 @@ export function computeSpendable(input: SpendableInput): SpendableResult {
     billsDueThisMonth = round2(billsDueThisMonth + (Number(t.amount) || 0));
   }
 
-  // Faturas de cartao a pagar do mes: TODA compra no cartao ainda nao paga
-  // (nao liquidada) com data ate o fim do mes selecionado entra no "a pagar",
-  // independente do ciclo de fechamento. Consistente com Lancamentos e Dashboard.
-  let cardInvoices = 0;
-  for (const t of input.transactions) {
-    if (t.type !== 'expense' || !t.cardId) continue;
-    if (t.status === 'cancelled') continue;
-    if (t.settled || t.coveredByInvoiceId) continue;
-    const dCard = parseLocalDate(t.date);
-    if (Number.isNaN(dCard.getTime())) continue;
-    if (dCard > endOfMonth) continue;
-    cardInvoices = round2(cardInvoices + (Number(t.amount) || 0));
-  }
+  const cardInvoices = round2(
+    input.cards.reduce(
+      (acc, c) => acc + computeCardInvoice(c.id, c.closingDay, input.transactions, today),
+      0
+    )
+  );
 
   // Parcela já paga neste mês não é reservada de novo: o valor já saiu do saldo.
   const loanPayments = round2(

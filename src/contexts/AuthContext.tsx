@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser, signInWithEmailAndPassword, createUserWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential, updatePassword, signInWithCustomToken } from 'firebase/auth';
+import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser, signInWithEmailAndPassword, createUserWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { User } from '../types';
@@ -24,22 +24,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Login unico vindo do Gestor CIIS: o token chega em ?sso= na URL.
-  // Roda antes do onAuthStateChanged para a sessao ja existir quando ele
-  // disparar. A URL e limpa ANTES da chamada de rede, para o token nao ficar
-  // no historico nem vazar pelo cabecalho Referer.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('sso');
-    if (!token) return;
-
-    window.history.replaceState(null, '', window.location.pathname);
-
-    signInWithCustomToken(auth, token).catch((err) => {
-      console.error('SSO: falha ao entrar com custom token', err?.code);
-    });
-  }, []);
 
   useEffect(() => {
     console.log('AuthContext: Initializing onAuthStateChanged');

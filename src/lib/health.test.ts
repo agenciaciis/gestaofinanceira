@@ -65,6 +65,15 @@ describe('computeHealthScore', () => {
     }
   });
 
+  it('sem despesa lancada nao da reserva cheia (nota neutra)', () => {
+    // Antes: expense=0 com saldo positivo dava 25/25 (premiava falta de dado).
+    // Agora: sem despesa a reserva fica neutra (nem cheia, nem zero).
+    const semDespesa = computeHealthScore({ ...base, monthlyExpense: 0, balance: 50000 });
+    const r = semDespesa.parts.find(p => p.key === 'reserva')!;
+    expect(r.points).toBeLessThan(r.max);
+    expect(r.points).toBeGreaterThan(0);
+  });
+
   it('saldo negativo não vira reserva positiva', () => {
     const r = computeHealthScore({ ...base, balance: -10000 });
     expect(r.parts.find(p => p.key === 'reserva')!.points).toBe(0);

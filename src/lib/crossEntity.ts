@@ -48,6 +48,13 @@ export interface CrossEntityPairInput {
   description: string;
   fromAccountId?: string | null;
   toAccountId?: string | null;
+  /**
+   * Pró-labore e distribuição são lançados depois de acontecer, então o
+   * padrão é `completed`. Já uma transferência pode ser agendada: nesse caso
+   * quem chama manda `pending`, e as DUAS pontas nascem pendentes — nunca
+   * uma de cada jeito, senão o consolidado deixa de fechar.
+   */
+  status?: 'pending' | 'completed';
 }
 
 export interface CrossEntityPair {
@@ -72,7 +79,7 @@ export function buildCrossEntityPair(input: CrossEntityPairInput): CrossEntityPa
   const shared = {
     amount,
     date: input.date,
-    status: 'completed' as const,
+    status: input.status ?? ('completed' as const),
     categoryId: 'transferencia',
     crossEntityGroupId: input.groupId,
     crossEntityKind: input.kind,
@@ -97,6 +104,34 @@ export function buildCrossEntityPair(input: CrossEntityPairInput): CrossEntityPa
       accountId: input.toAccountId ?? null,
     },
   };
+}
+
+/**
+ * A transferência atravessa entidades?
+ *
+ * Errar isto custa dinheiro nos dois sentidos. Dizendo "não" quando é cruzada,
+ * grava-se um registro só e a entrada nunca aparece na outra entidade. Dizendo
+ * "sim" quando não é, nascem duas pontas para dinheiro que ficou no mesmo
+ * bolso, e o consolidado passa a se anular sozinho.
+ *
+ * Conta de destino desconhecida devolve `false`: sem saber de quem ela é, o
+ * caminho seguro é o de sempre, que grava na entidade escolhida.
+ */
+export function isCrossEntityTransfer(
+  contas: Array<Pick<BankAccountRef, 'id' | 'entityId'>>,
+  entidadeOrigemId: string,
+  contaDestinoId: string,
+): boolean {
+  if (!entidadeOrigemId || !contaDestinoId) return false;
+  const destino = contas.find(c => c.id === contaDestinoId);
+  if (!destino) return false;
+  return destino.entityId !== entidadeOrigemId;
+}
+
+/** Só o que esta função precisa saber de uma conta bancária. */
+interface BankAccountRef {
+  id: string;
+  entityId: string;
 }
 
 const emptyTotals = (): EntityTotals => ({ income: 0, expense: 0, net: 0 });

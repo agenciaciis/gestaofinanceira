@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useEntity, FilterType } from '../contexts/EntityContext';
 import { 
   LayoutDashboard, 
-  Home, 
   CreditCard, 
   ArrowUpCircle, 
   ArrowDownCircle, 
@@ -26,12 +25,6 @@ import {
   Sun,
   Moon,
   Package,
-  Box,
-  Boxes,
-  ShoppingCart,
-  Tags,
-  Calculator,
-  ClipboardList,
   FileText,
   PiggyBank,
   ChevronLeft,
@@ -233,14 +226,10 @@ export const Layout: React.FC<{
 
           <nav className="flex-1 space-y-1 overflow-y-auto">
             <NavGroup label="Visão" collapsed={isCollapsed} />
-            <NavItem icon={Home} label="Início" collapsed={isCollapsed}
-              active={currentPage === 'inicio'} onClick={() => onNavigate('inicio')} />
             <NavItem icon={LayoutDashboard} label="Dashboard" collapsed={isCollapsed}
               active={currentPage === 'dashboard'} onClick={() => onNavigate('dashboard')} />
             <NavItem icon={PieChart} label="Relatórios" collapsed={isCollapsed}
               active={currentPage === 'reports'} onClick={() => onNavigate('reports')} />
-            <NavItem icon={ShoppingCart} label="Painel de Vendas" collapsed={isCollapsed}
-              active={currentPage === 'painel-vendas'} onClick={() => onNavigate('painel-vendas')} />
 
             <NavGroup label="Dia a dia" collapsed={isCollapsed} />
             <NavItem icon={ArrowUpCircle} label="Lançamentos" collapsed={isCollapsed}
@@ -263,18 +252,6 @@ export const Layout: React.FC<{
               active={currentPage === 'clients'} onClick={() => onNavigate('clients')} />
             <NavItem icon={Package} label="Serviços" collapsed={isCollapsed}
               active={currentPage === 'services'} onClick={() => onNavigate('services')} />
-            <NavItem icon={Box} label="Produtos" collapsed={isCollapsed}
-              active={currentPage === 'products'} onClick={() => onNavigate('products')} />
-            <NavItem icon={Tags} label="Categorias" collapsed={isCollapsed}
-              active={currentPage === 'categorias'} onClick={() => onNavigate('categorias')} />
-            <NavItem icon={Calculator} label="Precificação" collapsed={isCollapsed}
-              active={currentPage === 'precificacao'} onClick={() => onNavigate('precificacao')} />
-            <NavItem icon={Boxes} label="Estoque" collapsed={isCollapsed}
-              active={currentPage === 'estoque'} onClick={() => onNavigate('estoque')} />
-            <NavItem icon={ShoppingCart} label="Vendas" collapsed={isCollapsed}
-              active={currentPage === 'vendas'} onClick={() => onNavigate('vendas')} />
-            <NavItem icon={ClipboardList} label="Pedidos" collapsed={isCollapsed}
-              active={currentPage === 'pedidos'} onClick={() => onNavigate('pedidos')} />
             <NavItem icon={FileText} label="Orçamentos" collapsed={isCollapsed}
               active={currentPage === 'quotes'} onClick={() => onNavigate('quotes')} />
             <NavItem icon={Truck} label="Fornecedores" collapsed={isCollapsed}
@@ -344,18 +321,11 @@ export const Layout: React.FC<{
                currentPage === 'accounts' ? 'Contas Bancárias' : 
                currentPage === 'cards' ? 'Cartões de Crédito' :
                currentPage === 'transactions' ? 'Lançamentos' : 
-               currentPage === 'reports' ? 'Relatórios' :
-               currentPage === 'painel-vendas' ? 'Painel de Vendas' : 
+               currentPage === 'reports' ? 'Relatórios' : 
                currentPage === 'budgets' ? 'Metas Financeiras' :
                currentPage === 'goals' ? 'Caixinhas & Objetivos' :
                currentPage === 'clients' ? 'Gestão de Clientes' :
                currentPage === 'services' ? 'Serviços e Planos' :
-               currentPage === 'products' ? 'Produtos' :
-               currentPage === 'categorias' ? 'Categorias' :
-               currentPage === 'precificacao' ? 'Precificação' :
-               currentPage === 'estoque' ? 'Estoque' :
-               currentPage === 'vendas' ? 'Vendas' :
-               currentPage === 'pedidos' ? 'Pedidos' :
                currentPage === 'quotes' ? 'Orçamentos' :
                currentPage === 'suppliers' ? 'Fornecedores e Locais' :
                currentPage === 'health' ? 'Saúde Financeira' :

@@ -20,7 +20,6 @@ import { splitInstallments, parseLocalDate, totalBalance, isCardExpense, compute
 import { planRecurringRenewals } from '../lib/recurring';
 import { tagsDocPath, readTags, parseTags, mergeTags, matchesAllTags } from '../lib/tags';
 import { readGoals, goalsDocPath } from '../lib/goalStore';
-import { buildCrossEntityPair, isCrossEntityTransfer } from '../lib/crossEntity';
 
 const PAYMENT_TYPES: { id: NonNullable<Transaction['paymentType']>; label: string }[] = [
   { id: 'pix', label: 'PIX' },
@@ -61,15 +60,6 @@ export const Transactions: React.FC = () => {
   const [accountId, setAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
   const [cardId, setCardId] = useState('');
-
-  // Uma transferência pode sair da entidade escolhida e cair em outra
-  // (Ciis Store -> Agência CIIS). Quando isso acontece, o lançamento deixa de
-  // ser um registro só e vira um PAR: saída numa entidade, entrada na outra,
-  // ligadas por um grupo para se anularem no consolidado.
-  const contaDestino = accounts.find(a => a.id === toAccountId);
-  const destinoEmOutraEntidade = isCrossEntityTransfer(accounts, targetEntityId, toAccountId);
-  const nomeDaEntidade = (id?: string | null) =>
-    entities.find(en => en.id === id)?.name || 'outra entidade';
   const [paymentType, setPaymentType] = useState<'' | NonNullable<Transaction['paymentType']>>('');
   const [personalExpense, setPersonalExpense] = useState(false);
   const [clientId, setClientId] = useState('');
@@ -99,11 +89,6 @@ export const Transactions: React.FC = () => {
   const [payingTx, setPayingTx] = useState<Transaction | null>(null);
   const [paySelAccount, setPaySelAccount] = useState('');
   const [paySelDate, setPaySelDate] = useState('');
-  const [payingCardTx, setPayingCardTx] = useState<Transaction | null>(null);
-  const [cardPayAccountId, setCardPayAccountId] = useState('');
-  const [cardPayAmount, setCardPayAmount] = useState('');
-  const [cardPayDate, setCardPayDate] = useState('');
-  const [cardPaySaving, setCardPaySaving] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -186,56 +171,6 @@ export const Transactions: React.FC = () => {
       console.error('Erro ao registrar pagamento:', error);
       setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, status: t.status, accountId: t.accountId, paidAt: t.paidAt } : x));
       showToast('Erro ao registrar o pagamento.', 'error');
-    }
-  };
-
-  const openCardInvoicePay = (t: Transaction) => {
-    const accs = accounts.filter(a => a.entityId === t.entityId);
-    setPayingCardTx(t);
-    setCardPayAmount(Number(t.amount) > 0 ? Number(t.amount).toFixed(2) : '');
-    setCardPayDate(new Date().toISOString().split('T')[0]);
-    setCardPayAccountId(t.accountId || accs[0]?.id || '');
-  };
-
-  const confirmCardInvoicePay = async () => {
-    if (!payingCardTx) return;
-    if (!cardPayAccountId) { showToast('Escolha a conta de onde sai o pagamento.', 'error'); return; }
-    const amount = Number(cardPayAmount) || 0;
-    if (amount <= 0) { showToast('Informe um valor de pagamento.', 'error'); return; }
-    if (cardPaySaving) return;
-    setCardPaySaving(true);
-    const t = payingCardTx;
-    const ent = entities.find(e => e.id === t.entityId);
-    const card = cards.find(c => c.id === t.cardId);
-    try {
-      const batch = writeBatch(db);
-      const newTxRef = doc(collection(db, `entities/${t.entityId}/transactions`));
-      batch.set(newTxRef, {
-        description: `Pagamento fatura ${card?.name || t.description}`,
-        amount,
-        type: 'transfer',
-        status: 'completed',
-        date: cardPayDate,
-        accountId: cardPayAccountId,
-        categoryId: 'cartao',
-        cardPaymentFor: t.cardId || '',
-        entityId: t.entityId,
-        ownerUid: ent?.ownerUid,
-        collaboratorsEmails: ent?.collaboratorsEmails || [],
-        createdAt: serverTimestamp(),
-      });
-      const isFullPayment = amount >= (Number(t.amount) || 0) - 0.005;
-      if (isFullPayment) {
-        batch.update(doc(db, `entities/${t.entityId}/transactions/${t.id}`), { settled: true, settledAt: cardPayDate });
-      }
-      await batch.commit();
-      showToast(isFullPayment ? 'Fatura paga! Saldo do banco atualizado e limite liberado.' : 'Pagamento parcial registrado; o limite não foi liberado.', isFullPayment ? 'success' : 'info');
-      setPayingCardTx(null);
-    } catch (error) {
-      console.error('Erro ao pagar fatura:', error);
-      showToast('Erro ao registrar o pagamento da fatura.', 'error');
-    } finally {
-      setCardPaySaving(false);
     }
   };
 
@@ -781,41 +716,8 @@ export const Transactions: React.FC = () => {
           isRecurring,
           recurringPeriod: isRecurring ? recurringPeriod : null,
         });
-      } else if (type === 'transfer' && destinoEmOutraEntidade) {
-        // Transferência que atravessa entidades: UM registro só não serve.
-        // Precisa de saída numa e entrada na outra, ligadas pelo mesmo grupo,
-        // senão o consolidado soma o dinheiro duas vezes — como se a empresa
-        // tivesse gasto e a pessoa tivesse ganhado dinheiro novo.
-        const par = buildCrossEntityPair({
-          groupId: crypto.randomUUID(),
-          fromEntityId: targetEntityId,
-          toEntityId: contaDestino!.entityId,
-          amount: Number(amount),
-          date,
-          kind: 'transferencia',
-          description: `Transferência: ${description || 'Sem descrição'}`,
-          fromAccountId: accountId || null,
-          toAccountId: toAccountId || null,
-          status: jaEfetivado ? 'completed' : 'pending',
-        });
-
-        // Em lote: as duas pontas nascem juntas ou nenhuma nasce. Gravar uma
-        // de cada vez deixaria dinheiro saindo sem chegar se a segunda falhar.
-        const lote = writeBatch(db);
-        for (const ponta of [par.from, par.to]) {
-          const ent = entities.find(e => e.id === ponta.entityId);
-          const ref = doc(collection(db, `entities/${ponta.entityId}/transactions`));
-          lote.set(ref, {
-            ...ponta,
-            paymentType: paymentType || 'transferencia',
-            ownerUid: ent?.ownerUid,
-            collaboratorsEmails: ent?.collaboratorsEmails || [],
-            createdAt: serverTimestamp(),
-          });
-        }
-        await lote.commit();
       } else if (type === 'transfer') {
-        // Transferência entre contas da MESMA entidade: um registro basta.
+        // Create transfer record
         await addDoc(collection(db, `entities/${targetEntityId}/transactions`), {
           description: `Transferência: ${description || 'Sem descrição'}`,
           amount: Number(amount),
@@ -1345,16 +1247,6 @@ export const Transactions: React.FC = () => {
                             </button>
                           )
                         )}
-                        {isCardExpense(t) && !t.settled && t.status !== 'cancelled' && (
-                          <button
-                            onClick={() => openCardInvoicePay(t)}
-                            title="Pagar esta fatura (escolher conta)"
-                            className="flex min-w-[7rem] items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600 active:scale-95"
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Pagar fatura
-                          </button>
-                        )}
                         <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleEdit(t)}
@@ -1587,35 +1479,10 @@ export const Transactions: React.FC = () => {
                       required
                     >
                       <option value="">Selecione...</option>
-                      {/* A conta desta entidade primeiro, sem rótulo de grupo:
-                          é o caso de todo dia e não precisa de cerimônia. */}
                       {accounts.filter(a => a.entityId === targetEntityId && a.id !== accountId).map(a => (
                         <option key={a.id} value={a.id}>{a.bankName}</option>
                       ))}
-                      {/* Contas das OUTRAS entidades, cada uma no seu grupo.
-                          Sem isto não havia como mover dinheiro de Ciis Store
-                          para Agência CIIS: o destino só via a própria entidade. */}
-                      {entities
-                        .filter(en => en.id !== targetEntityId)
-                        .map(en => {
-                          const contas = accounts.filter(a => a.entityId === en.id);
-                          if (!contas.length) return null;
-                          return (
-                            <optgroup key={en.id} label={en.name}>
-                              {contas.map(a => (
-                                <option key={a.id} value={a.id}>{a.bankName}</option>
-                              ))}
-                            </optgroup>
-                          );
-                        })}
                     </select>
-                    {destinoEmOutraEntidade && (
-                      <p className="mt-1.5 text-xs text-indigo-600 dark:text-indigo-400">
-                        Vai para <b>{nomeDaEntidade(contaDestino?.entityId)}</b>. O sistema
-                        registra a saída e a entrada juntas, e elas se anulam no consolidado —
-                        o dinheiro mudou de bolso, não entrou dinheiro novo.
-                      </p>
-                    )}
                   </div>
                 </div>
               ) : (
@@ -2011,47 +1878,6 @@ export const Transactions: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-      {payingCardTx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm" onClick={() => setPayingCardTx(null)}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            onClick={e => e.stopPropagation()}
-            className="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl"
-          >
-            <button type="button" aria-label="Fechar" onClick={() => setPayingCardTx(null)} className="absolute right-4 top-4 rounded-xl p-2 text-content-subtle hover:bg-surface-muted hover:text-content">
-              <X className="h-5 w-5" />
-            </button>
-            <h3 className="text-xl font-bold text-content pr-10">Pagar fatura — {payingCardTx.description}</h3>
-            <p className="mt-2 text-sm text-content-subtle">Registra a saida do dinheiro da conta (quitacao da fatura) e libera o limite do cartao.</p>
-            <div className="mt-6 space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-content-subtle">Pagar com a conta</label>
-                <select value={cardPayAccountId} onChange={e => setCardPayAccountId(e.target.value)} className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm">
-                  <option value="">Selecione...</option>
-                  {accounts.filter(a => a.entityId === payingCardTx.entityId).map(a => (
-                    <option key={a.id} value={a.id}>{a.bankName}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-content-subtle">Valor</label>
-                  <input type="text" value={cardPayAmount} onChange={e => setCardPayAmount(e.target.value.replace(',', '.'))} className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-content-subtle">Data</label>
-                  <input type="date" value={cardPayDate} onChange={e => setCardPayDate(e.target.value)} className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm" />
-                </div>
-              </div>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setPayingCardTx(null)} className="flex-1 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-content-subtle hover:bg-surface-muted">Cancelar</button>
-              <button onClick={confirmCardInvoicePay} disabled={cardPaySaving} className="flex-1 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-50">Confirmar pagamento</button>
-            </div>
-          </motion.div>
         </div>
       )}
       <ImportTransactionsModal

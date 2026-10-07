@@ -76,13 +76,7 @@ export function computeHealthScore(input: HealthInput): HealthScore {
   };
 
   // 2. Reserva (25): quantos meses de despesa o saldo cobre. 6 meses = cheio.
-  // Sem despesa lancada nao da para medir quantos meses o saldo cobre. Antes isso
-  // dava nota CHEIA (6 meses), premiando a falta de dado. Agora, sem despesa, a nota
-  // fica NEUTRA (meia reserva) ate o usuario registrar gastos reais.
-  const canMeasureReserve = expense > 0;
-  const monthsCovered = canMeasureReserve
-    ? Math.max(0, balance) / expense
-    : (balance > 0 ? 3 : 0);
+  const monthsCovered = expense > 0 ? Math.max(0, balance) / expense : (balance > 0 ? 6 : 0);
   const reserva: HealthPart = {
     key: 'reserva',
     label: 'Reserva de emergência',
@@ -90,7 +84,7 @@ export function computeHealthScore(input: HealthInput): HealthScore {
     max: 25,
     detail: expense > 0
       ? `Seu saldo cobre ${monthsCovered.toFixed(1)} ${monthsCovered === 1 ? 'mês' : 'meses'} de despesa`
-      : 'Sem despesa lancada: nota neutra ate voce registrar gastos reais',
+      : 'Sem despesas registradas para medir',
   };
 
   // 3. Endividamento (25): dívida total contra uma renda anual.

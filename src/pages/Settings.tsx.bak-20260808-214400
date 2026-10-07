@@ -6,7 +6,7 @@ import { User, Shield, Bell, Database, LogOut, ChevronRight, Mail, Calendar, Mes
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, getDocs, doc, getDoc, writeBatch, Timestamp, deleteDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db } from '../firebase';
 import { BACKUP_VERSION, BACKUP_SUBCOLLECTIONS, encodeTimestamps, decodeTimestamps, validateBackup, countBackupItems, backupFilename, type Backup } from '../lib/backup';
 
 export const Settings: React.FC = () => {
@@ -119,7 +119,7 @@ export const Settings: React.FC = () => {
     if (activeTab !== 'integrations' || !user) return;
     (async () => {
       try {
-        const token = await auth.currentUser!.getIdToken();
+        const token = await user.getIdToken();
         const r = await fetch('/api/admin/integrations', { headers: { Authorization: `Bearer ${token}` } });
         if (r.ok) setIntStatus(await r.json());
       } catch { /* servidor fora do ar (dev): a tela ainda funciona no deploy */ }
@@ -135,7 +135,7 @@ export const Settings: React.FC = () => {
     if (Object.keys(body).length === 0) { showToast('Preencha ao menos uma chave para salvar.', 'error'); return; }
     setIntSaving(true);
     try {
-      const token = await auth.currentUser!.getIdToken();
+      const token = await user.getIdToken();
       const r = await fetch('/api/admin/integrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -280,11 +280,9 @@ export const Settings: React.FC = () => {
     setTgLoading(true);
     setTgUnavailable(false);
     try {
-      const token = await auth.currentUser!.getIdToken();
+      const token = await user.getIdToken();
       const res = await fetch('/api/telegram/link-code', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      // Parse defensivo: um corpo vazio/nao-JSON nao pode mascarar o status HTTP real
-      // (ex.: 503 quando o TELEGRAM_BOT_TOKEN nao esta configurado no servidor).
-      const data = await res.json().catch(() => ({} as any));
+      const data = await res.json();
       if (!res.ok) {
         // 503 = servidor no ar, mas o bot ainda nao foi configurado (sem TELEGRAM_BOT_TOKEN).
         if (res.status === 503) {
@@ -298,8 +296,7 @@ export const Settings: React.FC = () => {
       setTgCode(data.code || null);
       setTgLink(data.deepLink || null);
       if (!data.deepLink) showToast(`Abra o seu bot no Telegram e envie: /start ${data.code}`, 'info');
-    } catch (err) {
-      console.error('[connectTelegram] falhou:', err);
+    } catch {
       showToast('Não consegui falar com o servidor. Verifique sua conexão e tente de novo.', 'error');
     } finally {
       setTgLoading(false);

@@ -72,8 +72,6 @@ export interface CreditCard {
   entityId: string;
   /** Cor da marca (hex). Sem valor = visual escuro padrão. */
   color?: string;
-  /** Uso manual/saldo inicial de limite ja comprometido fora do sistema (R$). Some ao utilizado calculado. */
-  manualUsage?: number;
 }
 
 export interface Transaction {

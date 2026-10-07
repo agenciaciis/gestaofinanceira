@@ -59,12 +59,12 @@ describe('Relatório — a compra de cartão fica fora do caixa', () => {
     expect(verticalAnalysis(pt.receita, pt.receita)).toBe(100);
   });
 
-  it('Orçamento (budgetProgress): gasto de moradia = 1650; cartão não conta no orçado×realizado', () => {
+  it('Orçamento (budgetProgress): moradia = 1650; compra no cartão CONTA no orçamento da categoria', () => {
     const linhas = budgetProgress({ moradia: 2000, servicos: 500 }, txs, REF);
     const moradia = linhas.find(l => l.categoryId === 'moradia');
     const servicos = linhas.find(l => l.categoryId === 'servicos');
     expect(moradia?.spent).toBe(1650);
-    expect(servicos?.spent).toBe(0); // a compra de cartão em 'servicos' NÃO entra
+    expect(servicos?.spent).toBe(2142.2); // a compra de cartao em 'servicos' AGORA conta no orcamento (compromisso da categoria)
   });
 
   it('Sanidade: se a compra fosse de CONTA (não cartão), a despesa subiria para 3792,20', () => {
