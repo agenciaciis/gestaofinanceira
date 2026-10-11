@@ -37,9 +37,20 @@ export async function loadServerSecrets(db: FirebaseFirestore.Firestore | null):
     if (snap.exists) {
       applyToEnv(snap.data() || {});
       console.log('Integrações: segredos carregados do Firestore.');
+    } else {
+      console.log(`Integrações: nada configurado ainda (${DOC_PATH} não existe).`);
     }
   } catch (e: any) {
-    console.warn('Integrações: não consegui carregar do Firestore:', e?.message);
+    // NOT_FOUND não é falha: é a coleção ainda nem existir, o que acontece
+    // enquanto ninguém configurou integração nenhuma. Tratar isso como erro
+    // enche o log de alarme falso — e alarme falso é o que faz ninguém olhar
+    // o log no dia em que o problema é de verdade.
+    const naoExiste = e?.code === 5 || /NOT_FOUND/i.test(String(e?.message || ''));
+    if (naoExiste) {
+      console.log(`Integrações: nada configurado ainda (${DOC_PATH} não existe).`);
+    } else {
+      console.warn('Integrações: não consegui carregar do Firestore:', e?.message);
+    }
   }
 }
 
