@@ -14,14 +14,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
+//
+// O `projectId` sozinho NÃO autentica. Sem credencial, o SDK procura a
+// "application default credential" do Google, que não existe nesta VPS, e
+// toda leitura feita pelo servidor falha com "Could not load the default
+// credentials". O sintoma era silencioso: ia para o log e para mais lugar
+// nenhum, então os segredos das Integrações nunca chegavam a carregar.
+//
+// A credencial já estava no servidor (`serviceAccount.json`, fora do git).
+// Só não estava sendo usada.
 try {
+  const contaDeServico = path.join(process.cwd(), 'serviceAccount.json');
   const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  if (fs.existsSync(configPath)) {
+
+  if (fs.existsSync(contaDeServico)) {
+    const cred = JSON.parse(fs.readFileSync(contaDeServico, 'utf8'));
+    admin.initializeApp({
+      credential: admin.credential.cert(cred),
+      projectId: cred.project_id,
+    });
+    console.log('Firebase Admin autenticado com a conta de serviço.');
+  } else if (fs.existsSync(configPath)) {
     const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     admin.initializeApp({
       projectId: firebaseConfig.projectId,
     });
-    console.log('Firebase Admin initialized successfully from file');
+    // Aviso em vez de "successfully": sem credencial isto NÃO funciona para
+    // ler nada, e dizer que deu certo foi o que escondeu o problema até agora.
+    console.warn(
+      'Firebase Admin iniciado SEM credencial (só projectId): leituras do ' +
+      'servidor vão falhar. Ponha o serviceAccount.json na raiz do projeto.',
+    );
   } else if (process.env.FIREBASE_PROJECT_ID) {
     admin.initializeApp({
       projectId: process.env.FIREBASE_PROJECT_ID,
