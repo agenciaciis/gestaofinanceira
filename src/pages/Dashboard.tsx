@@ -302,6 +302,8 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       .filter(t => t.status === 'pending' && !isCardExpense(t) && !t.crossEntityGroupId && isBefore(parseLocalDate(t.date), inicioDeHoje))
       .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
     const overdue = overdueTxs.reduce((acc, t) => acc + t.amount, 0);
+    const overdueReceber = round2(overdueTxs.filter(t => t.type === 'income').reduce((a, t) => a + (Number(t.amount) || 0), 0));
+    const overduePagar = round2(overdueTxs.filter(t => t.type === 'expense').reduce((a, t) => a + (Number(t.amount) || 0), 0));
 
     // Dívida de cartão = soma das faturas EM ABERTO (ciclo atual), não o histórico inteiro.
     const cardDebt = transactions
@@ -345,6 +347,8 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       pendingExpense,
       overdue,
       overdueList: overdueTxs,
+      overdueReceber,
+      overduePagar,
       cardDebt,
       totalOpenDebts,
       totalEstimatedInterest,
@@ -857,14 +861,28 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-content">Contas vencidas</h3>
-                  <p className="text-sm text-content-subtle">
-                    {stats.overdueList.length} em aberto · total {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.overdue)}
-                  </p>
+                  <p className="text-sm text-content-subtle">{stats.overdueList.length} em atraso</p>
                 </div>
               </div>
               <button onClick={() => setOverdueOpen(false)} className="rounded-full p-2 text-content-subtle hover:bg-surface-muted">
                 <X className="h-6 w-6" />
               </button>
+            </div>
+
+            {/* Totais separados: a receber atrasado × a pagar atrasado × total */}
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <div className="rounded-xl bg-emerald-50 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-emerald-700">A receber atrasado</p>
+                <p className="text-lg font-black text-emerald-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.overdueReceber)}</p>
+              </div>
+              <div className="rounded-xl bg-rose-50 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-rose-700">A pagar atrasado</p>
+                <p className="text-lg font-black text-rose-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.overduePagar)}</p>
+              </div>
+              <div className="rounded-xl bg-surface-muted p-3">
+                <p className="text-[10px] uppercase tracking-wider text-content-subtle">Total em atraso</p>
+                <p className="text-lg font-black text-content">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.overdue)}</p>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-1">
