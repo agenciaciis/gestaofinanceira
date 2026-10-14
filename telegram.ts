@@ -234,7 +234,9 @@ export function registerTelegramRoutes(app: Express, firebaseAdmin: typeof admin
 
   // Agendador in-process: às 08:00 (São Paulo) dispara os alertas do dia;
   // na segunda inclui o resumo semanal. Guarda a última data para não repetir.
-  if (db && hasToken()) {
+  // Em cluster (PM2), roda SÓ na instância primária (0) para não mandar em dobro.
+  const isPrimaryInstance = !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === '0';
+  if (db && hasToken() && isPrimaryInstance) {
     // Auto-registra o webhook no Telegram (sem isso, nada chega ao servidor).
     setTelegramWebhook().then(r => {
       if (r.ok) console.log(`Telegram: webhook registrado em ${process.env.APP_URL}/api/telegram/webhook`);
