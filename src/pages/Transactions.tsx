@@ -235,11 +235,15 @@ export const Transactions: React.FC = () => {
     if (cardPaySaving) return;
     setCardPaySaving(true);
     const t = payingCardTx;
-    const ent = entities.find(e => e.id === t.entityId);
     const card = cards.find(c => c.id === t.cardId);
+    // A saída (quitação) é registrada na entidade da CONTA escolhida — assim o
+    // pagamento pode sair de um banco de outra entidade, e o saldo cai no lugar certo.
+    const destAcc = accounts.find(a => a.id === cardPayAccountId);
+    const destEntityId = destAcc?.entityId || t.entityId;
+    const destOwner = entities.find(e => e.id === destEntityId);
     try {
       const batch = writeBatch(db);
-      const newTxRef = doc(collection(db, `entities/${t.entityId}/transactions`));
+      const newTxRef = doc(collection(db, `entities/${destEntityId}/transactions`));
       batch.set(newTxRef, {
         description: `Pagamento fatura ${card?.name || t.description}`,
         amount,
@@ -249,9 +253,9 @@ export const Transactions: React.FC = () => {
         accountId: cardPayAccountId,
         categoryId: 'cartao',
         cardPaymentFor: t.cardId || '',
-        entityId: t.entityId,
-        ownerUid: ent?.ownerUid,
-        collaboratorsEmails: ent?.collaboratorsEmails || [],
+        entityId: destEntityId,
+        ownerUid: destOwner?.ownerUid,
+        collaboratorsEmails: destOwner?.collaboratorsEmails || [],
         createdAt: serverTimestamp(),
       });
       const isFullPayment = amount >= (Number(t.amount) || 0) - 0.005;
@@ -2081,10 +2085,26 @@ export const Transactions: React.FC = () => {
                 <label className="mb-1 block text-sm font-semibold text-content-subtle">Pagar com a conta</label>
                 <select value={cardPayAccountId} onChange={e => setCardPayAccountId(e.target.value)} className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm">
                   <option value="">Selecione...</option>
-                  {accounts.filter(a => a.entityId === payingCardTx.entityId).map(a => (
-                    <option key={a.id} value={a.id}>{a.bankName}</option>
-                  ))}
+                  {entities.map(en => {
+                    const accs = accounts.filter(a => a.entityId === en.id);
+                    if (accs.length === 0) return null;
+                    return (
+                      <optgroup key={en.id} label={en.name}>
+                        {accs.map(a => (
+                          <option key={a.id} value={a.id}>{a.bankName}{en.id !== payingCardTx.entityId ? ` · ${en.name}` : ''}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
+                {(() => {
+                  const dAcc = accounts.find(a => a.id === cardPayAccountId);
+                  if (dAcc && dAcc.entityId !== payingCardTx.entityId) {
+                    const dName = entities.find(e => e.id === dAcc.entityId)?.name || 'outra entidade';
+                    return <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">A saída sairá da conta da <strong>{dName}</strong> (o limite do cartão é liberado normalmente).</p>;
+                  }
+                  return null;
+                })()}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
