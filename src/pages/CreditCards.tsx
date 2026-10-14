@@ -652,6 +652,30 @@ export const CreditCards: React.FC = () => {
           );
           const dueDate = nextDueDate(card.dueDay);
 
+          // Fatura ATRASADA: compras de ciclos JÁ FECHADOS (antes do ciclo aberto
+          // atual) ainda não pagas (settled). O vencimento desse ciclo já passou.
+          // Não conta duas vezes: faturas consolidadas (sem cardId) já caem em
+          // "Vencidas" normal; aqui só as compras itemizadas de cartão.
+          const cicloAbertoInicio = currentInvoiceWindow(card.closingDay).start;
+          const faturaAtrasada = round2(
+            (cardTransactions[card.id] || []).reduce((acc, t) => {
+              if (t.type !== 'expense' || t.cardId !== card.id) return acc;
+              if (t.status === 'cancelled' || t.settled) return acc;
+              const d = parseLocalDate(t.date);
+              if (Number.isNaN(d.getTime()) || d >= cicloAbertoInicio) return acc;
+              return acc + (Number(t.amount) || 0);
+            }, 0)
+          );
+          // Último vencimento que já passou (para mostrar "venceu dd/mm").
+          const ultimoVenc = (() => {
+            const hj = new Date();
+            const ultimoDia = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+            const mk = (y: number, m: number) => new Date(y, m, Math.min(card.dueDay, ultimoDia(y, m)));
+            let d = mk(hj.getFullYear(), hj.getMonth());
+            if (d.getTime() > hj.getTime()) d = mk(hj.getFullYear(), hj.getMonth() - 1);
+            return d;
+          })();
+
           const gradient = cardGradient(card.color);
           const fg = readableForeground(gradient.from);
           const fgMuted = mutedForeground(gradient.from);
@@ -769,6 +793,19 @@ export const CreditCards: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {faturaAtrasada > 0 && (
+                  <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <div className="leading-tight">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-rose-600">Fatura atrasada</p>
+                      <p className="text-xs font-bold text-rose-700">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(faturaAtrasada)}
+                        <span className="ml-1 font-medium text-rose-500">· venceu {ultimoVenc.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
