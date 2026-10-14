@@ -652,29 +652,34 @@ export const CreditCards: React.FC = () => {
           );
           const dueDate = nextDueDate(card.dueDay);
 
-          // Fatura ATRASADA: compras de ciclos JÁ FECHADOS (antes do ciclo aberto
-          // atual) ainda não pagas (settled). O vencimento desse ciclo já passou.
-          // Não conta duas vezes: faturas consolidadas (sem cardId) já caem em
-          // "Vencidas" normal; aqui só as compras itemizadas de cartão.
-          const cicloAbertoInicio = currentInvoiceWindow(card.closingDay).start;
+          // Fatura ATRASADA: compras no cartão, não pagas (settled), cuja fatura
+          // JÁ VENCEU (data de vencimento real anterior a hoje). Não conta duas
+          // vezes: faturas consolidadas (sem cardId) já caem em "Vencidas" normal.
+          const ultimoDiaMes = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+          // Data de vencimento da fatura em que uma compra (na data `d`) cai.
+          const vencimentoDaCompra = (d: Date) => {
+            const ciclo = currentInvoiceWindow(card.closingDay, d); // [start, end): end = fechamento
+            const fech = ciclo.end;
+            // Vencimento = dueDay no mês do fechamento (se dueDay > closingDay) ou no mês seguinte.
+            const addMes = card.dueDay > card.closingDay ? 0 : 1;
+            const y = fech.getFullYear();
+            const m = fech.getMonth() + addMes;
+            return new Date(y, m, Math.min(card.dueDay, ultimoDiaMes(y, (m % 12 + 12) % 12)));
+          };
+          const hoje0 = (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
+          let ultimoVenc: Date | null = null;
           const faturaAtrasada = round2(
             (cardTransactions[card.id] || []).reduce((acc, t) => {
               if (t.type !== 'expense' || t.cardId !== card.id) return acc;
               if (t.status === 'cancelled' || t.settled) return acc;
               const d = parseLocalDate(t.date);
-              if (Number.isNaN(d.getTime()) || d >= cicloAbertoInicio) return acc;
+              if (Number.isNaN(d.getTime())) return acc;
+              const venc = vencimentoDaCompra(d);
+              if (venc.getTime() >= hoje0.getTime()) return acc; // ainda não venceu
+              if (!ultimoVenc || venc.getTime() > ultimoVenc.getTime()) ultimoVenc = venc;
               return acc + (Number(t.amount) || 0);
             }, 0)
           );
-          // Último vencimento que já passou (para mostrar "venceu dd/mm").
-          const ultimoVenc = (() => {
-            const hj = new Date();
-            const ultimoDia = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-            const mk = (y: number, m: number) => new Date(y, m, Math.min(card.dueDay, ultimoDia(y, m)));
-            let d = mk(hj.getFullYear(), hj.getMonth());
-            if (d.getTime() > hj.getTime()) d = mk(hj.getFullYear(), hj.getMonth() - 1);
-            return d;
-          })();
 
           const gradient = cardGradient(card.color);
           const fg = readableForeground(gradient.from);
@@ -801,7 +806,7 @@ export const CreditCards: React.FC = () => {
                       <p className="text-[10px] font-black uppercase tracking-wider text-rose-600">Fatura atrasada</p>
                       <p className="text-xs font-bold text-rose-700">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(faturaAtrasada)}
-                        <span className="ml-1 font-medium text-rose-500">· venceu {ultimoVenc.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                        {ultimoVenc && <span className="ml-1 font-medium text-rose-500">· venceu {ultimoVenc.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>}
                       </p>
                     </div>
                   </div>
