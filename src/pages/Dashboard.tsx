@@ -156,6 +156,9 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
     let currentTransactions: Transaction[] = [];
     let currentCards: CreditCard[] = [];
     let currentDebts: Debt[] = [];
+    // Só tira o "carregando" quando os lançamentos de TODAS as entidades
+    // chegarem — senão o painel pisca tudo zerado por ~1s antes dos dados.
+    const loadedTx = new Set<string>();
 
     // Reinicia os orçamentos ao trocar de entidade/filtro (senão sobrava o do período anterior).
     setBudgetsByEntity({});
@@ -190,7 +193,13 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
         const entityT = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[];
         currentTransactions = [...currentTransactions.filter(t => t.entityId !== id), ...entityT];
         setTransactions([...currentTransactions]);
-      }, (error) => handleFirestoreError(error, OperationType.LIST, `entities/${id}/transactions`));
+        loadedTx.add(id);
+        if (loadedTx.size >= entityIds.length) setLoading(false);
+      }, (error) => {
+        loadedTx.add(id);
+        if (loadedTx.size >= entityIds.length) setLoading(false);
+        handleFirestoreError(error, OperationType.LIST, `entities/${id}/transactions`);
+      });
       unsubscribes.push(unsubT);
 
       // Budgets — guardados por entidade (agregados depois), com reset ao trocar filtro.
@@ -200,8 +209,9 @@ export const Dashboard: React.FC<{ onNavigate?: (page: string) => void }> = ({ o
       unsubscribes.push(unsubB);
     });
 
-    setLoading(false);
-    return () => unsubscribes.forEach(unsub => unsub());
+    // Fallback: nunca deixa o "carregando" travado se algum snapshot demorar/falhar.
+    const loadingFallback = setTimeout(() => setLoading(false), 6000);
+    return () => { clearTimeout(loadingFallback); unsubscribes.forEach(unsub => unsub()); };
   }, [entities, filterType]);
 
   // Derived Data
